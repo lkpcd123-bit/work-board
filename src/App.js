@@ -62,7 +62,7 @@ const CSS = `
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 
 .wb{
-  --grad:linear-gradient(135deg,#6E5AE6 0%,#9B5BD6 45%,#D14FA8 100%);
+  --grad:#F4F5F7;
   --col:#EBECF0; --card:#FFFFFF;
   --ink:#172B4D; --ink2:#44546F; --ink3:#626F86;
   --line:#DFE1E6; --line2:#C1C7D0;
@@ -84,25 +84,25 @@ const CSS = `
 .wb ::selection{background:#B3D4FF;}
 
 /* ── 상단 바 ── */
-.topbar{background:rgba(0,0,0,.28);backdrop-filter:blur(6px);padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-.brand{font-size:19px;font-weight:800;color:#fff;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
+.topbar{background:#fff;border-bottom:1px solid #DFE1E6;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.brand{font-size:19px;font-weight:800;color:var(--ink);letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
 .brand .logo{width:26px;height:26px;border-radius:6px;background:#fff;color:#6E5AE6;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;}
-.who{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.22);color:#fff;padding:6px 12px;border-radius:20px;font-size:13.5px;font-weight:600;}
-.who:hover{background:rgba(255,255,255,.32);}
+.who{display:inline-flex;align-items:center;gap:8px;background:#EBECF0;color:var(--ink2);padding:6px 12px;border-radius:20px;font-size:13.5px;font-weight:600;}
+.who:hover{background:#DFE1E6;}
 .who .av{width:24px;height:24px;border-radius:50%;background:#fff;color:#6E5AE6;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;}
 .who .role{font-size:11px;opacity:.85;font-weight:500;}
-.save{font-size:12.5px;color:rgba(255,255,255,.85);display:inline-flex;align-items:center;gap:6px;}
+.save{font-size:12.5px;color:var(--ink3);display:inline-flex;align-items:center;gap:6px;}
 .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.5);}
 .dot.on{background:#57D9A3;} .dot.err{background:#FF8F73;}
-.ghostw{background:rgba(255,255,255,.22);color:#fff;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;}
-.ghostw:hover{background:rgba(255,255,255,.32);}
+.ghostw{background:#EBECF0;color:var(--ink2);padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;}
+.ghostw:hover{background:#DFE1E6;}
 
 /* ── 탭 ── */
 .tabs{display:flex;gap:4px;padding:12px 20px 0;flex-wrap:wrap;}
-.tab{padding:8px 16px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;color:rgba(255,255,255,.82);}
-.tab:hover{background:rgba(255,255,255,.16);color:#fff;}
-.tab.sel{background:#F7F8F9;color:var(--ink);}
-.tab em{font-style:normal;font-size:12px;margin-left:6px;background:rgba(255,255,255,.28);padding:1px 7px;border-radius:10px;}
+.tab{padding:8px 16px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;color:var(--ink3);}
+.tab:hover{background:#DFE1E6;color:var(--ink);}
+.tab.sel{background:#fff;color:var(--ink);}
+.tab em{font-style:normal;font-size:12px;margin-left:6px;background:#DFE1E6;padding:1px 7px;border-radius:10px;}
 .tab.sel em{background:#DFE1E6;color:var(--ink2);}
 
 .page{background:#F7F8F9;border-radius:0 12px 12px 12px;margin:0 16px;padding:18px;min-height:60vh;}
