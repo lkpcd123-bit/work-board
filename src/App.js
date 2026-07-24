@@ -38,14 +38,14 @@ const REPEATS = [{ id:"none",label:"반복 없음" },{ id:"daily",label:"매일"
 const ROLES = [{ id:"admin",label:"관리자" },{ id:"member",label:"멤버" },{ id:"viewer",label:"뷰어" }];
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-const todayStr = () => new Date().toISOString().slice(0,10);
+const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const addDays=(ds,n)=>{const d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+const addDays=(ds,n)=>{const d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
 const weekOf=(ds)=>{const d=new Date(ds+"T00:00:00");const dow=d.getDay();const mon=dow===0?-6:1-dow;const start=addDays(ds,mon);return Array.from({length:7},(_,i)=>addDays(start,i));};
 const DOW=["월","화","수","목","금","토","일"];
-const monthGrid=(y,m)=>{const first=new Date(y,m,1);const startPad=first.getDay();const last=new Date(y,m+1,0).getDate();const cells=[];for(let i=0;i<startPad;i++)cells.push(null);for(let i=1;i<=last;i++){const mm=String(m+1).padStart(2,"0"),dd=String(i).padStart(2,"0");cells.push(`${y}-${mm}-${dd}`);}while(cells.length%7!==0)cells.push(null);return cells;};
+const monthGrid=(y,m)=>{const first=new Date(y,m,1);const startPad=(first.getDay()+6)%7;const last=new Date(y,m+1,0).getDate();const cells=[];for(let i=0;i<startPad;i++)cells.push(null);for(let i=1;i<=last;i++){const mm=String(m+1).padStart(2,"0"),dd=String(i).padStart(2,"0");cells.push(`${y}-${mm}-${dd}`);}while(cells.length%7!==0)cells.push(null);return cells;};
 const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
 const emptyData = () => ({ tasks:[],routines:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,log:[],updatedAt:0 });
 function mergeData(r,l) {
@@ -436,7 +436,7 @@ function Board() {
                   const deg=Math.round(rate*360);
                   return (
                     <button key={d} className={"wkday"+(isSel?" sel":"")} onClick={()=>setRDate(d)}>
-                      <span className="dw">{DOW[new Date(d+"T00:00:00").getDay()]}</span>
+                      <span className="dw">{DOW[(new Date(d+"T00:00:00").getDay()+6)%7]}</span>
                       <span className={"dn"+(isToday?" td":"")}>{Number(d.slice(8))}</span>
                       <span className="ring" style={{background:`conic-gradient(#1B4D3E ${deg}deg, #E4E7E2 ${deg}deg)`}}><i /></span>
                     </button>
