@@ -42,14 +42,20 @@ const todayStr = () => new Date().toISOString().slice(0,10);
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,log:[],updatedAt:0 });
+const addDays=(ds,n)=>{const d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+const weekOf=(ds)=>{const d=new Date(ds+"T00:00:00");const start=addDays(ds,-d.getDay());return Array.from({length:7},(_,i)=>addDays(start,i));};
+const DOW=["일","월","화","수","목","금","토"];
+const monthGrid=(y,m)=>{const first=new Date(y,m,1);const startPad=first.getDay();const last=new Date(y,m+1,0).getDate();const cells=[];for(let i=0;i<startPad;i++)cells.push(null);for(let i=1;i<=last;i++){const mm=String(m+1).padStart(2,"0"),dd=String(i).padStart(2,"0");cells.push(`${y}-${mm}-${dd}`);}while(cells.length%7!==0)cells.push(null);return cells;};
+const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
+const emptyData = () => ({ tasks:[],routines:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
+  const rm=new Map(); [...(r.routines||[]),...(l.routines||[])].forEach(t=>{const p=rm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))rm.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
+  return { tasks:[...map.values()],routines:[...rm.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
 }
 
 const CSS = `
@@ -68,6 +74,47 @@ const CSS = `
 .panel{background:var(--surface);border:1px solid var(--line);padding:18px;margin-bottom:14px;}.panel h3{font-size:14px;font-weight:800;margin-bottom:4px;}.sub{font-size:11.5px;color:var(--ink3);line-height:1.65;margin-bottom:14px;}.mrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);}
 .mask{position:fixed;inset:0;background:rgba(21,23,27,.45);display:flex;align-items:flex-start;justify-content:center;padding:34px 14px;overflow-y:auto;z-index:50;}.modal{background:var(--surface);border:1px solid var(--line2);width:100%;max-width:560px;padding:20px;}.modal.sm{max-width:400px;}.modal h2{font-size:17px;font-weight:800;margin-bottom:14px;}.fld{margin-bottom:11px;}.fld label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px;}.fld input,.fld select,.fld textarea{width:100%;background:#FBFCFA;border:1px solid var(--line2);padding:7px 9px;font-size:13px;color:var(--ink);}.fld textarea{resize:vertical;min-height:60px;line-height:1.5;}.r2{display:grid;grid-template-columns:1fr 1fr;gap:9px;}.r3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;}.mfoot{display:flex;gap:7px;align-items:center;margin-top:16px;padding-top:13px;border-top:1px solid var(--line);}.del{background:transparent;border:none;color:var(--danger);font-size:12px;padding:6px 0;}
 .sect{border-top:1px solid var(--line);margin-top:14px;padding-top:12px;}.sect h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px;font-weight:500;}.item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;}.item .x{background:transparent;border:none;color:var(--ink3);font-size:14px;padding:0 3px;line-height:1;}.item a{color:var(--sig);text-decoration:none;word-break:break-all;}.addrow{display:flex;gap:6px;margin-top:6px;}.addrow input{flex:1;background:#FBFCFA;border:1px solid var(--line2);padding:6px 8px;font-size:12.5px;}.addrow button{background:var(--ink);color:#fff;border:none;padding:6px 11px;font-size:12px;}.cmt{border-left:2px solid var(--line2);padding:4px 0 4px 9px;margin-bottom:8px;}.cmt .ch2{font-family:var(--mono);font-size:10px;color:var(--ink3);margin-bottom:3px;}.cmt p{font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;}.hint{font-size:11.5px;color:var(--ink3);}
+.rwrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start;}
+.wkstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.wkday{background:var(--surface);border:1px solid var(--line);padding:7px 2px 9px;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.wkday.sel{border-color:var(--sig);border-width:2px;padding:6px 1px 8px;}
+.wkday .dw{font-family:var(--mono);font-size:9.5px;color:var(--ink3);}
+.wkday .dn{font-family:var(--mono);font-size:14px;font-weight:600;line-height:1;}
+.wkday .dn.td{color:var(--sig);}
+.ring{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.ring i{width:10px;height:10px;border-radius:50%;background:var(--surface);display:block;}
+.rrow{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);padding:9px 11px;margin-bottom:6px;cursor:pointer;}
+.rrow.sel{border-color:var(--sig);border-left:3px solid var(--sig);padding-left:9px;}
+.rrow.on{background:#F5F8F4;}
+.rtitle{font-size:13px;font-weight:600;letter-spacing:-.015em;margin-bottom:3px;word-break:keep-all;}
+.rrow.on .rtitle{color:var(--ink2);}
+.rmeta{display:flex;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:10px;color:var(--ink3);}
+.rcheck{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line2);background:var(--surface);color:transparent;font-size:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.rcheck.on{background:var(--sig);border-color:var(--sig);color:#fff;}
+.rcheck:disabled{opacity:.4;cursor:default;}
+.rside{position:sticky;top:14px;}
+.rstats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:14px;}
+.rstat{background:#F8FAF7;padding:9px 11px;}
+.rstat .k{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:3px;}
+.rstat .v{font-family:var(--mono);font-size:17px;font-weight:600;line-height:1;}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.calhead span{font-family:var(--mono);font-size:12px;font-weight:600;}
+.calhead button{background:transparent;border:1px solid var(--line2);width:22px;height:22px;font-size:12px;color:var(--ink2);padding:0;line-height:1;}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cdw{font-family:var(--mono);font-size:9px;color:var(--ink3);text-align:center;padding-bottom:3px;}
+.ccell{aspect-ratio:1;border:1px solid var(--line);background:var(--surface);font-family:var(--mono);font-size:10.5px;color:var(--ink2);padding:0;display:flex;align-items:center;justify-content:center;}
+.ccell.mute{border:none;background:transparent;}
+.ccell.on{background:var(--sig);border-color:var(--sig);color:#fff;font-weight:600;}
+.ccell.td{outline:1px solid var(--warn);outline-offset:-2px;}
+.ccell.sel{border-color:var(--ink);border-width:2px;}
+.iss,.issrow{display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid var(--line);}
+.issrow{background:var(--surface);border:1px solid var(--line);padding:10px 12px;margin-bottom:6px;align-items:center;}
+.iss.done .isstext,.issrow.done .isstext{color:var(--ink3);text-decoration:line-through;}
+.issck{width:18px;height:18px;border:1.5px solid var(--line2);background:var(--surface);font-size:10px;color:var(--sig);flex-shrink:0;padding:0;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.iss.done .issck,.issrow.done .issck{background:#EFF2ED;}
+.isstext{font-size:12.5px;line-height:1.5;word-break:break-word;}
+.issmeta{font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:3px;}
+@media(max-width:900px){.rwrap{grid-template-columns:1fr;}.rside{position:static;}}
 .note{margin-top:26px;font-family:var(--mono);font-size:10.5px;color:var(--ink3);line-height:1.75;border-top:1px solid var(--line);padding-top:12px;}
 @media(max-width:1000px){.board{grid-template-columns:repeat(2,minmax(0,1fr));}.metrics{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:620px){.board{grid-template-columns:1fr;}.metrics{grid-template-columns:repeat(2,1fr));}.r3{grid-template-columns:1fr;}}
@@ -114,6 +161,11 @@ function Board() {
   const [nameInput, setNameInput] = useState("");
   const [confirmBox, setConfirmBox] = useState(null);
   const [newChannel, setNewChannel] = useState("");
+  const [rDate, setRDate] = useState(todayStr());
+  const [selR, setSelR] = useState(null);
+  const [rDraft, setRDraft] = useState(null);
+  const [issueText, setIssueText] = useState("");
+  const [issueFilter, setIssueFilter] = useState("open");
   const dataRef = useRef(data); dataRef.current = data;
   const busyRef = useRef(false);
   const importRef = useRef(null);
@@ -203,6 +255,65 @@ function Board() {
   const archiveDone=()=>{const targets=live.filter((t)=>t.status==="done");if(!targets.length){setConfirmBox(null);return;}const ids=new Set(targets.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.map((t)=>ids.has(t.id)?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("완료 일괄 보관",null,`${targets.length}건`)]);setConfirmBox(null);};
   const purgeArchive=()=>{const ids=new Set(archived.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.filter((t)=>!ids.has(t.id))}),[mkLog("보관함 영구 삭제",null,`${ids.size}건`)]);setConfirmBox(null);};
   const addChannel=()=>{const id=newChannel.trim();if(!id||dataRef.current.channels.some((c)=>c.id===id))return;commit((d)=>({...d,channels:[...d.channels,{id,color:"#7A8189"}],channelsUpdatedAt:Date.now()}),[mkLog("채널 추가",null,id)]);setNewChannel("");};
+  /* ── 반복 업무 ── */
+  const routines = useMemo(()=>(data.routines||[]).filter((r)=>!r.deleted),[data.routines]);
+  const routineById=(id)=>routines.find((r)=>r.id===id);
+
+  const saveRoutine=()=>{
+    if(!rDraft.title.trim())return;
+    const now=Date.now(); const isNew=rDraft._new; const clean={...rDraft}; delete clean._new;
+    commit((d)=>{const list=d.routines||[];const ex=list.some((r)=>r.id===clean.id);
+      const rec={...clean,checkins:clean.checkins||{},issues:clean.issues||[],createdAt:clean.createdAt||now,updatedAt:now,updatedBy:me};
+      return{...d,routines:ex?list.map((r)=>r.id===rec.id?rec:r):[...list,rec]};},
+      [{id:uid(),ts:now,who:me||"익명",taskId:clean.id,taskTitle:clean.title,action:isNew?"반복업무 생성":"반복업무 수정",detail:clean.when}]);
+    setRDraft(null);
+  };
+
+  const toggleCheck=(r,date)=>{
+    if(!canEdit)return;
+    const has=!!(r.checkins||{})[date];
+    commit((d)=>({...d,routines:(d.routines||[]).map((x)=>{
+      if(x.id!==r.id)return x;
+      const c={...(x.checkins||{})};
+      if(c[date])delete c[date]; else c[date]={by:me||"익명",ts:Date.now()};
+      return{...x,checkins:c,updatedAt:Date.now()};
+    })}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:r.id,taskTitle:r.title,action:has?"체크 해제":"체크 완료",detail:date}]);
+  };
+
+  const removeRoutine=(r)=>{
+    commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===r.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),
+      [{id:uid(),ts:Date.now(),who:me||"익명",taskId:r.id,taskTitle:r.title,action:"반복업무 삭제",detail:""}]);
+    setSelR(null); setRDraft(null);
+  };
+
+  const addIssue=(r,text)=>{
+    const t=text.trim(); if(!t)return;
+    const iss={id:uid(),text:t,author:me||"익명",ts:Date.now(),date:rDate,resolved:false};
+    commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===r.id?{...x,issues:[iss,...(x.issues||[])],updatedAt:Date.now()}:x)}),
+      [{id:uid(),ts:Date.now(),who:me||"익명",taskId:r.id,taskTitle:r.title,action:"이슈 등록",detail:t.slice(0,30)}]);
+    setIssueText("");
+  };
+
+  const toggleIssue=(rid,iid)=>{
+    commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id!==rid?x:{...x,issues:(x.issues||[]).map((i)=>i.id===iid?{...i,resolved:!i.resolved,resolvedBy:me}:i),updatedAt:Date.now()})}),[]);
+  };
+
+  const delIssue=(rid,iid)=>{
+    commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id!==rid?x:{...x,issues:(x.issues||[]).filter((i)=>i.id!==iid),updatedAt:Date.now()})}),[]);
+  };
+
+  const allIssues=useMemo(()=>{
+    const out=[];
+    routines.forEach((r)=>(r.issues||[]).forEach((i)=>out.push({...i,routineId:r.id,routineTitle:r.title,owner:r.owner})));
+    return out.sort((a,b)=>b.ts-a.ts);
+  },[routines]);
+
+  const week=useMemo(()=>weekOf(rDate),[rDate]);
+  const dayRate=useCallback((date)=>{
+    if(!routines.length)return 0;
+    return routines.filter((r)=>(r.checkins||{})[date]).length/routines.length;
+  },[routines]);
+
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
@@ -243,7 +354,7 @@ function Board() {
         </div>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"list",label:"목록",n:null},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"list",label:"목록",n:null},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -282,6 +393,189 @@ function Board() {
             </div>
           </div>
         );})}</div>
+      )}
+
+      {view==="routine"&&(()=>{
+        const sel=selR?routineById(selR):null;
+        const grouped={"오전":routines.filter((r)=>r.when==="오전"),"오후":routines.filter((r)=>r.when!=="오전")};
+        const doneToday=routines.filter((r)=>(r.checkins||{})[rDate]).length;
+        return (
+        <div className="rwrap">
+          <div>
+            <div className="panel" style={{padding:14,marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:800}}>반복 업무</div>
+                  <div style={{fontFamily:"monospace",fontSize:11,color:"#8F959C",marginTop:3}}>
+                    {rDate.replace(/-/g,".")} · 오늘 {doneToday}/{routines.length}
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button className="btn ghost" onClick={()=>setRDate(todayStr())}>오늘</button>
+                  {canEdit&&<button className="btn" onClick={()=>setRDraft({_new:true,id:uid(),title:"",when:"오전",owner:me,memo:"",checkins:{},issues:[]})}>+ 추가</button>}
+                </div>
+              </div>
+              <div className="wkstrip">
+                {week.map((d)=>{
+                  const rate=dayRate(d); const isSel=d===rDate; const isToday=d===todayStr();
+                  const deg=Math.round(rate*360);
+                  return (
+                    <button key={d} className={"wkday"+(isSel?" sel":"")} onClick={()=>setRDate(d)}>
+                      <span className="dw">{DOW[new Date(d+"T00:00:00").getDay()]}</span>
+                      <span className={"dn"+(isToday?" td":"")}>{Number(d.slice(8))}</span>
+                      <span className="ring" style={{background:`conic-gradient(#1B4D3E ${deg}deg, #E4E7E2 ${deg}deg)`}}><i /></span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {routines.length===0&&<div className="empty">반복 업무를 추가해 시작하세요</div>}
+            {["오전","오후"].map((slot)=>grouped[slot].length>0&&(
+              <div key={slot} style={{marginBottom:14}}>
+                <div style={{fontFamily:"monospace",fontSize:10,letterSpacing:".1em",color:"#8F959C",marginBottom:7}}>
+                  {slot} <span style={{color:"#C4C9C1"}}>{grouped[slot].length}</span>
+                </div>
+                {grouped[slot].map((r)=>{
+                  const ck=r.checkins||{}; const on=!!ck[rDate];
+                  const total=Object.keys(ck).length; const st=streakOf(ck,rDate);
+                  const openIss=(r.issues||[]).filter((i)=>!i.resolved).length;
+                  return (
+                    <div key={r.id} className={"rrow"+(on?" on":"")+(selR===r.id?" sel":"")} onClick={()=>setSelR(r.id)}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div className="rtitle">{r.title}</div>
+                        <div className="rmeta">
+                          <span>총 {total}일</span><span>연속 {st}일</span>
+                          {r.owner&&<span>· {r.owner}</span>}
+                          {openIss>0&&<span style={{color:"#B4342F",fontWeight:600}}>⚠ 이슈 {openIss}</span>}
+                          {on&&ck[rDate].by&&<span style={{color:"#1B4D3E"}}>✓ {ck[rDate].by}</span>}
+                        </div>
+                      </div>
+                      <button className={"rcheck"+(on?" on":"")} disabled={!canEdit}
+                        onClick={(e)=>{e.stopPropagation();toggleCheck(r,rDate);}}>{on?"✓":""}</button>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          <div className="rside">
+            {!sel&&<div className="panel" style={{textAlign:"center",padding:"36px 18px"}}>
+              <div style={{fontSize:20,marginBottom:8}}>↻</div>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:6}}>반복 업무를 선택하세요</div>
+              <div className="hint" style={{lineHeight:1.6}}>월간 체크 수, 총 체크 수, 비율과 연속 기록,<br/>담당자·비고·이슈가 여기에 표시됩니다.</div>
+            </div>}
+            {sel&&(()=>{
+              const ck=sel.checkins||{};
+              const y=Number(rDate.slice(0,4)),m=Number(rDate.slice(5,7))-1;
+              const cells=monthGrid(y,m);
+              const monthKeys=Object.keys(ck).filter((k)=>k.startsWith(rDate.slice(0,7)));
+              const daysInMonth=new Date(y,m+1,0).getDate();
+              const total=Object.keys(ck).length;
+              const st=streakOf(ck,rDate);
+              const openIss=(sel.issues||[]).filter((i)=>!i.resolved);
+              return (
+              <div className="panel">
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:14}}>
+                  <div>
+                    <div style={{fontSize:15,fontWeight:800,letterSpacing:"-.02em"}}>{sel.title}</div>
+                    <div style={{fontFamily:"monospace",fontSize:10.5,color:"#8F959C",marginTop:3}}>{sel.when} · 담당 {sel.owner||"미지정"}</div>
+                  </div>
+                  <button style={{background:"none",border:"none",fontSize:16,color:"#8F959C",cursor:"pointer"}} onClick={()=>setSelR(null)}>×</button>
+                </div>
+
+                <div className="rstats">
+                  <div className="rstat"><span className="k">월간 체크</span><span className="v">{monthKeys.length}일</span></div>
+                  <div className="rstat"><span className="k">총 체크</span><span className="v">{total}일</span></div>
+                  <div className="rstat"><span className="k">월 달성률</span><span className="v">{Math.round(monthKeys.length/daysInMonth*100)}%</span></div>
+                  <div className="rstat"><span className="k">연속</span><span className="v">{st}일</span></div>
+                </div>
+
+                <div className="calhead">
+                  <button onClick={()=>setRDate(addDays(rDate.slice(0,8)+"01",-1))}>‹</button>
+                  <span>{y}년 {m+1}월</span>
+                  <button onClick={()=>{const nd=new Date(y,m+1,1);setRDate(nd.toISOString().slice(0,10));}}>›</button>
+                </div>
+                <div className="cal">
+                  {DOW.map((d)=><span key={d} className="cdw">{d}</span>)}
+                  {cells.map((c,i)=>{
+                    if(!c)return <span key={i} className="ccell mute" />;
+                    const on=!!ck[c]; const isToday=c===todayStr(); const isSel=c===rDate;
+                    return <button key={i} className={"ccell"+(on?" on":"")+(isToday?" td":"")+(isSel?" sel":"")}
+                      title={on?`${ck[c].by} 체크`:""} onClick={()=>{setRDate(c);}}
+                      onDoubleClick={()=>toggleCheck(sel,c)}>{on?"✓":Number(c.slice(8))}</button>;
+                  })}
+                </div>
+                <div className="hint" style={{marginTop:6,fontSize:10.5}}>날짜를 더블클릭하면 체크가 토글됩니다.</div>
+
+                <div className="sect"><h4>담당자</h4>
+                  <input list="wb-owners" disabled={!canEdit} value={sel.owner||""}
+                    onChange={(e)=>{const v=e.target.value;commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,owner:v,updatedAt:Date.now()}:x)}),[]);}}
+                    placeholder="담당자 이름" style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13}} />
+                </div>
+
+                <div className="sect"><h4>비고 · 메모</h4>
+                  <textarea disabled={!canEdit} value={sel.memo||""} placeholder="이 반복 업무에 대한 참고 사항, 절차, 확인 포인트"
+                    onChange={(e)=>{const v=e.target.value;setData((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,memo:v}:x)}));}}
+                    onBlur={(e)=>{const v=e.target.value;commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,memo:v,updatedAt:Date.now()}:x)}),[]);}}
+                    style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13,minHeight:70,lineHeight:1.5,resize:"vertical"}} />
+                </div>
+
+                <div className="sect"><h4>이슈{openIss.length>0&&` · 미해결 ${openIss.length}`}</h4>
+                  {(sel.issues||[]).length===0&&<span className="hint">등록된 이슈가 없습니다</span>}
+                  {(sel.issues||[]).map((i)=>(
+                    <div key={i.id} className={"iss"+(i.resolved?" done":"")}>
+                      <button className="issck" onClick={()=>toggleIssue(sel.id,i.id)}>{i.resolved?"✓":""}</button>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div className="isstext">{i.text}</div>
+                        <div className="issmeta">{i.author} · {fmtTs(i.ts)}{i.date&&` · ${i.date.slice(5)}`}</div>
+                      </div>
+                      {canEdit&&<button style={{background:"none",border:"none",color:"#8F959C",cursor:"pointer"}} onClick={()=>delIssue(sel.id,i.id)}>×</button>}
+                    </div>
+                  ))}
+                  <div className="addrow"><input placeholder="이슈 입력 후 Enter" value={issueText}
+                    onChange={(e)=>setIssueText(e.target.value)}
+                    onKeyDown={(e)=>{if(e.key==="Enter")addIssue(sel,issueText);}} /></div>
+                </div>
+
+                <div className="mfoot">
+                  {isAdmin&&<button className="del" onClick={()=>removeRoutine(sel)}>삭제</button>}
+                  <span className="spacer" />
+                  {canEdit&&<button className="btn ghost" onClick={()=>setRDraft({...sel})}>수정</button>}
+                </div>
+              </div>
+              );
+            })()}
+          </div>
+        </div>
+        );})()}
+
+      {view==="issue"&&(
+        <div>
+          <div className="panel"><h3>이슈 모아보기</h3>
+            <p className="sub">반복 업무에서 등록된 이슈가 전부 모입니다. 체크하면 해결 처리됩니다.</p>
+            <div style={{display:"flex",gap:7}}>
+              {[{id:"open",label:`미해결 ${allIssues.filter((i)=>!i.resolved).length}`},{id:"done",label:`해결 ${allIssues.filter((i)=>i.resolved).length}`},{id:"all",label:`전체 ${allIssues.length}`}].map((f)=>(
+                <button key={f.id} className={"chip"+(issueFilter===f.id?" sel":"")} onClick={()=>setIssueFilter(f.id)}>{f.label}</button>
+              ))}
+            </div>
+          </div>
+          {(()=>{
+            const list=allIssues.filter((i)=>issueFilter==="all"?true:issueFilter==="open"?!i.resolved:i.resolved);
+            if(!list.length)return <div className="empty">해당하는 이슈가 없습니다</div>;
+            return list.map((i)=>(
+              <div key={i.id} className={"issrow"+(i.resolved?" done":"")}>
+                <button className="issck" onClick={()=>toggleIssue(i.routineId,i.id)}>{i.resolved?"✓":""}</button>
+                <div style={{flex:1,minWidth:0}}>
+                  <div className="isstext">{i.text}</div>
+                  <div className="issmeta">{i.routineTitle} · {i.author} · {fmtTs(i.ts)}{i.owner&&` · 담당 ${i.owner}`}</div>
+                </div>
+                <button className="btn ghost" onClick={()=>{setView("routine");setSelR(i.routineId);}}>이동</button>
+              </div>
+            ));
+          })()}
+        </div>
       )}
 
       {view==="list"&&(
@@ -361,6 +655,24 @@ function Board() {
         <div className="mask"><div className="modal sm"><h2>이름을 알려주세요</h2><p className="hint" style={{lineHeight:1.6,marginBottom:14}}>담당자, 댓글, 변경 이력에 이 이름이 남습니다.</p>
           <div className="fld"><label>이름</label><input autoFocus value={nameInput} onChange={(e)=>setNameInput(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&saveMe(nameInput)} placeholder="예) 김현민" /></div>
           <div className="mfoot"><span className="spacer" />{me&&<button className="btn ghost" onClick={()=>setAskName(false)}>취소</button>}<button className="btn" onClick={()=>saveMe(nameInput)}>시작하기</button></div>
+        </div></div>
+      )}
+
+      {rDraft&&(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setRDraft(null)}><div className="modal sm">
+          <h2>{rDraft._new?"새 반복 업무":"반복 업무 수정"}</h2>
+          <div className="fld"><label>업무명</label><input autoFocus value={rDraft.title} onChange={(e)=>setRDraft({...rDraft,title:e.target.value})} placeholder="예) 쿠팡 전 상품 가격·아이템위너 확인" /></div>
+          <div className="r2">
+            <div className="fld"><label>시간대</label><select value={rDraft.when} onChange={(e)=>setRDraft({...rDraft,when:e.target.value})}><option value="오전">오전</option><option value="오후">오후</option></select></div>
+            <div className="fld"><label>담당자</label><input list="wb-owners" value={rDraft.owner||""} onChange={(e)=>setRDraft({...rDraft,owner:e.target.value})} placeholder="이름" /></div>
+          </div>
+          <div className="fld"><label>비고 · 메모</label><textarea value={rDraft.memo||""} onChange={(e)=>setRDraft({...rDraft,memo:e.target.value})} placeholder="확인 절차, 기준값, 참고 링크" /></div>
+          <div className="mfoot">
+            {!rDraft._new&&isAdmin&&<button className="del" onClick={()=>removeRoutine(rDraft)}>삭제</button>}
+            <span className="spacer" />
+            <button className="btn ghost" onClick={()=>setRDraft(null)}>취소</button>
+            <button className="btn" onClick={saveRoutine} disabled={!rDraft.title.trim()}>저장</button>
+          </div>
         </div></div>
       )}
 
