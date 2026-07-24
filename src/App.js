@@ -272,12 +272,13 @@ function Board() {
   const toggleCheck=(r,date)=>{
     if(!canEdit)return;
     const has=!!(r.checkins||{})[date];
+    const now=Date.now();
     commit((d)=>({...d,routines:(d.routines||[]).map((x)=>{
       if(x.id!==r.id)return x;
       const c={...(x.checkins||{})};
-      if(c[date])delete c[date]; else c[date]={by:me||"익명",ts:Date.now()};
-      return{...x,checkins:c,updatedAt:Date.now()};
-    })}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:r.id,taskTitle:r.title,action:has?"체크 해제":"체크 완료",detail:date}]);
+      if(has)delete c[date]; else c[date]={by:me||"익명",ts:now};
+      return{...x,checkins:c,updatedAt:now,updatedBy:me};
+    })}),[{id:uid(),ts:now,who:me||"익명",taskId:r.id,taskTitle:r.title,action:has?"체크 해제":"체크 완료",detail:date}]);
   };
 
   const removeRoutine=(r)=>{
@@ -510,15 +511,14 @@ function Board() {
                 <div className="hint" style={{marginTop:6,fontSize:10.5}}>날짜를 더블클릭하면 체크가 토글됩니다.</div>
 
                 <div className="sect"><h4>담당자</h4>
-                  <input list="wb-owners" disabled={!canEdit} value={sel.owner||""}
-                    onChange={(e)=>{const v=e.target.value;commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,owner:v,updatedAt:Date.now()}:x)}),[]);}}
+                  <input list="wb-owners" disabled={!canEdit} defaultValue={sel.owner||""}
+                    onBlur={(e)=>{const v=e.target.value.trim();if(v===(sel.owner||""))return;commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,owner:v,updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("담당자 변경",sel,v)]);}}
                     placeholder="담당자 이름" style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13}} />
                 </div>
 
                 <div className="sect"><h4>비고 · 메모</h4>
-                  <textarea disabled={!canEdit} value={sel.memo||""} placeholder="이 반복 업무에 대한 참고 사항, 절차, 확인 포인트"
-                    onChange={(e)=>{const v=e.target.value;setData((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,memo:v}:x)}));}}
-                    onBlur={(e)=>{const v=e.target.value;commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,memo:v,updatedAt:Date.now()}:x)}),[]);}}
+                  <textarea disabled={!canEdit} defaultValue={sel.memo||""} placeholder="이 반복 업무에 대한 참고 사항, 절차, 확인 포인트"
+                    onBlur={(e)=>{const v=e.target.value;if(v===(sel.memo||""))return;commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,memo:v,updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("메모 수정",sel,"")]);}}
                     style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13,minHeight:70,lineHeight:1.5,resize:"vertical"}} />
                 </div>
 
