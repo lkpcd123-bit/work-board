@@ -269,7 +269,52 @@ const CSS = `
 `;
 
 /* ══════════════════════════════════════════════ */
-export default function App() {
+const PASSWORD = "shakebaby2024"; // 비밀번호 여기서 변경
+
+export default function WorkBoard() {
+  const [auth, setAuth] = useState(() => sessionStorage.getItem("wb-auth") === "1");
+  const [pwInput, setPwInput] = useState("");
+
+  if (!auth) {
+    const tryLogin = (val) => {
+      if (val === PASSWORD) {
+        sessionStorage.setItem("wb-auth", "1");
+        setAuth(true);
+      } else {
+        alert("비밀번호가 틀렸습니다.");
+        setPwInput("");
+      }
+    };
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", minHeight: "100vh", background: "#EDEFEC",
+        fontFamily: "sans-serif", gap: 12
+      }}>
+        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em" }}>업무 보드</div>
+        <div style={{ fontSize: 13, color: "#8F959C", marginBottom: 8 }}>비밀번호를 입력하세요</div>
+        <input
+          type="password" autoFocus value={pwInput}
+          onChange={(e) => setPwInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && tryLogin(e.target.value)}
+          placeholder="비밀번호"
+          style={{
+            padding: "10px 14px", fontSize: 14,
+            border: "1px solid #C4C9C1", width: 240, outline: "none"
+          }}
+        />
+        <button
+          onClick={() => tryLogin(pwInput)}
+          style={{
+            background: "#1B4D3E", color: "#fff", border: "none",
+            padding: "10px 24px", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", width: 240
+          }}
+        >입장</button>
+      </div>
+    );
+  }
+
   const [data, setData] = useState(emptyData());
   const [me, setMe] = useState("");
   const [ready, setReady] = useState(false);
