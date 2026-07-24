@@ -399,11 +399,6 @@ function Board() {
   const inChannel=useCallback((tc,fc)=>tc===fc||parentOf(tc)===fc,[parentOf]);
 
   const applyFilters=useCallback((list)=>{
-    /* 채널 계층 */
-    const parentOf=useCallback((id)=>(data.channels.find((c)=>c.id===id)||{}).parent||null,[data.channels]);
-    const topChannels=useMemo(()=>data.channels.filter((c)=>!c.parent),[data.channels]);
-    const subsOf=useCallback((pid)=>data.channels.filter((c)=>c.parent===pid),[data.channels]);
-    const inChannel=useCallback((taskCh,filterCh)=>taskCh===filterCh||parentOf(taskCh)===filterCh,[parentOf]);
     const kw=q.trim().toLowerCase();
     return list.filter((t)=>{
       if(fCh!=="전체"&&!inChannel(t.channel,fCh))return false;
