@@ -638,7 +638,7 @@ function Board() {
               <span className="spacer" />{isAdmin&&data.channels.length>1&&<button className="del" onClick={()=>commit((d)=>({...d,channels:d.channels.filter((x)=>x.id!==c.id),channelsUpdatedAt:Date.now()}),[mkLog("채널 삭제",null,c.id)])}>삭제</button>}
             </div>
           ))}
-          {isAdmin&&<div className="addrow"><input placeholder="채널명 (예: 무신사)" value={newChannel} onChange={(e)=>setNewChannel(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&addChannel()} /><button onClick={addChannel}>추가</button></div>}
+          {isAdmin&&<div className="addrow"><input placeholder="채널명 (예: 무신사)" value={newChannel} onChange={(e)=>setNewChannel(e.target.value)} onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addChannel();}} /><button onClick={addChannel}>추가</button></div>}
         </div>
         <div className="panel"><h3>백업</h3><p className="sub">주기적으로 내려받아 두세요.</p>
           <div style={{display:"flex",gap:7}}>
@@ -653,7 +653,7 @@ function Board() {
 
       {askName&&(
         <div className="mask"><div className="modal sm"><h2>이름을 알려주세요</h2><p className="hint" style={{lineHeight:1.6,marginBottom:14}}>담당자, 댓글, 변경 이력에 이 이름이 남습니다.</p>
-          <div className="fld"><label>이름</label><input autoFocus value={nameInput} onChange={(e)=>setNameInput(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&saveMe(nameInput)} placeholder="예) 김현민" /></div>
+          <div className="fld"><label>이름</label><input autoFocus value={nameInput} onChange={(e)=>setNameInput(e.target.value)} onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;saveMe(nameInput);}} placeholder="예) 김현민" /></div>
           <div className="mfoot"><span className="spacer" />{me&&<button className="btn ghost" onClick={()=>setAskName(false)}>취소</button>}<button className="btn" onClick={()=>saveMe(nameInput)}>시작하기</button></div>
         </div></div>
       )}
