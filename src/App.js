@@ -536,7 +536,7 @@ function Board() {
                   ))}
                   <div className="addrow"><input placeholder="이슈 입력 후 Enter" value={issueText}
                     onChange={(e)=>setIssueText(e.target.value)}
-                    onKeyDown={(e)=>{if(e.key==="Enter")addIssue(sel,issueText);}} /></div>
+                    onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addIssue(sel,issueText);}} /></div>
                 </div>
 
                 <div className="mfoot">
@@ -693,7 +693,23 @@ function Board() {
             <div className="fld"><label>업무 유형</label><select disabled={!canEdit} value={draft.type} onChange={(e)=>setDraft({...draft,type:e.target.value})}>{TYPES.map((t)=><option key={t} value={t}>{t}</option>)}</select></div>
           </div>
           <div className="r2">
-            <div className="fld"><label>담당자</label><input list="wb-owners" disabled={!canEdit} value={draft.owner} onChange={(e)=>setDraft({...draft,owner:e.target.value})} placeholder="이름" /><datalist id="wb-owners">{[...new Set([...owners,...data.members.map((m)=>m.name)])].map((o)=><option key={o} value={o} />)}</datalist></div>
+            <div className="fld"><label>담당자</label>
+              <input list="wb-owners" value={draft.owner} onChange={(e)=>setDraft({...draft,owner:e.target.value})} placeholder="이름 직접 입력 또는 목록 선택" style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13}} />
+              <datalist id="wb-owners">
+                {[...new Set([...owners,...data.members.map((m)=>m.name),me].filter(Boolean))].map((o)=><option key={o} value={o} />)}
+              </datalist>
+              <div style={{fontSize:10.5,color:"#8F959C",marginTop:4,fontFamily:"monospace"}}>직접 입력하거나 아래 목록에서 선택하세요</div>
+              {data.members.length>0&&(
+                <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:6}}>
+                  {[...new Set([...data.members.map((m)=>m.name),me].filter(Boolean))].map((n)=>(
+                    <button key={n} type="button" onClick={()=>setDraft({...draft,owner:n})}
+                      style={{background:draft.owner===n?"#1B4D3E":"#EFF2ED",color:draft.owner===n?"#fff":"#565C64",border:"1px solid #DBDFD9",padding:"4px 10px",fontSize:12,cursor:"pointer",fontFamily:"sans-serif"}}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="fld"><label>마감일</label><input type="date" disabled={!canEdit} value={draft.due} onChange={(e)=>setDraft({...draft,due:e.target.value})} /></div>
           </div>
           <div className="r3">
@@ -704,22 +720,22 @@ function Board() {
           <div className="fld"><label>메모</label><textarea disabled={!canEdit} value={draft.memo} onChange={(e)=>setDraft({...draft,memo:e.target.value})} placeholder="진행 상황, 공급사 회신, 참고 수치" /></div>
           <div className="sect"><h4>태그</h4>
             <div className="ctags">{(draft.tags||[]).map((g)=><span key={g} className="tag">{g}{canEdit&&<button className="x" style={{fontSize:11,marginLeft:3,border:"none",cursor:"pointer",background:"none"}} onClick={()=>setDraft({...draft,tags:draft.tags.filter((x)=>x!==g)})}>x</button>}</span>)}{!(draft.tags||[]).length&&<span className="hint">없음</span>}</div>
-            {canEdit&&<div className="addrow"><input placeholder="태그 입력 후 Enter" onKeyDown={(e)=>{const v=e.target.value.trim();if(e.key==="Enter"&&v&&!(draft.tags||[]).includes(v)){setDraft({...draft,tags:[...(draft.tags||[]),v]});e.target.value="";}}} /></div>}
+            {canEdit&&<div className="addrow"><input placeholder="태그 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v&&!(draft.tags||[]).includes(v)){setDraft({...draft,tags:[...(draft.tags||[]),v]});e.target.value="";}}} /></div>}
           </div>
           <div className="sect"><h4>세부 단계{(draft.checklist||[]).length>0&&` (${draft.checklist.filter((c)=>c.done).length}/${draft.checklist.length})`}</h4>
             {(draft.checklist||[]).map((c)=><div key={c.id} className="item"><input type="checkbox" checked={c.done} disabled={!canEdit} style={{width:"auto"}} onChange={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,done:!x.done}:x)})} /><span style={{flex:1,textDecoration:c.done?"line-through":"none",color:c.done?"#8F959C":"inherit"}}>{c.text}</span>{canEdit&&<button style={{background:"none",border:"none",cursor:"pointer",color:"#8F959C"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.filter((x)=>x.id!==c.id)})}>x</button>}</div>)}
             {!(draft.checklist||[]).length&&<span className="hint">없음</span>}
-            {canEdit&&<div className="addrow"><input placeholder="단계 입력 후 Enter" onKeyDown={(e)=>{const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:[...(draft.checklist||[]),{id:uid(),text:v,done:false}]});e.target.value="";}}} /></div>}
+            {canEdit&&<div className="addrow"><input placeholder="단계 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:[...(draft.checklist||[]),{id:uid(),text:v,done:false}]});e.target.value="";}}} /></div>}
           </div>
           <div className="sect"><h4>링크 첨부</h4>
             {(draft.links||[]).map((l)=><div key={l.id} className="item"><span>🔗</span><a href={l.url} target="_blank" rel="noreferrer" style={{flex:1}}>{l.label||l.url}</a>{canEdit&&<button style={{background:"none",border:"none",cursor:"pointer",color:"#8F959C"}} onClick={()=>setDraft({...draft,links:draft.links.filter((x)=>x.id!==l.id)})}>x</button>}</div>)}
             {!(draft.links||[]).length&&<span className="hint">없음</span>}
-            {canEdit&&<div className="addrow"><input placeholder="링크 붙여넣고 Enter" onKeyDown={(e)=>{const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,links:[...(draft.links||[]),{id:uid(),url:v,label:""}]});e.target.value="";}}} /></div>}
+            {canEdit&&<div className="addrow"><input placeholder="링크 붙여넣고 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,links:[...(draft.links||[]),{id:uid(),url:v,label:""}]});e.target.value="";}}} /></div>}
           </div>
           <div className="sect"><h4>댓글{(draft.comments||[]).length>0&&` (${draft.comments.length})`}</h4>
             {(draft.comments||[]).map((c)=><div key={c.id} className="cmt"><div className="ch2"><b>{c.author}</b> · {fmtTs(c.ts)}</div><p>{c.text}</p></div>)}
             {!(draft.comments||[]).length&&<span className="hint">없음</span>}
-            <div className="addrow"><input placeholder="댓글 입력 후 Enter" onKeyDown={(e)=>{const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,comments:[...(draft.comments||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}}} /></div>
+            <div className="addrow"><input placeholder="댓글 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,comments:[...(draft.comments||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}}} /></div>
           </div>
           {!draft._new&&(
             <div className="sect"><h4>이 업무의 이력</h4>
