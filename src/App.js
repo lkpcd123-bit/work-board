@@ -43,8 +43,8 @@ const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Dat
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
 const addDays=(ds,n)=>{const d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
-const weekOf=(ds)=>{const d=new Date(ds+"T00:00:00");const start=addDays(ds,-d.getDay());return Array.from({length:7},(_,i)=>addDays(start,i));};
-const DOW=["일","월","화","수","목","금","토"];
+const weekOf=(ds)=>{const d=new Date(ds+"T00:00:00");const dow=d.getDay();const mon=dow===0?-6:1-dow;const start=addDays(ds,mon);return Array.from({length:7},(_,i)=>addDays(start,i));};
+const DOW=["월","화","수","목","금","토","일"];
 const monthGrid=(y,m)=>{const first=new Date(y,m,1);const startPad=first.getDay();const last=new Date(y,m+1,0).getDate();const cells=[];for(let i=0;i<startPad;i++)cells.push(null);for(let i=1;i<=last;i++){const mm=String(m+1).padStart(2,"0"),dd=String(i).padStart(2,"0");cells.push(`${y}-${mm}-${dd}`);}while(cells.length%7!==0)cells.push(null);return cells;};
 const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
 const emptyData = () => ({ tasks:[],routines:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,log:[],updatedAt:0 });
@@ -77,7 +77,8 @@ const CSS = `
 .rwrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start;}
 .wkstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
 .wkday{background:var(--surface);border:1px solid var(--line);padding:7px 2px 9px;display:flex;flex-direction:column;align-items:center;gap:4px;}
-.wkday.sel{border-color:var(--sig);border-width:2px;padding:6px 1px 8px;}
+.wkday.sel{border-color:var(--sig);border-width:2px;padding:6px 1px 8px;background:#E8F2EE;}
+.wkday .dn.td{color:var(--sig);font-weight:800;font-size:16px;}
 .wkday .dw{font-family:var(--mono);font-size:9.5px;color:var(--ink3);}
 .wkday .dn{font-family:var(--mono);font-size:14px;font-weight:600;line-height:1;}
 .wkday .dn.td{color:var(--sig);}
@@ -201,7 +202,7 @@ function Board() {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
       const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote}:emptyData();
-      const next=mutator(mergeData(base,dataRef.current));
+      const next=mergeData(base,dataRef.current);
       if(logEntries&&logEntries.length)next.log=[...logEntries,...(next.log||[])].slice(0,LOG_CAP);
       next.updatedAt=Date.now();
       await setDoc(BOARD_REF(),next); setData(next); setSaveState("saved"); setTimeout(()=>setSaveState("idle"),1500);
