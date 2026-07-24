@@ -168,6 +168,7 @@ function Board() {
   const [issueFilter, setIssueFilter] = useState("open");
   const dataRef = useRef(data); dataRef.current = data;
   const busyRef = useRef(false);
+  const addingRef = useRef(false);
   const importRef = useRef(null);
 
   const myRole = useMemo(() => { const m=data.members.find((x)=>x.name===me); if(m)return m.role; return data.members.length===0?"admin":"member"; }, [data.members, me]);
@@ -254,7 +255,19 @@ function Board() {
   const setArchivedFlag=(task,flag)=>commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,archived:flag,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog(flag?"아카이브":"아카이브 해제",task)]);
   const archiveDone=()=>{const targets=live.filter((t)=>t.status==="done");if(!targets.length){setConfirmBox(null);return;}const ids=new Set(targets.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.map((t)=>ids.has(t.id)?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("완료 일괄 보관",null,`${targets.length}건`)]);setConfirmBox(null);};
   const purgeArchive=()=>{const ids=new Set(archived.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.filter((t)=>!ids.has(t.id))}),[mkLog("보관함 영구 삭제",null,`${ids.size}건`)]);setConfirmBox(null);};
-  const addChannel=()=>{const id=newChannel.trim();if(!id||dataRef.current.channels.some((c)=>c.id===id))return;commit((d)=>({...d,channels:[...d.channels,{id,color:"#7A8189"}],channelsUpdatedAt:Date.now()}),[mkLog("채널 추가",null,id)]);setNewChannel("");};
+  const addChannel=()=>{
+    if(addingRef.current)return;
+    const id=newChannel.trim();
+    if(!id)return;
+    if((dataRef.current.channels||[]).some((c)=>c.id===id)){alert("이미 있는 채널명입니다.");return;}
+    addingRef.current=true;
+    setNewChannel("");
+    commit((d)=>{
+      if((d.channels||[]).some((c)=>c.id===id))return d;
+      return{...d,channels:[...d.channels,{id,color:"#7A8189"}],channelsUpdatedAt:Date.now()};
+    },[mkLog("채널 추가",null,id)]);
+    setTimeout(()=>{addingRef.current=false;},600);
+  };
   /* ── 반복 업무 ── */
   const routines = useMemo(()=>(data.routines||[]).filter((r)=>!r.deleted),[data.routines]);
   const routineById=(id)=>routines.find((r)=>r.id===id);
@@ -655,10 +668,9 @@ function Board() {
           {isAdmin&&(
             <div className="addrow" style={{marginTop:10}}>
               <input
-                placeholder="채널명 (예: 무신사)"
+                placeholder="채널명 입력 후 추가 버튼 클릭"
                 value={newChannel}
                 onChange={(e)=>setNewChannel(e.target.value)}
-                onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addChannel();}}
               />
               <button onClick={()=>addChannel()}>추가</button>
             </div>
