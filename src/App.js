@@ -461,7 +461,42 @@ function Board() {
         <div className="legend">{dist.length===0?<span className="leg" style={{color:"#8F959C"}}>미완료 없음</span>:dist.map((c)=><span key={c.id} className="leg"><b style={{background:c.color}} />{c.id} {c.n}</span>)}</div>
         <div className="tools">
           <input className="inp" placeholder="검색" value={q} onChange={(e)=>setQ(e.target.value)} style={{width:120}} />
-          <button className={"chip"+(fCh==="전체"?" sel":"")} onClick={()=>setFCh("전체")}>전체</button>
+          {(()=>{
+            const curParent=data.channels.find((c)=>c.id===fCh)?.parent||null;
+            const inSub=!!curParent||(fCh!=="전체"&&subsOf(fCh).length>0&&false)||data.channels.some((c)=>c.id===fCh&&c.parent);
+            const activePid=inSub?curParent:(fCh!=="전체"&&subsOf(fCh).length>0?null:null);
+
+            if(fCh!=="전체"&&data.channels.find((c)=>c.id===fCh)?.parent){
+              const pid=data.channels.find((c)=>c.id===fCh).parent;
+              const par=data.channels.find((c)=>c.id===pid);
+              return <>
+                <button className="chip sel" onClick={()=>setFCh(pid)} style={{background:"var(--ink2)",borderColor:"var(--ink2)"}}>
+                  ← {pid}
+                </button>
+                <button className={"chip"+(fCh===pid?" sel":"")} onClick={()=>setFCh(pid)}>
+                  <b style={{background:par?.color||"#7A8189"}} />전체
+                </button>
+                {subsOf(pid).map((k)=>(
+                  <button key={k.id} className={"chip"+(fCh===k.id?" sel":"")} onClick={()=>setFCh(k.id)}>
+                    <b style={{background:k.color}} />{k.id}
+                  </button>
+                ))}
+              </>;
+            }
+
+            const tops=data.channels.filter((c)=>!c.parent);
+            return <>
+              <button className={"chip"+(fCh==="전체"?" sel":"")} onClick={()=>setFCh("전체")}>전체</button>
+              {tops.map((c)=>{
+                const hasSubs=subsOf(c.id).length>0;
+                return (
+                  <button key={c.id} className={"chip"+(fCh===c.id?" sel":"")} onClick={()=>setFCh(c.id)}>
+                    <b style={{background:c.color}} />{c.id}{hasSubs&&<span style={{fontSize:9,opacity:.6,marginLeft:2}}>▶</span>}
+                  </button>
+                );
+              })}
+            </>;
+          })()}
           {topChannels.map((c)=>{
             const kids=subsOf(c.id);
             const active=fCh===c.id||kids.some((k)=>k.id===fCh);
