@@ -69,6 +69,13 @@ const CSS = `
 .tools{display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--line2);}.inp,.sel{background:var(--surface);border:1px solid var(--line2);color:var(--ink);padding:6px 9px;font-size:12.5px;border-radius:0;}.inp::placeholder{color:var(--ink3);}.chip{background:transparent;border:1px solid var(--line2);color:var(--ink2);padding:5px 10px;font-size:12px;display:inline-flex;align-items:center;gap:6px;}.chip b{width:7px;height:7px;border-radius:1px;}.chip.sel{background:var(--ink);color:#fff;border-color:var(--ink);}.chip.tog.sel{background:var(--sig);border-color:var(--sig);}.btn{background:var(--sig);color:#fff;border:none;padding:7px 14px;font-size:12.5px;font-weight:600;}.btn:disabled{opacity:.4;cursor:default;}.btn.ghost{background:transparent;color:var(--ink2);border:1px solid var(--line2);font-weight:500;}.btn.warn{background:var(--danger);}
 .board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start;}.colhead{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:7px;margin-bottom:9px;border-bottom:2px solid var(--ink);}.colhead span{font-size:13px;font-weight:700;}.colhead em{font-family:var(--mono);font-style:normal;font-size:11.5px;color:var(--ink3);}.colbody{display:flex;flex-direction:column;gap:7px;min-height:70px;padding:2px;}.colbody.over{background:#E2E8DF;outline:1px dashed var(--sig);}
 .card{position:relative;background:var(--surface);border:1px solid var(--line);padding:10px 11px 9px 14px;cursor:pointer;}.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--ch);}.card.late{border-color:#E3B3B0;}.card.drag{opacity:.35;}.cmeta{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-family:var(--mono);font-size:10px;color:var(--ink3);flex-wrap:wrap;}.cmeta .ch{color:var(--ch);font-weight:600;}.ctitle{font-size:13.5px;font-weight:600;line-height:1.4;margin-bottom:7px;word-break:keep-all;}.card.done .ctitle{color:var(--ink3);text-decoration:line-through;}.ctags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px;}.tag{font-family:var(--mono);font-size:9.5px;background:#EFF2ED;border:1px solid var(--line);padding:1px 5px;color:var(--ink2);display:inline-flex;align-items:center;}.cbar{height:3px;background:#E9ECE7;margin-bottom:7px;}.cbar i{display:block;height:100%;background:var(--sig);}.cfoot{display:flex;align-items:center;justify-content:space-between;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--ink2);}.due.late{color:var(--danger);font-weight:600;}.due.soon{color:var(--warn);font-weight:600;}.pri{font-family:var(--mono);font-size:9.5px;border:1px solid var(--line2);padding:1px 5px;color:var(--ink2);}.pri.high{border-color:var(--danger);color:var(--danger);}.icons{display:inline-flex;gap:6px;color:var(--ink3);font-family:var(--mono);font-size:9.5px;}.empty{border:1px dashed var(--line2);padding:13px 10px;text-align:center;font-size:11.5px;color:var(--ink3);}
+.prow{display:flex;align-items:center;gap:10px;}
+.ppct{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--sig);min-width:56px;letter-spacing:-.02em;}
+.prange{flex:1;-webkit-appearance:none;appearance:none;height:5px;background:#E4E7E2;outline:none;border-radius:3px;}
+.prange::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--sig);cursor:pointer;}
+.prange::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--sig);cursor:pointer;}
+.pbadge{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line2);padding:3px 9px;color:var(--ink2);white-space:nowrap;}
+.pticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:var(--ink3);margin-top:3px;padding-left:66px;}
 .tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);font-size:12.5px;}.tbl th{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;color:var(--ink3);text-align:left;padding:9px 10px;border-bottom:1px solid var(--line2);font-weight:500;}.tbl td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}.tbl tr:last-child td{border-bottom:none;}.tbl tr.cl:hover{background:#F6F8F4;cursor:pointer;}.m{font-family:var(--mono);font-size:11.5px;color:var(--ink2);white-space:nowrap;}.chdot{display:inline-flex;align-items:center;gap:6px;}.chdot b{width:8px;height:8px;border-radius:1px;}
 .logrow{display:grid;grid-template-columns:118px 78px 1fr;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12.5px;}.logrow .t{font-family:var(--mono);font-size:10.5px;color:var(--ink3);}.logrow .w{font-family:var(--mono);font-size:10.5px;color:var(--ink2);font-weight:500;}
 .panel{background:var(--surface);border:1px solid var(--line);padding:18px;margin-bottom:14px;}.panel h3{font-size:14px;font-weight:800;margin-bottom:4px;}.sub{font-size:11.5px;color:var(--ink3);line-height:1.65;margin-bottom:14px;}.mrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);}
@@ -236,8 +243,19 @@ function Board() {
   const distTotal=dist.reduce((s,c)=>s+c.n,0);
 
   const saveMe=async(name)=>{const n=name.trim();if(!n)return;setMe(n);setAskName(false);try{localStorage.setItem(ME_KEY,n);}catch(e){}if(!dataRef.current.members.find((m)=>m.name===n)){const role=dataRef.current.members.length===0?"admin":"member";commit((d)=>({...d,members:[...d.members,{name:n,role,updatedAt:Date.now()}]}),[{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:"팀 합류",detail:ROLES.find((r)=>r.id===role).label}]);}};
-  const openNew=(status)=>setDraft({_new:true,id:uid(),title:"",channel:data.channels[0]?.id||"공통",type:"채널운영",owner:me,due:"",priority:"mid",memo:"",status:status||"todo",tags:[],checklist:[],links:[],comments:[],repeat:"none",archived:false,deleted:false});
+  const openNew=(status)=>setDraft({_new:true,id:uid(),title:"",channel:data.channels[0]?.id||"공통",type:"채널운영",owner:me,due:"",priority:"mid",memo:"",progress:0,status:status||"todo",tags:[],checklist:[],links:[],comments:[],repeat:"none",archived:false,deleted:false}); 
   const openTask=(t)=>setDraft({...t,tags:[...(t.tags||[])],checklist:[...(t.checklist||[])],links:[...(t.links||[])],comments:[...(t.comments||[])]});
+
+  const duplicateTask=(t)=>{
+    const now=Date.now();
+    const copy={...t,id:uid(),title:t.title+" (복사)",status:"todo",progress:0,comments:[],
+      checklist:(t.checklist||[]).map((c)=>({...c,id:uid(),done:false})),
+      links:(t.links||[]).map((l)=>({...l,id:uid()})),
+      createdAt:now,createdBy:me,updatedAt:now,doneAt:null,archived:false,deleted:false};
+    delete copy._new;
+    commit((d)=>({...d,tasks:[copy,...d.tasks]}),[mkLog("업무 복사",copy,`원본: ${t.title}`)]);
+    setDraft(null);
+  };
 
   const saveDraft=()=>{
     if(!draft.title.trim())return;
@@ -343,7 +361,10 @@ function Board() {
         <div className="cmeta"><span className="ch">{t.channel}</span><span>·</span><span>{t.type}</span>{t.repeat&&t.repeat!=="none"&&<><span>·</span><span>↻{REPEATS.find((r)=>r.id===t.repeat)?.label}</span></>}</div>
         <p className="ctitle">{t.title}</p>
         {!!(t.tags||[]).length&&<div className="ctags">{t.tags.map((g)=><span key={g} className="tag">{g}</span>)}</div>}
-        {ck.length>0&&<div className="cbar"><i style={{width:(ckDone/ck.length)*100+"%"}} /></div>}
+        {(t.progress>0||ck.length>0)&&(()=>{
+          const pct=t.progress!=null&&t.progress>0?t.progress:(ck.length?Math.round(ckDone/ck.length*100):0);
+          return <div className="cbar" title={`진행률 ${pct}%`}><i style={{width:pct+"%"}} /></div>;
+        })()}
         <div className="cfoot">
           <span>{t.owner||"미지정"}{t.due&&<>{" "}<span className={"due"+(late?" late":soon?" soon":"")}>{t.due.slice(5)}{late?` +${Math.abs(d)}d`:""}</span></>}</span>
           <span style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -754,6 +775,18 @@ function Board() {
             <div className="fld"><label>상태</label><select disabled={!canEdit} value={draft.status} onChange={(e)=>setDraft({...draft,status:e.target.value})}>{COLUMNS.map((c)=><option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
             <div className="fld"><label>반복</label><select disabled={!canEdit} value={draft.repeat} onChange={(e)=>setDraft({...draft,repeat:e.target.value})}>{REPEATS.map((r)=><option key={r.id} value={r.id}>{r.label}</option>)}</select></div>
           </div>
+          <div className="fld">
+            <label>진행률</label>
+            <div className="prow">
+              <span className="ppct">{draft.progress||0}%</span>
+              <input type="range" min="0" max="100" step="5" disabled={!canEdit}
+                value={draft.progress||0}
+                onChange={(e)=>{const v=Number(e.target.value);setDraft({...draft,progress:v,status:v===100?"done":draft.status==="done"&&v<100?"doing":draft.status});}}
+                className="prange" />
+              <span className="pbadge">{COLUMNS.find((c)=>c.id===draft.status)?.label}</span>
+            </div>
+            <div className="pticks"><span>0</span><span>50</span><span>100</span></div>
+          </div>
           <div className="fld"><label>메모</label><textarea disabled={!canEdit} value={draft.memo} onChange={(e)=>setDraft({...draft,memo:e.target.value})} placeholder="진행 상황, 공급사 회신, 참고 수치" /></div>
           <div className="sect"><h4>태그</h4>
             <div className="ctags">{(draft.tags||[]).map((g)=><span key={g} className="tag">{g}{canEdit&&<button className="x" style={{fontSize:11,marginLeft:3,border:"none",cursor:"pointer",background:"none"}} onClick={()=>setDraft({...draft,tags:draft.tags.filter((x)=>x!==g)})}>x</button>}</span>)}{!(draft.tags||[]).length&&<span className="hint">없음</span>}</div>
@@ -782,6 +815,7 @@ function Board() {
           )}
           <div className="mfoot">
             {!draft._new&&isAdmin&&<button className="del" onClick={()=>removeTask(draft)}>삭제</button>}
+            {!draft._new&&canEdit&&<button className="btn ghost" onClick={()=>duplicateTask(draft)}>복사</button>}
             {!draft._new&&canEdit&&!draft.archived&&<button className="btn ghost" onClick={()=>{setArchivedFlag(draft,true);setDraft(null);}}>보관</button>}
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setDraft(null)}>닫기</button>
