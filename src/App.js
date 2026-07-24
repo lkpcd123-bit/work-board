@@ -629,16 +629,40 @@ function Board() {
             </div>
           ))}
         </div>
-        <div className="panel"><h3>판매 채널</h3><p className="sub">채널이 늘면 여기서 추가하세요.</p>
+        <div className="panel"><h3>판매 채널</h3><p className="sub">채널이 늘면 여기서 추가하세요. 이름 클릭 후 수정 가능합니다.</p>
           {data.channels.map((c,i)=>(
             <div key={c.id} className="mrow" style={{borderTop:"1px solid var(--line)"}}>
               <input type="color" value={c.color} disabled={!isAdmin} style={{width:34,height:26,padding:0,border:"1px solid #C4C9C1"}} onChange={(e)=>{const color=e.target.value;commit((d)=>({...d,channels:d.channels.map((x,j)=>j===i?{...x,color}:x),channelsUpdatedAt:Date.now()}),[]);}} />
-              <span style={{fontSize:13,fontWeight:600}}>{c.id}</span>
+              <input
+                defaultValue={c.id} disabled={!isAdmin}
+                onBlur={(e)=>{
+                  const newId=e.target.value.trim();
+                  if(!newId||newId===c.id)return;
+                  commit((d)=>({
+                    ...d,
+                    channels:d.channels.map((x,j)=>j===i?{...x,id:newId}:x),
+                    tasks:d.tasks.map((t)=>t.channel===c.id?{...t,channel:newId}:t),
+                    routines:(d.routines||[]).map((r)=>r.channel===c.id?{...r,channel:newId}:r),
+                    channelsUpdatedAt:Date.now()
+                  }),[mkLog("채널 이름 변경",null,`${c.id} → ${newId}`)]);
+                }}
+                style={{fontSize:13,fontWeight:600,border:"none",background:"transparent",width:100,padding:"2px 4px",borderBottom:isAdmin?"1px dashed #C4C9C1":"none"}}
+              />
               <span style={{fontSize:11,color:"#8F959C",fontFamily:"monospace"}}>{data.tasks.filter((t)=>!t.deleted&&t.channel===c.id).length}건</span>
               <span className="spacer" />{isAdmin&&data.channels.length>1&&<button className="del" onClick={()=>commit((d)=>({...d,channels:d.channels.filter((x)=>x.id!==c.id),channelsUpdatedAt:Date.now()}),[mkLog("채널 삭제",null,c.id)])}>삭제</button>}
             </div>
           ))}
-          {isAdmin&&<div className="addrow"><input placeholder="채널명 (예: 무신사)" value={newChannel} onChange={(e)=>setNewChannel(e.target.value)} onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addChannel();}} /><button onClick={addChannel}>추가</button></div>}
+          {isAdmin&&(
+            <div className="addrow" style={{marginTop:10}}>
+              <input
+                placeholder="채널명 (예: 무신사)"
+                value={newChannel}
+                onChange={(e)=>setNewChannel(e.target.value)}
+                onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addChannel();}}
+              />
+              <button onClick={()=>addChannel()}>추가</button>
+            </div>
+          )}
         </div>
         <div className="panel"><h3>백업</h3><p className="sub">주기적으로 내려받아 두세요.</p>
           <div style={{display:"flex",gap:7}}>
