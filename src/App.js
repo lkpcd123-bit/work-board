@@ -940,7 +940,7 @@ function Board() {
       </>)}
 
       </div>
-      <div className="note" style={{margin:"18px 16px 0",color:"rgba(255,255,255,.8)",borderTopColor:"rgba(255,255,255,.25)"}}>데이터는 Firebase(구글)에 실시간 저장됩니다. 계약 조건이나 개인정보는 올리지 마세요.</div>
+      <div className="note" style={{margin:"18px 16px 0"}}>데이터는 Firebase(구글)에 실시간 저장됩니다. 계약 조건이나 개인정보는 올리지 마세요.</div>
 
       {askName&&(
         <div className="mask"><div className="modal sm"><h2>이름을 알려주세요</h2><p className="hint" style={{lineHeight:1.6,marginBottom:14}}>담당자, 댓글, 변경 이력에 이 이름이 남습니다.</p>
