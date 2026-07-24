@@ -60,7 +60,7 @@ function mergeData(r,l) {
 
 const CSS = `
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
-.wb{--bg:#EDEFEC;--surface:#fff;--ink:#15171B;--ink2:#565C64;--ink3:#8F959C;--line:#DBDFD9;--line2:#C4C9C1;--sig:#1B4D3E;--danger:#B4342F;--warn:#A8690E;--sans:'Pretendard',-apple-system,system-ui,sans-serif;--mono:ui-monospace,monospace;background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding:20px 18px 60px;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+.wb{--bg:#E9ECE7;--surface:#fff;--ink:#0E1013;--ink2:#3C424A;--ink3:#646A72;--line:#CDD3CA;--line2:#A9B0A6;--sig:#14453A;--danger:#A32B27;--warn:#8A5408;--sans:'Pretendard',-apple-system,system-ui,sans-serif;--mono:ui-monospace,monospace;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;min-height:100vh;padding:20px 18px 60px;box-sizing:border-box;}
 .wb *,.wb *::before,.wb *::after{box-sizing:border-box;}.wb button{font-family:inherit;cursor:pointer;}.wb input,.wb select,.wb textarea{font-family:inherit;}.wb p,.wb h1,.wb h2,.wb h3,.wb h4{margin:0;}.spacer{flex:1;}
 .top{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px;}.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px;}.title{font-size:26px;font-weight:800;letter-spacing:-.035em;line-height:1;}.topright{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.save{font-family:var(--mono);font-size:11px;color:var(--ink3);display:inline-flex;align-items:center;gap:6px;}.dot{width:6px;height:6px;border-radius:50%;background:var(--line2);}.dot.on{background:var(--sig);}.dot.err{background:var(--danger);}.who{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);border:1px solid var(--line2);padding:5px 10px;background:var(--surface);}.who b{font-weight:700;color:var(--ink);}.role{font-family:var(--mono);font-size:9.5px;color:var(--ink3);}
 .tabs{display:flex;border-bottom:2px solid var(--ink);margin-bottom:16px;flex-wrap:wrap;}.tab{background:transparent;border:none;padding:8px 14px;font-size:13px;font-weight:600;color:var(--ink3);}.tab.sel{background:var(--ink);color:#fff;}.tab em{font-family:var(--mono);font-style:normal;font-size:10.5px;opacity:.7;margin-left:5px;}
@@ -124,6 +124,52 @@ const CSS = `
 .issmeta{font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:3px;}
 @media(max-width:900px){.rwrap{grid-template-columns:1fr;}.rside{position:static;}}
 .note{margin-top:26px;font-family:var(--mono);font-size:10.5px;color:var(--ink3);line-height:1.75;border-top:1px solid var(--line);padding-top:12px;}
+/* ── 가독성 보정 ── */
+.eyebrow{font-size:11px;letter-spacing:.14em;color:var(--ink2);}
+.k{font-size:11px!important;letter-spacing:.06em!important;color:var(--ink2)!important;}
+.v{font-size:25px!important;}
+.tab{font-size:14px;color:var(--ink2);}
+.leg{font-size:12px;color:var(--ink2);}
+.cmeta{font-size:11px;color:var(--ink2);}
+.ctitle{font-size:14px;line-height:1.45;}
+.cfoot{font-size:11.5px;color:var(--ink2);}
+.pri{font-size:10.5px;letter-spacing:.04em;}
+.icons{font-size:10.5px;color:var(--ink2);}
+.tag{font-size:11px;color:var(--ink2);}
+.tbl{font-size:13.5px;}
+.tbl th{font-size:11px;letter-spacing:.06em;color:var(--ink2);}
+.m{font-size:12.5px;color:var(--ink2);}
+.chip{font-size:13px;}
+.btn{font-size:13.5px;}
+.inp,.sel{font-size:13.5px;}
+.fld label{font-size:11px;letter-spacing:.06em;color:var(--ink2);}
+.fld input,.fld select,.fld textarea{font-size:14px;}
+.sect h4{font-size:11px;letter-spacing:.06em;color:var(--ink2);}
+.hint{font-size:12.5px;color:var(--ink2);}
+.sub{font-size:12.5px;color:var(--ink2);line-height:1.7;}
+.note{font-size:11.5px;color:var(--ink2);}
+.subrow{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;background:#DFE4DC;padding:4px 8px;border:1px solid var(--line2);}
+.subarrow{font-family:var(--mono);font-size:12px;color:var(--ink2);}
+.chip.sub{font-size:12px;padding:3px 9px;background:var(--surface);}
+.chip.sub.sel{background:var(--sig);color:#fff;border-color:var(--sig);}
+.rtitle{font-size:14px;}
+.rmeta{font-size:11px;color:var(--ink2);}
+.rstat .k{font-size:10.5px!important;}
+.rstat .v{font-size:19px!important;}
+.wkday .dw{font-size:11px;color:var(--ink2);}
+.wkday .dn{font-size:16px;}
+.cdw{font-size:10.5px;color:var(--ink2);}
+.ccell{font-size:11.5px;}
+.isstext{font-size:13.5px;}
+.issmeta{font-size:11px;color:var(--ink2);}
+.logrow{font-size:13.5px;}
+.logrow .t,.logrow .w{font-size:11.5px;}
+.colhead span{font-size:14px;}
+.colhead em{font-size:12.5px;color:var(--ink2);}
+.panel h3{font-size:15px;}
+.modal h2{font-size:18px;}
+.title{font-size:28px;}
+.empty{font-size:12.5px;color:var(--ink2);}
 @media(max-width:1000px){.board{grid-template-columns:repeat(2,minmax(0,1fr));}.metrics{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:620px){.board{grid-template-columns:1fr;}.metrics{grid-template-columns:repeat(2,1fr));}.r3{grid-template-columns:1fr;}}
 `;
@@ -169,6 +215,8 @@ function Board() {
   const [nameInput, setNameInput] = useState("");
   const [confirmBox, setConfirmBox] = useState(null);
   const [newChannel, setNewChannel] = useState("");
+  const [newSub, setNewSub] = useState("");
+  const [subTarget, setSubTarget] = useState(null);
   const [rDate, setRDate] = useState(todayStr());
   const [selR, setSelR] = useState(null);
   const [rDraft, setRDraft] = useState(null);
@@ -224,9 +272,14 @@ function Board() {
   const allTags=useMemo(()=>[...new Set(data.tasks.filter((t)=>!t.deleted).flatMap((t)=>t.tags||[]))].sort(),[data.tasks]);
 
   const applyFilters=useCallback((list)=>{
+    /* 채널 계층 */
+    const parentOf=useCallback((id)=>(data.channels.find((c)=>c.id===id)||{}).parent||null,[data.channels]);
+    const topChannels=useMemo(()=>data.channels.filter((c)=>!c.parent),[data.channels]);
+    const subsOf=useCallback((pid)=>data.channels.filter((c)=>c.parent===pid),[data.channels]);
+    const inChannel=useCallback((taskCh,filterCh)=>taskCh===filterCh||parentOf(taskCh)===filterCh,[parentOf]);
     const kw=q.trim().toLowerCase();
     return list.filter((t)=>{
-      if(fCh!=="전체"&&t.channel!==fCh)return false;
+      if(fCh!=="전체"&&!inChannel(t.channel,fCh))return false;
       if(fOwner!=="전체"&&t.owner!==fOwner)return false;
       if(fTag!=="전체"&&!(t.tags||[]).includes(fTag))return false;
       if(onlyMine&&t.owner!==me)return false;
@@ -234,12 +287,12 @@ function Board() {
       if(kw){const h=`${t.title} ${t.memo||""} ${t.type} ${t.owner||""} ${(t.tags||[]).join(" ")}`.toLowerCase();if(!h.includes(kw))return false;}
       return true;
     });
-  },[q,fCh,fOwner,fTag,onlyMine,onlyLate,me]);
+  },[q,fCh,fOwner,fTag,onlyMine,onlyLate,me,inChannel]);
 
   const sortFn=useCallback((a,b)=>{ if(sortBy==="due"){if(!a.due&&!b.due)return 0;if(!a.due)return 1;if(!b.due)return -1;return a.due<b.due?-1:1;} if(sortBy==="pri"){const r=(t)=>PRIORITIES.find((p)=>p.id===t.priority)?.rank??1;return r(a)-r(b);} return(b.updatedAt||0)-(a.updatedAt||0); },[sortBy]);
   const visible=useMemo(()=>applyFilters(live).slice().sort(sortFn),[live,applyFilters,sortFn]);
   const stats=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return{total:live.length,doing:live.filter((t)=>t.status==="doing").length,week:o.filter((t)=>{const d=dayDiff(t.due);return d!==null&&d>=0&&d<=7;}).length,late:o.filter((t)=>{const d=dayDiff(t.due);return d!==null&&d<0;}).length,mine:o.filter((t)=>t.owner===me).length};},[live,me]);
-  const dist=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return data.channels.map((c)=>({...c,n:o.filter((t)=>t.channel===c.id).length})).filter((c)=>c.n>0);},[live,data.channels]);
+  const dist=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return data.channels.filter((c)=>!c.parent).map((c)=>({...c,n:o.filter((t)=>t.channel===c.id||(data.channels.find((x)=>x.id===t.channel)||{}).parent===c.id).length})).filter((c)=>c.n>0);},[live,data.channels]);
   const distTotal=dist.reduce((s,c)=>s+c.n,0);
 
   const saveMe=async(name)=>{const n=name.trim();if(!n)return;setMe(n);setAskName(false);try{localStorage.setItem(ME_KEY,n);}catch(e){}if(!dataRef.current.members.find((m)=>m.name===n)){const role=dataRef.current.members.length===0?"admin":"member";commit((d)=>({...d,members:[...d.members,{name:n,role,updatedAt:Date.now()}]}),[{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:"팀 합류",detail:ROLES.find((r)=>r.id===role).label}]);}};
@@ -274,17 +327,18 @@ function Board() {
   const setArchivedFlag=(task,flag)=>commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,archived:flag,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog(flag?"아카이브":"아카이브 해제",task)]);
   const archiveDone=()=>{const targets=live.filter((t)=>t.status==="done");if(!targets.length){setConfirmBox(null);return;}const ids=new Set(targets.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.map((t)=>ids.has(t.id)?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("완료 일괄 보관",null,`${targets.length}건`)]);setConfirmBox(null);};
   const purgeArchive=()=>{const ids=new Set(archived.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.filter((t)=>!ids.has(t.id))}),[mkLog("보관함 영구 삭제",null,`${ids.size}건`)]);setConfirmBox(null);};
-  const addChannel=()=>{
+  const addChannel=(parent)=>{
     if(addingRef.current)return;
-    const id=newChannel.trim();
+    const id=(parent?newSub:newChannel).trim();
     if(!id)return;
     if((dataRef.current.channels||[]).some((c)=>c.id===id)){alert("이미 있는 채널명입니다.");return;}
     addingRef.current=true;
-    setNewChannel("");
+    if(parent){setNewSub("");setSubTarget(null);}else{setNewChannel("");}
+    const pc=parent?(dataRef.current.channels.find((c)=>c.id===parent)||{}).color:null;
     commit((d)=>{
       if((d.channels||[]).some((c)=>c.id===id))return d;
-      return{...d,channels:[...d.channels,{id,color:"#7A8189"}],channelsUpdatedAt:Date.now()};
-    },[mkLog("채널 추가",null,id)]);
+      return{...d,channels:[...d.channels,{id,color:pc||"#7A8189",parent:parent||null}],channelsUpdatedAt:Date.now()};
+    },[mkLog(parent?"하위 채널 추가":"채널 추가",null,parent?`${parent} > ${id}`:id)]);
     setTimeout(()=>{addingRef.current=false;},600);
   };
   /* ── 반복 업무 ── */
@@ -408,8 +462,26 @@ function Board() {
         <div className="tools">
           <input className="inp" placeholder="검색" value={q} onChange={(e)=>setQ(e.target.value)} style={{width:120}} />
           <button className={"chip"+(fCh==="전체"?" sel":"")} onClick={()=>setFCh("전체")}>전체</button>
-          {data.channels.map((c)=><button key={c.id} className={"chip"+(fCh===c.id?" sel":"")} onClick={()=>setFCh(c.id)}><b style={{background:c.color}} />{c.id}</button>)}
+          {topChannels.map((c)=>{
+            const kids=subsOf(c.id);
+            const active=fCh===c.id||kids.some((k)=>k.id===fCh);
+            return <button key={c.id} className={"chip"+(active?" sel":"")} onClick={()=>setFCh(c.id)}>
+              <b style={{background:c.color}} />{c.id}{kids.length>0&&<span style={{opacity:.55,fontSize:10}}>▾{kids.length}</span>}
+            </button>;
+          })}
           <select className="sel" value={fOwner} onChange={(e)=>setFOwner(e.target.value)}><option value="전체">담당자 전체</option>{owners.map((o)=><option key={o} value={o}>{o}</option>)}</select>
+          {(()=>{
+            const pid=fCh==="전체"?null:(parentOf(fCh)||fCh);
+            const kids=pid?subsOf(pid):[];
+            if(!kids.length)return null;
+            return <span className="subrow">
+              <span className="subarrow">└</span>
+              <button className={"chip sub"+(fCh===pid?" sel":"")} onClick={()=>setFCh(pid)}>전체</button>
+              {kids.map((k)=><button key={k.id} className={"chip sub"+(fCh===k.id?" sel":"")} onClick={()=>setFCh(k.id)}>
+                <b style={{background:k.color}} />{k.id}
+              </button>)}
+            </span>;
+          })()}
           {allTags.length>0&&<select className="sel" value={fTag} onChange={(e)=>setFTag(e.target.value)}><option value="전체">태그 전체</option>{allTags.map((g)=><option key={g} value={g}>{g}</option>)}</select>}
           <button className={"chip tog"+(onlyMine?" sel":"")} onClick={()=>setOnlyMine((v)=>!v)}>내 업무</button>
           <button className={"chip tog"+(onlyLate?" sel":"")} onClick={()=>setOnlyLate((v)=>!v)}>지연만</button>
@@ -664,40 +736,61 @@ function Board() {
             </div>
           ))}
         </div>
-        <div className="panel"><h3>판매 채널</h3><p className="sub">채널이 늘면 여기서 추가하세요. 이름 클릭 후 수정 가능합니다.</p>
-          {data.channels.map((c,i)=>(
-            <div key={c.id} className="mrow" style={{borderTop:"1px solid var(--line)"}}>
-              <input type="color" value={c.color} disabled={!isAdmin} style={{width:34,height:26,padding:0,border:"1px solid #C4C9C1"}} onChange={(e)=>{const color=e.target.value;commit((d)=>({...d,channels:d.channels.map((x,j)=>j===i?{...x,color}:x),channelsUpdatedAt:Date.now()}),[]);}} />
-              <input
-                defaultValue={c.id} disabled={!isAdmin}
-                onBlur={(e)=>{
-                  const newId=e.target.value.trim();
-                  if(!newId||newId===c.id)return;
-                  commit((d)=>({
-                    ...d,
-                    channels:d.channels.map((x,j)=>j===i?{...x,id:newId}:x),
-                    tasks:d.tasks.map((t)=>t.channel===c.id?{...t,channel:newId}:t),
-                    routines:(d.routines||[]).map((r)=>r.channel===c.id?{...r,channel:newId}:r),
-                    channelsUpdatedAt:Date.now()
-                  }),[mkLog("채널 이름 변경",null,`${c.id} → ${newId}`)]);
-                }}
-                style={{fontSize:13,fontWeight:600,border:"none",background:"transparent",width:100,padding:"2px 4px",borderBottom:isAdmin?"1px dashed #C4C9C1":"none"}}
-              />
-              <span style={{fontSize:11,color:"#8F959C",fontFamily:"monospace"}}>{data.tasks.filter((t)=>!t.deleted&&t.channel===c.id).length}건</span>
-              <span className="spacer" />{isAdmin&&data.channels.length>1&&<button className="del" onClick={()=>commit((d)=>({...d,channels:d.channels.filter((x)=>x.id!==c.id),channelsUpdatedAt:Date.now()}),[mkLog("채널 삭제",null,c.id)])}>삭제</button>}
+        
+        <div className="panel"><h3>판매 채널</h3><p className="sub">상위 채널 아래에 하위 채널을 넣을 수 있습니다. 이름을 클릭하면 수정됩니다.</p>
+          {topChannels.map((c)=>{
+            const i=data.channels.findIndex((x)=>x.id===c.id);
+            const kids=subsOf(c.id);
+            const cnt=(id)=>data.tasks.filter((t)=>!t.deleted&&t.channel===id).length;
+            return (
+            <div key={c.id} style={{borderTop:"1px solid var(--line)",paddingTop:4,marginTop:4}}>
+              <div className="mrow" style={{borderTop:"none"}}>
+                <input type="color" value={c.color} disabled={!isAdmin} style={{width:34,height:26,padding:0,border:"1px solid #A9B0A6"}}
+                  onChange={(e)=>{const color=e.target.value;commit((d)=>({...d,channels:d.channels.map((x,j)=>j===i?{...x,color}:x),channelsUpdatedAt:Date.now()}),[]);}} />
+                <input defaultValue={c.id} disabled={!isAdmin}
+                  onBlur={(e)=>{const newId=e.target.value.trim();if(!newId||newId===c.id)return;
+                    commit((d)=>({...d,
+                      channels:d.channels.map((x)=>x.id===c.id?{...x,id:newId}:(x.parent===c.id?{...x,parent:newId}:x)),
+                      tasks:d.tasks.map((t)=>t.channel===c.id?{...t,channel:newId}:t),
+                      channelsUpdatedAt:Date.now()}),[mkLog("채널 이름 변경",null,`${c.id} → ${newId}`)]);}}
+                  style={{fontSize:14,fontWeight:700,border:"none",background:"transparent",width:120,padding:"2px 4px",borderBottom:isAdmin?"1px dashed #A9B0A6":"none"}} />
+                <span style={{fontSize:11,color:"var(--ink2)",fontFamily:"monospace"}}>{cnt(c.id)}건</span>
+                <span className="spacer" />
+                {isAdmin&&<button className="btn ghost" style={{padding:"3px 9px",fontSize:11.5}} onClick={()=>setSubTarget(c.id)}>+ 하위</button>}
+                {isAdmin&&topChannels.length>1&&<button className="del" onClick={()=>commit((d)=>({...d,channels:d.channels.filter((x)=>x.id!==c.id&&x.parent!==c.id),channelsUpdatedAt:Date.now()}),[mkLog("채널 삭제",null,c.id)])}>삭제</button>}
+              </div>
+              {kids.map((k)=>(
+                <div key={k.id} className="mrow" style={{borderTop:"none",paddingLeft:22,paddingTop:3,paddingBottom:3}}>
+                  <span style={{color:"var(--ink2)",fontSize:12}}>└</span>
+                  <input type="color" value={k.color} disabled={!isAdmin} style={{width:26,height:20,padding:0,border:"1px solid #A9B0A6"}}
+                    onChange={(e)=>{const color=e.target.value;commit((d)=>({...d,channels:d.channels.map((x)=>x.id===k.id?{...x,color}:x),channelsUpdatedAt:Date.now()}),[]);}} />
+                  <input defaultValue={k.id} disabled={!isAdmin}
+                    onBlur={(e)=>{const newId=e.target.value.trim();if(!newId||newId===k.id)return;
+                      commit((d)=>({...d,
+                        channels:d.channels.map((x)=>x.id===k.id?{...x,id:newId}:x),
+                        tasks:d.tasks.map((t)=>t.channel===k.id?{...t,channel:newId}:t),
+                        channelsUpdatedAt:Date.now()}),[mkLog("하위 채널 이름 변경",null,`${k.id} → ${newId}`)]);}}
+                    style={{fontSize:13,border:"none",background:"transparent",width:110,padding:"2px 4px",borderBottom:isAdmin?"1px dashed #CDD3CA":"none"}} />
+                  <span style={{fontSize:11,color:"var(--ink2)",fontFamily:"monospace"}}>{cnt(k.id)}건</span>
+                  <span className="spacer" />
+                  {isAdmin&&<button className="del" onClick={()=>commit((d)=>({...d,channels:d.channels.filter((x)=>x.id!==k.id),channelsUpdatedAt:Date.now()}),[mkLog("하위 채널 삭제",null,k.id)])}>삭제</button>}
+                </div>
+              ))}
+              {subTarget===c.id&&isAdmin&&(
+                <div className="addrow" style={{paddingLeft:22,marginTop:4}}>
+                  <input autoFocus placeholder={`${c.id} 하위 채널명`} value={newSub} onChange={(e)=>setNewSub(e.target.value)} />
+                  <button onClick={()=>addChannel(c.id)}>추가</button>
+                  <button style={{background:"transparent",border:"1px solid #A9B0A6",color:"var(--ink2)",padding:"6px 11px",fontSize:12}} onClick={()=>{setSubTarget(null);setNewSub("");}}>취소</button>
+                </div>
+              )}
             </div>
-          ))}
+          );})}
           {isAdmin&&(
-            <div className="addrow" style={{marginTop:10}}>
-              <input
-                placeholder="채널명 입력 후 추가 버튼 클릭"
-                value={newChannel}
-                onChange={(e)=>setNewChannel(e.target.value)}
-              />
-              <button onClick={()=>addChannel()}>추가</button>
+            <div className="addrow" style={{marginTop:12,borderTop:"1px solid var(--line)",paddingTop:12}}>
+              <input placeholder="상위 채널명 입력 후 추가 버튼 클릭" value={newChannel} onChange={(e)=>setNewChannel(e.target.value)} />
             </div>
-          )}
-        </div>
+          )}<button onClick={()=>addChannel(null)}>추가</button>
+            </div>
         <div className="panel"><h3>백업</h3><p className="sub">주기적으로 내려받아 두세요.</p>
           <div style={{display:"flex",gap:7}}>
             <button className="btn ghost" onClick={exportJson}>JSON 내려받기</button>
@@ -747,7 +840,16 @@ function Board() {
           <h2>{draft._new?"새 업무":"업무 상세"}</h2>
           <div className="fld"><label>업무명</label><input autoFocus disabled={!canEdit} value={draft.title} onChange={(e)=>setDraft({...draft,title:e.target.value})} placeholder="예) 쿠팡 락토컷 상세페이지 개편" /></div>
           <div className="r2">
-            <div className="fld"><label>채널</label><select disabled={!canEdit} value={draft.channel} onChange={(e)=>setDraft({...draft,channel:e.target.value})}>{data.channels.map((c)=><option key={c.id} value={c.id}>{c.id}</option>)}</select></div>
+            <div className="fld"><label>채널</label><select disabled={!canEdit} value={draft.channel} onChange={(e)=>setDraft({...draft,channel:e.target.value})}>
+              {topChannels.map((c)=>{
+                const kids=subsOf(c.id);
+                if(!kids.length)return <option key={c.id} value={c.id}>{c.id}</option>;
+                return <optgroup key={c.id} label={c.id}>
+                  <option value={c.id}>{c.id} (전체)</option>
+                  {kids.map((k)=><option key={k.id} value={k.id}>　└ {k.id}</option>)}
+                </optgroup>;
+              })}
+            </select></div>
             <div className="fld"><label>업무 유형</label><select disabled={!canEdit} value={draft.type} onChange={(e)=>setDraft({...draft,type:e.target.value})}>{TYPES.map((t)=><option key={t} value={t}>{t}</option>)}</select></div>
           </div>
           <div className="r2">
