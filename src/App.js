@@ -199,7 +199,10 @@ const CSS = `
 
 /* ── 모달 ── */
 .mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:flex-start;justify-content:center;padding:36px 14px;overflow-y:auto;z-index:50;}
-.modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:24px;}
+.modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:0;display:flex;flex-direction:column;max-height:90vh;}
+.modal h2{font-size:19px;font-weight:800;margin:0;padding:20px 24px 16px;border-bottom:1px solid var(--line);}
+.modal-body{flex:1;overflow-y:auto;padding:20px 24px;}
+.modal-foot{padding:16px 24px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;}
 .modal.sm{max-width:420px;}
 .modal h2{font-size:19px;font-weight:800;margin-bottom:18px;letter-spacing:-.02em;}
 .fld{margin-bottom:14px;}
@@ -419,8 +422,8 @@ function Board() {
   const distTotal=dist.reduce((s,c)=>s+c.n,0);
 
   const saveMe=async(name)=>{const n=name.trim();if(!n)return;setMe(n);setAskName(false);try{localStorage.setItem(ME_KEY,n);}catch(e){}if(!dataRef.current.members.find((m)=>m.name===n)){const role=dataRef.current.members.length===0?"admin":"member";commit((d)=>({...d,members:[...d.members,{name:n,role,updatedAt:Date.now()}]}),[{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:"팀 합류",detail:ROLES.find((r)=>r.id===role).label}]);}};
-  const openNew=(status)=>setDraft({_new:true,id:uid(),title:"",channel:data.channels[0]?.id||"공통",type:"채널운영",owner:me,due:"",priority:"mid",memo:"",progress:0,status:status||"todo",tags:[],checklist:[],links:[],comments:[],repeat:"none",archived:false,deleted:false}); 
-  const openTask=(t)=>setDraft({...t,tags:[...(t.tags||[])],checklist:[...(t.checklist||[])],links:[...(t.links||[])],comments:[...(t.comments||[])]});
+  const openNew=(status)=>setDraft({_new:true,id:uid(),title:"",channel:data.channels[0]?.id||"공통",type:"채널운영",owner:me,due:"",priority:"mid",memo:"",progress:0,status:status||"todo",tags:[],checklist:[],links:[],comments:[],issues:[],repeat:"none",archived:false,deleted:false});
+  const openTask=(t)=>setDraft({...t,tags:[...(t.tags||[])],checklist:[...(t.checklist||[])],links:[...(t.links||[])],comments:[...(t.comments||[])],issues:[...(t.issues||[])]});
 
   const duplicateTask=(t)=>{
     const now=Date.now();
@@ -514,9 +517,10 @@ function Board() {
 
   const allIssues=useMemo(()=>{
     const out=[];
-    routines.forEach((r)=>(r.issues||[]).forEach((i)=>out.push({...i,routineId:r.id,routineTitle:r.title,owner:r.owner})));
+    routines.forEach((r)=>(r.issues||[]).forEach((i)=>out.push({...i,routineId:r.id,routineTitle:r.title,owner:r.owner,src:"반복"})));
+    live.forEach((t)=>(t.issues||[]).forEach((i)=>out.push({...i,taskId:t.id,routineTitle:t.title,owner:t.owner,src:"업무"})));
     return out.sort((a,b)=>b.ts-a.ts);
-  },[routines]);
+  },[routines,live]);
 
   const week=useMemo(()=>weekOf(rDate),[rDate]);
   const dayRate=useCallback((date)=>{
@@ -812,12 +816,18 @@ function Board() {
             if(!list.length)return <div className="empty">해당하는 이슈가 없습니다</div>;
             return list.map((i)=>(
               <div key={i.id} className={"issrow"+(i.resolved?" done":"")}>
-                <button className="issck" onClick={()=>toggleIssue(i.routineId,i.id)}>{i.resolved?"✓":""}</button>
+                <button className="issck" onClick={()=>{
+                  if(i.routineId)toggleIssue(i.routineId,i.id);
+                  else commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===i.taskId?{...t,issues:(t.issues||[]).map((x)=>x.id===i.id?{...x,resolved:!x.resolved}:x),updatedAt:Date.now()}:t)}),[]);
+                }}>{i.resolved?"✓":""}</button>
                 <div style={{flex:1,minWidth:0}}>
                   <div className="isstext">{i.text}</div>
-                  <div className="issmeta">{i.routineTitle} · {i.author} · {fmtTs(i.ts)}{i.owner&&` · 담당 ${i.owner}`}</div>
+                  <div className="issmeta"><b style={{color:i.src==="업무"?"#0055CC":"#1F845A"}}>{i.src}</b> · {i.routineTitle} · {i.author} · {fmtTs(i.ts)}{i.owner&&` · 담당 ${i.owner}`}</div>
                 </div>
-                <button className="btn ghost" onClick={()=>{setView("routine");setSelR(i.routineId);}}>이동</button>
+                <button className="btn ghost" onClick={()=>{
+                  if(i.routineId){setView("routine");setSelR(i.routineId);}
+                  else{const t=data.tasks.find((x)=>x.id===i.taskId);if(t){setView("board");openTask(t);}}
+                }}>이동</button>
               </div>
             ));
           })()}
@@ -979,6 +989,7 @@ function Board() {
       {draft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setDraft(null)}><div className="modal">
           <h2>{draft._new?"새 업무":"업무 상세"}</h2>
+          <div className="modal-body">
           <div className="fld"><label>업무명</label><input autoFocus disabled={!canEdit} value={draft.title} onChange={(e)=>setDraft({...draft,title:e.target.value})} placeholder="예) 쿠팡 락토컷 상세페이지 개편" /></div>
           <div className="r2">
             <div className="fld"><label>채널</label><select disabled={!canEdit} value={draft.channel} onChange={(e)=>setDraft({...draft,channel:e.target.value})}>
@@ -1046,17 +1057,65 @@ function Board() {
             {canEdit&&<div className="addrow"><input placeholder="링크 붙여넣고 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,links:[...(draft.links||[]),{id:uid(),url:v,label:""}]});e.target.value="";}}} /></div>}
           </div>
           <div className="sect"><h4>댓글{(draft.comments||[]).length>0&&` (${draft.comments.length})`}</h4>
-            {(draft.comments||[]).map((c)=><div key={c.id} className="cmt"><div className="ch2"><b>{c.author}</b> · {fmtTs(c.ts)}</div><p>{c.text}</p></div>)}
+            {(draft.comments||[]).map((c)=>(
+              <div key={c.id} className="cmt">
+                <div className="ch2"><b>{c.author}</b> · {fmtTs(c.ts)}{c.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                {c.editing
+                  ? <div style={{display:"flex",gap:6,marginTop:4}}>
+                      <input defaultValue={c.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14}}
+                        onKeyDown={(e)=>{
+                          if(e.nativeEvent.isComposing)return;
+                          if(e.key==="Enter"&&!e.shiftKey){
+                            const v=e.target.value.trim();if(!v)return;
+                            setDraft({...draft,comments:draft.comments.map((x)=>x.id===c.id?{...x,text:v,edited:true,editing:false}:x)});
+                          }
+                          if(e.key==="Escape")setDraft({...draft,comments:draft.comments.map((x)=>x.id===c.id?{...x,editing:false}:x)});
+                        }} />
+                      <button className="btn ghost" onClick={()=>setDraft({...draft,comments:draft.comments.map((x)=>x.id===c.id?{...x,editing:false}:x)})}>취소</button>
+                    </div>
+                  : <p>{c.text}</p>}
+                <div style={{display:"flex",gap:10,marginTop:3}}>
+                  {(c.author===me||isAdmin)&&!c.editing&&<button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,comments:draft.comments.map((x)=>x.id===c.id?{...x,editing:true}:x)})}>수정</button>}
+                  {(c.author===me||isAdmin)&&<button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,comments:draft.comments.filter((x)=>x.id!==c.id)})}>삭제</button>}
+                </div>
+              </div>
+            ))}
             {!(draft.comments||[]).length&&<span className="hint">없음</span>}
             <div className="addrow"><input placeholder="댓글 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,comments:[...(draft.comments||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}}} /></div>
           </div>
+          <div className="sect"><h4>이슈</h4>
+            {(draft.issues||[]).length===0&&<span className="hint">없음</span>}
+            {(draft.issues||[]).map((iss)=>(
+              <div key={iss.id} className={"iss"+(iss.resolved?" done":"")}>
+                <button className="issck" onClick={()=>setDraft({...draft,issues:(draft.issues||[]).map((x)=>x.id===iss.id?{...x,resolved:!x.resolved}:x)})}>
+                  {iss.resolved?"✓":""}
+                </button>
+                <div style={{flex:1}}>
+                  <div className="isstext">{iss.text}</div>
+                  <div className="issmeta">{iss.author} · {fmtTs(iss.ts)}</div>
+                </div>
+                {canEdit&&<button style={{background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",fontSize:16}} onClick={()=>setDraft({...draft,issues:(draft.issues||[]).filter((x)=>x.id!==iss.id)})}>×</button>}
+              </div>
+            ))}
+            <div className="addrow">
+              <input placeholder="이슈 입력 후 Enter" onKeyDown={(e)=>{
+                if(e.nativeEvent.isComposing||e.key!=="Enter")return;
+                const v=e.target.value.trim();if(!v)return;
+                const iss={id:uid(),text:v,author:me||"익명",ts:Date.now(),resolved:false};
+                setDraft({...draft,issues:[iss,...(draft.issues||[])]});
+                e.target.value="";
+              }} />
+            </div>
+          </div>
+
           {!draft._new&&(
             <div className="sect"><h4>이 업무의 이력</h4>
               {(data.log||[]).filter((e)=>e.taskId===draft.id).slice(0,6).map((e)=><div key={e.id} className="item" style={{fontSize:11.5,color:"#565C64"}}><span style={{fontSize:10.5,color:"#8F959C",minWidth:96,fontFamily:"monospace"}}>{fmtTs(e.ts)}</span><span style={{fontSize:10.5,minWidth:54,fontFamily:"monospace"}}>{e.who}</span><span>{e.action}{e.detail&&` · ${e.detail}`}</span></div>)}
               {!(data.log||[]).some((e)=>e.taskId===draft.id)&&<span className="hint">기록 없음</span>}
             </div>
           )}
-          <div className="mfoot">
+          </div>
+          <div className="modal-foot">
             {!draft._new&&isAdmin&&<button className="del" onClick={()=>removeTask(draft)}>삭제</button>}
             {!draft._new&&canEdit&&<button className="btn ghost" onClick={()=>duplicateTask(draft)}>복사</button>}
             {!draft._new&&canEdit&&!draft.archived&&<button className="btn ghost" onClick={()=>{setArchivedFlag(draft,true);setDraft(null);}}>보관</button>}
