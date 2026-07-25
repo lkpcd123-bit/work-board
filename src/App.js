@@ -134,10 +134,11 @@ const CSS = `
 .chip.back{background:var(--ink2);color:#fff;border-color:var(--ink2);}
 .btn{background:var(--pri);color:#fff;padding:8px 16px;font-size:14px;font-weight:700;border-radius:6px;}
 .btn:hover{background:var(--pri-d);}
-.btn:disabled{opacity:.4;cursor:default;}
+.btn:disabled{opacity:.4;cursor:default;background:#0C66E4;color:#fff;}
 .btn.ghost{background:#EBECF0;color:var(--ink2);font-weight:600;}
 .btn.ghost:hover{background:#DFE1E6;}
-.btn.warn{background:var(--danger);}
+.btn-save{background:#0C66E4!important;color:#fff!important;padding:8px 16px;font-size:14px;font-weight:700;border-radius:6px;opacity:1!important;}
+.btn-save:hover{background:#0055CC!important;}
 
 /* ── 보드 ── */
 .board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start;}
@@ -198,13 +199,12 @@ const CSS = `
 .mrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}
 
 /* ── 모달 ── */
-.mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:flex-start;justify-content:center;padding:36px 14px;overflow-y:auto;z-index:50;}
+.mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:center;justify-content:center;padding:16px;overflow:hidden;z-index:50;}
 .modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:0;display:flex;flex-direction:column;max-height:90vh;}
-.modal h2{font-size:19px;font-weight:800;margin:0;padding:20px 24px 16px;border-bottom:1px solid var(--line);}
+.modal h2{font-size:19px;font-weight:800;margin:0;padding:20px 24px 16px;border-bottom:1px solid var(--line);letter-spacing:-.02em;}
 .modal-body{flex:1;overflow-y:auto;padding:20px 24px;}
 .modal-foot{padding:16px 24px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;}
 .modal.sm{max-width:420px;}
-.modal h2{font-size:19px;font-weight:800;margin-bottom:18px;letter-spacing:-.02em;}
 .fld{margin-bottom:14px;}
 .fld label{display:block;font-size:12.5px;font-weight:700;color:var(--ink3);margin-bottom:6px;}
 .fld input,.fld select,.fld textarea{width:100%;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:9px 11px;font-size:14.5px;color:var(--ink);}
@@ -1121,8 +1121,7 @@ function Board() {
             {!draft._new&&canEdit&&!draft.archived&&<button className="btn ghost" onClick={()=>{setArchivedFlag(draft,true);setDraft(null);}}>보관</button>}
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setDraft(null)}>닫기</button>
-            <button className="btn" onClick={saveDraft} disabled={!draft.title.trim()}>저장</button>
-          </div>
+            <button className="btn-save" onClick={saveDraft}>저장</button>         </div>
         </div></div>
       )}
     </div>
