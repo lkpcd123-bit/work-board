@@ -134,11 +134,10 @@ const CSS = `
 .chip.back{background:var(--ink2);color:#fff;border-color:var(--ink2);}
 .btn{background:var(--pri);color:#fff;padding:8px 16px;font-size:14px;font-weight:700;border-radius:6px;}
 .btn:hover{background:var(--pri-d);}
-.btn:disabled{opacity:.4;cursor:default;background:#0C66E4;color:#fff;}
+.btn:disabled{opacity:.4;cursor:default;}
 .btn.ghost{background:#EBECF0;color:var(--ink2);font-weight:600;}
 .btn.ghost:hover{background:#DFE1E6;}
-.btn-save{background:#0C66E4!important;color:#fff!important;padding:8px 16px;font-size:14px;font-weight:700;border-radius:6px;opacity:1!important;}
-.btn-save:hover{background:#0055CC!important;}
+.btn.warn{background:var(--danger);}
 
 /* ── 보드 ── */
 .board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start;}
@@ -199,7 +198,7 @@ const CSS = `
 .mrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}
 
 /* ── 모달 ── */
-.mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:center;justify-content:center;padding:16px;overflow:hidden;z-index:50;}
+.mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:flex-start;justify-content:center;padding:36px 14px;overflow-y:auto;z-index:50;}
 .modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:0;display:flex;flex-direction:column;max-height:90vh;}
 .modal h2{font-size:19px;font-weight:800;margin:0;padding:20px 24px 16px;border-bottom:1px solid var(--line);letter-spacing:-.02em;}
 .modal-body{flex:1;overflow-y:auto;padding:20px 24px;}
@@ -298,6 +297,53 @@ const CSS = `
 
 @media(max-width:1100px){.board{grid-template-columns:repeat(2,minmax(0,1fr));}.metrics{grid-template-columns:repeat(3,1fr);}.rwrap{grid-template-columns:1fr;}.rside{position:static;}}
 @media(max-width:680px){.board{grid-template-columns:1fr;}.metrics{grid-template-columns:repeat(2,1fr);}.r3{grid-template-columns:1fr;}.page{margin:0 8px;padding:12px;}}
+/* ══ Monday 스타일 테이블 ══ */
+.mdtoolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:14px;margin-bottom:8px;border-bottom:1px solid var(--line);}
+.mdsep{width:1px;height:22px;background:var(--line);margin:0 4px;}
+.mdlbl{font-size:13px;color:var(--ink3);font-weight:600;}
+.mdgroup{margin-bottom:26px;}
+.mdghead{display:flex;align-items:center;gap:8px;padding:6px 2px 8px;background:none;}
+.mdarrow{font-size:13px;line-height:1;}
+.mdgtitle{font-size:16px;font-weight:800;letter-spacing:-.01em;}
+.mdgcount{font-size:13px;color:var(--ink3);font-weight:600;}
+.mdtblwrap{background:var(--card);border-radius:8px;box-shadow:var(--sh);overflow-x:auto;}
+.mdtbl{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;}
+.mdtbl th{font-size:13px;font-weight:600;color:var(--ink3);text-align:center;padding:9px 10px;background:#F5F6F8;border-bottom:1px solid var(--line);border-right:1px solid var(--line);white-space:nowrap;}
+.mdtbl th:last-child{border-right:none;}
+.mdtbl td{padding:0;border-bottom:1px solid var(--line);border-right:1px solid var(--line);height:38px;text-align:center;vertical-align:middle;}
+.mdtbl td:last-child{border-right:none;}
+.mdtbl tr:last-child td{border-bottom:none;}
+.mdspine{width:6px!important;min-width:6px;padding:0!important;background:var(--gc);border-right:none!important;}
+.mdtbl thead th.mdspine{background:var(--gc);}
+.mdname{position:relative;text-align:left!important;}
+.mdname input{width:100%;border:none;background:transparent;padding:8px 30px 8px 12px;font-size:14px;font-weight:600;color:var(--ink);font-family:inherit;}
+.mdname input:focus{outline:2px solid var(--pri);outline-offset:-2px;background:#fff;border-radius:4px;}
+.mdopen{position:absolute;right:6px;top:50%;transform:translateY(-50%);color:var(--ink3);font-size:13px;opacity:0;padding:2px 4px;}
+.mdname:hover .mdopen{opacity:1;}
+.mdopen:hover{color:var(--pri);}
+.mdplain{width:100%;border:none;background:transparent;padding:8px 9px;font-size:13.5px;color:var(--ink2);font-family:inherit;text-align:center;}
+.mdplain:focus{outline:2px solid var(--pri);outline-offset:-2px;background:#fff;border-radius:4px;}
+.mdcell{padding:0!important;}
+.mdcolorsel{width:100%;height:38px;border:none;background:transparent;color:#fff;font-size:13.5px;font-weight:600;text-align:center;text-align-last:center;font-family:inherit;cursor:pointer;-webkit-appearance:none;appearance:none;}
+.mdcolorsel option{color:var(--ink);background:#fff;}
+.mdcolorsel:focus{outline:2px solid rgba(255,255,255,.7);outline-offset:-3px;}
+.mddue{display:flex;align-items:center;justify-content:center;gap:3px;padding:0 4px;}
+.mdwarn{width:16px;height:16px;border-radius:50%;background:#E2445C;color:#fff;font-size:11px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mdok{color:#00C875;font-size:14px;font-weight:900;flex-shrink:0;}
+.mddue input{padding:6px 2px;font-size:12.5px;}
+.mdpg{display:flex;align-items:center;gap:7px;padding:0 10px;}
+.mdpgbar{flex:1;height:7px;background:#E6E9EF;border-radius:4px;overflow:hidden;}
+.mdpgbar i{display:block;height:100%;background:#00C875;border-radius:4px;}
+.mdpg span{font-size:12px;color:var(--ink2);font-weight:700;min-width:32px;}
+.mdempty{color:var(--ink3);font-size:13px;padding:14px!important;}
+.mdaddrow td{height:34px;text-align:left!important;background:#FCFCFD;}
+.mdadd{color:var(--ink3);font-size:13.5px;font-weight:600;padding:8px 12px;width:100%;text-align:left;}
+.mdadd:hover{color:var(--pri);}
+.mdsum td{height:32px;background:#F5F6F8;border-bottom:none;padding:0 8px!important;}
+.mdstack{display:flex;height:9px;border-radius:5px;overflow:hidden;background:#E6E9EF;}
+.mdstack i{display:block;height:100%;}
+.mdrange{font-size:12px;color:var(--ink2);font-weight:600;background:#E6E9EF;border-radius:12px;padding:3px 10px;display:inline-block;}
+
 `;
 
 function LoginScreen() {
@@ -343,6 +389,8 @@ function Board() {
   const [newChannel, setNewChannel] = useState("");
   const [newSub, setNewSub] = useState("");
   const [subTarget, setSubTarget] = useState(null);
+  const [grpBy, setGrpBy] = useState("status");
+  const [collapsed, setCollapsed] = useState({});
   const [rDate, setRDate] = useState(todayStr());
   const [selR, setSelR] = useState(null);
   const [rDraft, setRDraft] = useState(null);
@@ -583,7 +631,7 @@ function Board() {
       </div>
       <div className="page">
 
-      {(view==="board"||view==="list")&&(<>
+      {view==="board"&&(<>
         <div className="metrics">
           <button className="metric cl" onClick={()=>{setOnlyMine(false);setOnlyLate(false);}}><span className="k">전체</span><span className="v">{stats.total}</span></button>
           <div className="metric"><span className="k">진행중</span><span className="v">{stats.doing}</span></div>
@@ -834,22 +882,163 @@ function Board() {
         </div>
       )}
 
-      {view==="list"&&(
-        <table className="tbl"><thead><tr><th>채널</th><th>업무명</th><th>유형</th><th>담당</th><th>마감</th><th>우선</th><th>상태</th></tr></thead>
-          <tbody>
-            {visible.length===0&&<tr><td colSpan={7} style={{textAlign:"center",color:"#8F959C",padding:20,fontSize:12}}>표시할 업무가 없습니다</td></tr>}
-            {visible.map((t)=>{const d=dayDiff(t.due),late=d!==null&&d<0&&t.status!=="done";return(
-              <tr key={t.id} className="cl" onClick={()=>openTask(t)}>
-                <td><span className="chdot m"><b style={{background:chColor(t.channel)}} />{t.channel}</span></td>
-                <td style={{fontWeight:600}}>{t.title}</td><td className="m">{t.type}</td><td className="m">{t.owner||"—"}</td>
-                <td className="m" style={late?{color:"#B4342F",fontWeight:600}:{}}>{t.due||"—"}</td>
-                <td className="m">{PRIORITIES.find((p)=>p.id===t.priority)?.label}</td>
-                <td className="m">{COLUMNS.find((c)=>c.id===t.status)?.label}</td>
-              </tr>
-            );})}
-          </tbody>
-        </table>
-      )}
+      {view==="list"&&(()=>{
+        const STCOL={todo:"#579BFC",doing:"#FDAB3D",review:"#A25DDC",done:"#00C875"};
+        const PRCOL={high:"#333E85",mid:"#5559DF",low:"#579BFC"};
+        const patch=(t,k,v)=>{
+          if(!canEdit)return;
+          const now=Date.now();
+          const upd={[k]:v};
+          if(k==="status")upd.doneAt=v==="done"?(t.doneAt||now):null;
+          commit((d)=>({...d,tasks:d.tasks.map((x)=>x.id===t.id?{...x,...upd,updatedAt:now,updatedBy:me}:x)}),
+            [mkLog("셀 수정",t,`${k} → ${v}`)]);
+        };
+        const groups=grpBy==="status"
+          ? COLUMNS.map((c)=>({key:c.id,label:c.label,color:STCOL[c.id],items:visible.filter((t)=>t.status===c.id)}))
+          : data.channels.map((c)=>({key:c.id,label:c.id,color:c.color,items:visible.filter((t)=>t.channel===c.id)})).filter((g)=>g.items.length>0);
+        return (
+        <div>
+          <div className="mdtoolbar">
+            <button className="btn" onClick={()=>openNew()}>+ 새로운 태스크</button>
+            <span style={{width:12}} />
+            <input className="inp" placeholder="검색" value={q} onChange={(e)=>setQ(e.target.value)} style={{width:140}} />
+            <span className="mdsep" />
+            <span className="mdlbl">그룹</span>
+            <select className="sel" value={grpBy} onChange={(e)=>setGrpBy(e.target.value)}>
+              <option value="status">상태별</option>
+              <option value="channel">채널별</option>
+            </select>
+            <span className="mdsep" />
+            <select className="sel" value={fOwner} onChange={(e)=>setFOwner(e.target.value)}>
+              <option value="전체">담당자 전체</option>
+              {owners.map((o)=><option key={o} value={o}>{o}</option>)}
+            </select>
+            <button className={"chip tog"+(onlyMine?" sel":"")} onClick={()=>setOnlyMine((v)=>!v)}>내 업무</button>
+            <button className={"chip tog"+(onlyLate?" sel":"")} onClick={()=>setOnlyLate((v)=>!v)}>지연만</button>
+            <span className="spacer" />
+            <span className="mdlbl">{visible.length}건</span>
+          </div>
+
+          {groups.map((g)=>{
+            const open=!collapsed[g.key];
+            const items=g.items;
+            const stCount=COLUMNS.map((c)=>({...c,n:items.filter((t)=>t.status===c.id).length,color:STCOL[c.id]})).filter((c)=>c.n>0);
+            const prCount=PRIORITIES.map((p)=>({...p,n:items.filter((t)=>t.priority===p.id).length,color:PRCOL[p.id]})).filter((p)=>p.n>0);
+            const dues=items.map((t)=>t.due).filter(Boolean).sort();
+            const avgPg=items.length?Math.round(items.reduce((s,t)=>s+(t.progress||0),0)/items.length):0;
+            return (
+            <div key={g.key} className="mdgroup">
+              <button className="mdghead" onClick={()=>setCollapsed({...collapsed,[g.key]:open})}>
+                <span className="mdarrow" style={{color:g.color}}>{open?"▾":"▸"}</span>
+                <span className="mdgtitle" style={{color:g.color}}>{g.label}</span>
+                <span className="mdgcount">{items.length}</span>
+              </button>
+              {open&&(
+                <div className="mdtblwrap" style={{"--gc":g.color}}>
+                  <table className="mdtbl">
+                    <thead>
+                      <tr>
+                        <th className="mdspine" />
+                        <th style={{minWidth:220}}>태스크</th>
+                        <th style={{width:110}}>소유자</th>
+                        <th style={{width:130}}>상태</th>
+                        <th style={{width:130}}>마감일</th>
+                        <th style={{width:120}}>우선순위</th>
+                        <th style={{width:120}}>진행률</th>
+                        <th style={{minWidth:150}}>메모</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.length===0&&<tr><td className="mdspine" /><td colSpan={7} className="mdempty">항목이 없습니다</td></tr>}
+                      {items.map((t)=>{
+                        const d=dayDiff(t.due),late=d!==null&&d<0&&t.status!=="done";
+                        return (
+                        <tr key={t.id}>
+                          <td className="mdspine" />
+                          <td className="mdname">
+                            <input defaultValue={t.title} disabled={!canEdit}
+                              onBlur={(e)=>{const v=e.target.value.trim();if(v&&v!==t.title)patch(t,"title",v);}}
+                              onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter")e.target.blur();}} />
+                            <button className="mdopen" onClick={()=>openTask(t)} title="상세 열기">⤢</button>
+                          </td>
+                          <td>
+                            <select className="mdplain" value={t.owner||""} disabled={!canEdit}
+                              onChange={(e)=>patch(t,"owner",e.target.value)}>
+                              <option value="">—</option>
+                              {[...new Set([...owners,...data.members.map((m)=>m.name)].filter(Boolean))].map((o)=><option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </td>
+                          <td className="mdcell" style={{background:STCOL[t.status]}}>
+                            <select className="mdcolorsel" value={t.status} disabled={!canEdit}
+                              onChange={(e)=>patch(t,"status",e.target.value)}>
+                              {COLUMNS.map((c)=><option key={c.id} value={c.id}>{c.label}</option>)}
+                            </select>
+                          </td>
+                          <td>
+                            <div className="mddue">
+                              {late&&<span className="mdwarn" title={`${Math.abs(d)}일 지연`}>!</span>}
+                              {t.status==="done"&&<span className="mdok">✓</span>}
+                              <input type="date" className="mdplain" value={t.due||""} disabled={!canEdit}
+                                style={t.status==="done"?{textDecoration:"line-through",color:"var(--ink3)"}:late?{color:"#E2445C",fontWeight:700}:{}}
+                                onChange={(e)=>patch(t,"due",e.target.value)} />
+                            </div>
+                          </td>
+                          <td className="mdcell" style={{background:PRCOL[t.priority]}}>
+                            <select className="mdcolorsel" value={t.priority} disabled={!canEdit}
+                              onChange={(e)=>patch(t,"priority",e.target.value)}>
+                              {PRIORITIES.map((p)=><option key={p.id} value={p.id}>{p.label}</option>)}
+                            </select>
+                          </td>
+                          <td>
+                            <div className="mdpg">
+                              <div className="mdpgbar"><i style={{width:(t.progress||0)+"%"}} /></div>
+                              <span>{t.progress||0}%</span>
+                            </div>
+                          </td>
+                          <td>
+                            <input className="mdplain" defaultValue={t.memo||""} placeholder="—" disabled={!canEdit}
+                              onBlur={(e)=>{const v=e.target.value;if(v!==(t.memo||""))patch(t,"memo",v);}}
+                              onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter")e.target.blur();}} />
+                          </td>
+                        </tr>
+                      );})}
+                      {canEdit&&(
+                        <tr className="mdaddrow">
+                          <td className="mdspine" />
+                          <td colSpan={7}>
+                            <button className="mdadd" onClick={()=>openNew(grpBy==="status"?g.key:"todo")}>+ 태스크 추가</button>
+                          </td>
+                        </tr>
+                      )}
+                      <tr className="mdsum">
+                        <td className="mdspine" />
+                        <td />
+                        <td />
+                        <td>
+                          {stCount.length>0&&<div className="mdstack">
+                            {stCount.map((c)=><i key={c.id} title={`${c.label} ${c.n}`} style={{background:c.color,flex:c.n}} />)}
+                          </div>}
+                        </td>
+                        <td>
+                          {dues.length>0&&<span className="mdrange">{dues[0].slice(5).replace("-","월 ")}일 – {dues[dues.length-1].slice(5).replace("-","월 ")}일</span>}
+                        </td>
+                        <td>
+                          {prCount.length>0&&<div className="mdstack">
+                            {prCount.map((p)=><i key={p.id} title={`${p.label} ${p.n}`} style={{background:p.color,flex:p.n}} />)}
+                          </div>}
+                        </td>
+                        <td><span className="mdrange">평균 {avgPg}%</span></td>
+                        <td />
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );})}
+        </div>
+        );
+      })()}
 
       {view==="archive"&&(<>
         <div className="panel"><h3>완료 업무 보관함</h3><p className="sub">보드에서 치운 업무입니다. 되돌리면 다시 보드로 올라옵니다.</p>
@@ -1121,7 +1310,7 @@ function Board() {
             {!draft._new&&canEdit&&!draft.archived&&<button className="btn ghost" onClick={()=>{setArchivedFlag(draft,true);setDraft(null);}}>보관</button>}
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setDraft(null)}>닫기</button>
-            <button className="btn-save" onClick={saveDraft}>저장</button>         </div>
+            <button className="btn" onClick={saveDraft} style={{background:"#0C66E4",color:"#fff"}}>저장</button>         </div>
         </div></div>
       )}
     </div>
