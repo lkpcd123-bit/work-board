@@ -358,6 +358,8 @@ const CSS = `
 .rfilters{display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap;}
 .issbtn{border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:16px;white-space:nowrap;}
 .issbtn.active{background:#FFECEB;color:#C9372C;border-color:#F2C0BC;}
+.btn-save{background:#0C66E4!important;color:#fff!important;padding:8px 16px;font-size:14px;font-weight:700;border-radius:6px;}
+.btn-save:hover{background:#0055CC!important;}
 .issbtn:hover{border-color:var(--ink3);}
 .fcitem{display:flex;align-items:center;gap:9px;padding:5px 0;}
 .fccheck{width:20px;height:20px;border:2px solid var(--line2);border-radius:5px;background:var(--card);font-size:11px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;}
@@ -1277,8 +1279,7 @@ function Board() {
       )}
 
       {issueDetail&&(()=>{
-        const findLive=allIssues.find((x)=>x.id===issueDetail.id)||issueDetail;
-        const i=findLive;
+        const i=issueDetail;
         const addHistory=(text)=>{
           const t=text.trim();if(!t)return;
           const entry={id:uid(),text:t,author:me||"익명",ts:Date.now()};
