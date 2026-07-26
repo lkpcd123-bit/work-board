@@ -503,8 +503,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote}:emptyData();
-      const next=mergeData(base,dataRef.current);
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:remote.checkitems||[]}:emptyData();      const next=mergeData(base,dataRef.current);
       if(logEntries&&logEntries.length)next.log=[...logEntries,...(next.log||[])].slice(0,LOG_CAP);
       next.updatedAt=Date.now();
       await setDoc(BOARD_REF(),next); setData(next); setSaveState("saved"); setTimeout(()=>setSaveState("idle"),1500);
