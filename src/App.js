@@ -1025,6 +1025,7 @@ function Board() {
                 <div className="ckcolhead">
                   <div className="ckcoltitle">{tab.label}<em>{items.filter((c)=>!c.done).length}</em></div>
                   <div style={{display:"flex",gap:5}}>
+                    {isCL&&canEdit&&items.some((c)=>c.done)&&<button className="ckclear" onClick={()=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.tab===tab.id&&x.done?{...x,done:false,doneAt:null,updatedAt:Date.now()}:x)}),[])}}>체크 초기화</button>}
                     {isCL&&canEdit&&items.length>0&&<button className="ckclear" onClick={()=>setConfirmBox({kind:"clearCk",tab:tab.id})}>전체 지우기</button>}
                     {canEdit&&<button className="ckplus" onClick={()=>setCkDraft({_new:true,id:uid(),tab:tab.id,title:"",start:"",due:"",desc:"",done:false,subs:isCL?[]:undefined})}>+</button>}
                   </div>
