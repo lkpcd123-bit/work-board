@@ -655,7 +655,7 @@ function Board() {
         <button className="ghostw" onClick={()=>load()}>새로고침</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"list",label:"목록",n:null},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -915,14 +915,18 @@ function Board() {
                   </div>}
                 </div>
 
-                <div className="sect"><h4>이슈{openIss.length>0&&` · 미해결 ${openIss.length}`}</h4>
+                <div className="sect">
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                    <h4 style={{margin:0}}>이슈{openIss.length>0&&` · 미해결 ${openIss.length}`}</h4>
+                    <button className="btn ghost" style={{padding:"4px 10px",fontSize:12}} onClick={()=>{setView("issue");setIssueFilter("all");}}>이슈 목록 전체보기 →</button>
+                  </div>
                   {(sel.issues||[]).length===0&&<span className="hint">등록된 이슈가 없습니다</span>}
                   {(sel.issues||[]).map((i)=>(
                     <div key={i.id} className={"iss"+(i.resolved?" done":"")}>
                       <button className="issck" onClick={()=>toggleIssue(sel.id,i.id)}>{i.resolved?"✓":""}</button>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div className="isstext">{i.text}</div>
-                        <div className="issmeta">{i.author} · {fmtTs(i.ts)}{i.date&&` · ${i.date.slice(5)}`}</div>
+                      <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setIssueDetail({...i,routineId:sel.id,routineTitle:sel.title,owner:sel.owner,src:"반복"})}>
+                        <div className="isstext">{i.text}{(i.history||[]).length>0&&<span style={{fontSize:11,color:"var(--pri)",marginLeft:6,fontWeight:700}}>💬{(i.history||[]).length}</span>}</div>
+                        <div className="issmeta">{i.author} · {fmtTs(i.ts)}{i.date&&` · ${i.date.slice(5)}`} · 클릭해 히스토리</div>
                       </div>
                       {canEdit&&<button style={{background:"none",border:"none",color:"#8F959C",cursor:"pointer"}} onClick={()=>delIssue(sel.id,i.id)}>×</button>}
                     </div>
@@ -1285,6 +1289,13 @@ function Board() {
           }
           setIssueDetail({...i,history:[...(i.history||[]),entry]});
         };
+        const applyHist=(newHist)=>{
+          if(i.routineId)commit((d)=>({...d,routines:(d.routines||[]).map((r)=>r.id===i.routineId?{...r,issues:(r.issues||[]).map((x)=>x.id===i.id?{...x,history:newHist}:x),updatedAt:Date.now()}:r)}),[]);
+          else commit((d)=>({...d,tasks:d.tasks.map((tk)=>tk.id===i.taskId?{...tk,issues:(tk.issues||[]).map((x)=>x.id===i.id?{...x,history:newHist}:x),updatedAt:Date.now()}:tk)}),[]);
+          setIssueDetail({...i,history:newHist});
+        };
+        const editHistory=(hid,text)=>{const t=text.trim();if(!t)return;applyHist((i.history||[]).map((h)=>h.id===hid?{...h,text:t,edited:true}:h));};
+        const delHistory=(hid)=>applyHist((i.history||[]).filter((h)=>h.id!==hid));
         const toggleR=()=>{
           if(i.routineId)toggleIssue(i.routineId,i.id);
           else commit((d)=>({...d,tasks:d.tasks.map((tk)=>tk.id===i.taskId?{...tk,issues:(tk.issues||[]).map((x)=>x.id===i.id?{...x,resolved:!x.resolved,resolvedBy:me}:x),updatedAt:Date.now()}:tk)}),[]);
@@ -1303,8 +1314,22 @@ function Board() {
               {(i.history||[]).length===0&&<span className="hint">아직 기록이 없습니다. 아래에 진행 상황을 적어보세요.</span>}
               {(i.history||[]).map((h)=>(
                 <div key={h.id} className="cmt">
-                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}</div>
-                  <p>{h.text}</p>
+                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                  {h.editing
+                    ? <div style={{display:"flex",gap:6,marginTop:4}}>
+                        <input defaultValue={h.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14}}
+                          onKeyDown={(e)=>{
+                            if(e.nativeEvent.isComposing)return;
+                            if(e.key==="Enter"){editHistory(h.id,e.target.value);}
+                            if(e.key==="Escape")setIssueDetail({...i,history:i.history.map((x)=>x.id===h.id?{...x,editing:false}:x)});
+                          }} />
+                        <button className="btn ghost" onClick={()=>setIssueDetail({...i,history:i.history.map((x)=>x.id===h.id?{...x,editing:false}:x)})}>취소</button>
+                      </div>
+                    : <p>{h.text}</p>}
+                  {canEdit&&!h.editing&&<div style={{display:"flex",gap:10,marginTop:3}}>
+                    <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setIssueDetail({...i,history:i.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>수정</button>
+                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>delHistory(h.id)}>삭제</button>
+                  </div>}
                 </div>
               ))}
               {canEdit&&<div className="addrow">
@@ -1329,7 +1354,7 @@ function Board() {
           <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요? 보드에서 사라지고 보관함에서 볼 수 있습니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
           <div className="mfoot"><span className="spacer" />
             <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":"취소"}</button>
-            <button className={confirmBox.kind==="purge"?"btn warn":"btn"} onClick={()=>{
+            <button className={confirmBox.kind==="purge"?"btn warn":"btn-save"} onClick={()=>{
               if(confirmBox.kind==="purge")purgeArchive();
               else if(confirmBox.kind==="archiveOne"){const tid=confirmBox.taskId;commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===tid?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("아카이브",{id:tid,title:confirmBox.taskTitle})]);setConfirmBox(null);}
               else archiveDone();
@@ -1356,24 +1381,23 @@ function Board() {
             </select></div>
             <div className="fld"><label>업무 유형</label><select disabled={!canEdit} value={draft.type} onChange={(e)=>setDraft({...draft,type:e.target.value})}>{TYPES.map((t)=><option key={t} value={t}>{t}</option>)}</select></div>
           </div>
+          <div className="fld"><label>담당자</label>
+            <input list="wb-owners" value={draft.owner} onChange={(e)=>setDraft({...draft,owner:e.target.value})} placeholder="이름 직접 입력 또는 목록 선택" style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13}} />
+            <datalist id="wb-owners">
+              {[...new Set([...owners,...data.members.map((m)=>m.name),me].filter(Boolean))].map((o)=><option key={o} value={o} />)}
+            </datalist>
+            {data.members.length>0&&(
+              <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:6}}>
+                {[...new Set([...data.members.map((m)=>m.name),me].filter(Boolean))].map((n)=>(
+                  <button key={n} type="button" onClick={()=>setDraft({...draft,owner:n})}
+                    style={{background:draft.owner===n?"#1B4D3E":"#EFF2ED",color:draft.owner===n?"#fff":"#565C64",border:"1px solid #DBDFD9",padding:"4px 10px",fontSize:12,cursor:"pointer",fontFamily:"sans-serif"}}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="r2">
-            <div className="fld"><label>담당자</label>
-              <input list="wb-owners" value={draft.owner} onChange={(e)=>setDraft({...draft,owner:e.target.value})} placeholder="이름 직접 입력 또는 목록 선택" style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13}} />
-              <datalist id="wb-owners">
-                {[...new Set([...owners,...data.members.map((m)=>m.name),me].filter(Boolean))].map((o)=><option key={o} value={o} />)}
-              </datalist>
-              <div style={{fontSize:10.5,color:"#8F959C",marginTop:4,fontFamily:"monospace"}}>직접 입력하거나 아래 목록에서 선택하세요</div>
-              {data.members.length>0&&(
-                <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:6}}>
-                  {[...new Set([...data.members.map((m)=>m.name),me].filter(Boolean))].map((n)=>(
-                    <button key={n} type="button" onClick={()=>setDraft({...draft,owner:n})}
-                      style={{background:draft.owner===n?"#1B4D3E":"#EFF2ED",color:draft.owner===n?"#fff":"#565C64",border:"1px solid #DBDFD9",padding:"4px 10px",fontSize:12,cursor:"pointer",fontFamily:"sans-serif"}}>
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
             <div className="fld"><label>시작일</label><input type="date" disabled={!canEdit} value={draft.start||""} onChange={(e)=>setDraft({...draft,start:e.target.value})} /></div>
             <div className="fld"><label>마감일</label><input type="date" disabled={!canEdit} value={draft.due} onChange={(e)=>setDraft({...draft,due:e.target.value})} /></div>
           </div>
