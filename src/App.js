@@ -21,8 +21,10 @@ const COLUMNS = [
   { id: "todo", label: "대기" },
   { id: "doing", label: "진행중" },
   { id: "review", label: "검토·컨펌" },
+  { id: "issuecol", label: "이슈" },
   { id: "done", label: "완료" },
 ];
+const BOARDS = ["공용","김현민","김찬"];
 const DEFAULT_CHANNELS = [
   { id: "공통", color: "#7A8189" },
   { id: "자사몰", color: "#3355C9" },
@@ -140,7 +142,7 @@ const CSS = `
 .btn.warn{background:var(--danger);}
 
 /* ── 보드 ── */
-.board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start;}
+.board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;align-items:start;}
 .colwrap{background:var(--col);border-radius:12px;padding:10px;}
 .colhead{display:flex;align-items:center;justify-content:space-between;padding:2px 6px 10px;}
 .colhead span{font-size:14.5px;font-weight:700;letter-spacing:-.01em;}
@@ -295,7 +297,7 @@ const CSS = `
 .chsub .mrow{border-top:none;padding:6px 0;}
 .subhint{font-size:12px;color:var(--ink3);font-weight:600;}
 
-@media(max-width:1100px){.board{grid-template-columns:repeat(2,minmax(0,1fr));}.metrics{grid-template-columns:repeat(3,1fr);}.rwrap{grid-template-columns:1fr;}.rside{position:static;}}
+@media(max-width:1100px){.board{grid-template-columns:repeat(3,minmax(0,1fr));}.metrics{grid-template-columns:repeat(3,1fr);}.rwrap{grid-template-columns:1fr;}.rside{position:static;}}
 @media(max-width:680px){.board{grid-template-columns:1fr;}.metrics{grid-template-columns:repeat(2,1fr);}.r3{grid-template-columns:1fr;}.page{margin:0 8px;padding:12px;}}
 /* ══ Monday 스타일 테이블 ══ */
 .mdtoolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:14px;margin-bottom:8px;border-bottom:1px solid var(--line);}
@@ -344,6 +346,24 @@ const CSS = `
 .mdstack i{display:block;height:100%;}
 .mdrange{font-size:12px;color:var(--ink2);font-weight:600;background:#E6E9EF;border-radius:12px;padding:3px 10px;display:inline-block;}
 
+/* ══ 신규 기능 CSS ══ */
+.boardtabs{display:flex;gap:6px;margin-bottom:14px;}
+.boardtab{background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;color:var(--ink2);display:inline-flex;align-items:center;gap:7px;}
+.boardtab:hover{border-color:var(--pri);}
+.boardtab.sel{background:var(--pri);color:#fff;border-color:var(--pri);}
+.boardtab em{font-style:normal;font-size:12px;background:rgba(0,0,0,.12);padding:1px 7px;border-radius:9px;}
+.boardtab.sel em{background:rgba(255,255,255,.25);}
+.datefilt{display:inline-flex;align-items:center;gap:6px;}
+.datefilt input[type=date]{font-size:13px;padding:6px 8px;}
+.rfilters{display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap;}
+.issbtn{border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:16px;white-space:nowrap;}
+.issbtn.active{background:#FFECEB;color:#C9372C;border-color:#F2C0BC;}
+.issbtn:hover{border-color:var(--ink3);}
+.fcitem{display:flex;align-items:center;gap:9px;padding:5px 0;}
+.fccheck{width:20px;height:20px;border:2px solid var(--line2);border-radius:5px;background:var(--card);font-size:11px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;}
+.fccheck.on{background:var(--ok);border-color:var(--ok);color:#fff;}
+.fccheck:disabled{opacity:.4;}
+
 `;
 
 function LoginScreen() {
@@ -391,6 +411,16 @@ function Board() {
   const [subTarget, setSubTarget] = useState(null);
   const [grpBy, setGrpBy] = useState("status");
   const [collapsed, setCollapsed] = useState({});
+  const [curBoard, setCurBoard] = useState("공용");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [rDateFrom, setRDateFrom] = useState("");
+  const [rDateTo, setRDateTo] = useState("");
+  const [rOwner, setROwner] = useState("전체");
+  const [rQuery, setRQuery] = useState("");
+  const [issueDetail, setIssueDetail] = useState(null);
+  const [listDateFrom, setListDateFrom] = useState("");
+  const [listDateTo, setListDateTo] = useState("");
   const [rDate, setRDate] = useState(todayStr());
   const [selR, setSelR] = useState(null);
   const [rDraft, setRDraft] = useState(null);
@@ -440,8 +470,8 @@ function Board() {
 
   const mkLog=(action,task,detail)=>({id:uid(),ts:Date.now(),who:me||"익명",taskId:task?.id||null,taskTitle:task?.title||"",action,detail:detail||""});
 
-  const live=useMemo(()=>data.tasks.filter((t)=>!t.deleted&&!t.archived),[data.tasks]);
-  const archived=useMemo(()=>data.tasks.filter((t)=>!t.deleted&&t.archived),[data.tasks]);
+  const live=useMemo(()=>data.tasks.filter((t)=>!t.deleted&&!t.archived&&(t.boardId||"공용")===curBoard),[data.tasks,curBoard]);
+  const archived=useMemo(()=>data.tasks.filter((t)=>!t.deleted&&t.archived&&(t.boardId||"공용")===curBoard),[data.tasks,curBoard]);
   const owners=useMemo(()=>[...new Set(data.tasks.filter((t)=>!t.deleted).map((t)=>t.owner).filter(Boolean))].sort(),[data.tasks]);
   const allTags=useMemo(()=>[...new Set(data.tasks.filter((t)=>!t.deleted).flatMap((t)=>t.tags||[]))].sort(),[data.tasks]);
 
@@ -458,20 +488,22 @@ function Board() {
       if(fTag!=="전체"&&!(t.tags||[]).includes(fTag))return false;
       if(onlyMine&&t.owner!==me)return false;
       if(onlyLate){const d=dayDiff(t.due);if(!(d!==null&&d<0&&t.status!=="done"))return false;}
+      if(dateFrom&&(!t.due||t.due<dateFrom))return false;
+      if(dateTo&&(!t.due||t.due>dateTo))return false;
       if(kw){const h=`${t.title} ${t.memo||""} ${t.type} ${t.owner||""} ${(t.tags||[]).join(" ")}`.toLowerCase();if(!h.includes(kw))return false;}
       return true;
     });
-  },[q,fCh,fOwner,fTag,onlyMine,onlyLate,me,inChannel]);
+  },[q,fCh,fOwner,fTag,onlyMine,onlyLate,me,inChannel,dateFrom,dateTo]);
 
   const sortFn=useCallback((a,b)=>{ if(sortBy==="due"){if(!a.due&&!b.due)return 0;if(!a.due)return 1;if(!b.due)return -1;return a.due<b.due?-1:1;} if(sortBy==="pri"){const r=(t)=>PRIORITIES.find((p)=>p.id===t.priority)?.rank??1;return r(a)-r(b);} return(b.updatedAt||0)-(a.updatedAt||0); },[sortBy]);
   const visible=useMemo(()=>applyFilters(live).slice().sort(sortFn),[live,applyFilters,sortFn]);
-  const stats=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return{total:live.length,doing:live.filter((t)=>t.status==="doing").length,week:o.filter((t)=>{const d=dayDiff(t.due);return d!==null&&d>=0&&d<=7;}).length,late:o.filter((t)=>{const d=dayDiff(t.due);return d!==null&&d<0;}).length,mine:o.filter((t)=>t.owner===me).length};},[live,me]);
+  const stats=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return{total:live.length,doing:live.filter((t)=>t.status==="doing").length,tomorrow:o.filter((t)=>dayDiff(t.due)===1).length,late:o.filter((t)=>{const d=dayDiff(t.due);return d!==null&&d<0;}).length,open:o.length};},[live]);
   const dist=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return data.channels.filter((c)=>!c.parent).map((c)=>({...c,n:o.filter((t)=>t.channel===c.id||(data.channels.find((x)=>x.id===t.channel)||{}).parent===c.id).length})).filter((c)=>c.n>0);},[live,data.channels]);
   const distTotal=dist.reduce((s,c)=>s+c.n,0);
 
   const saveMe=async(name)=>{const n=name.trim();if(!n)return;setMe(n);setAskName(false);try{localStorage.setItem(ME_KEY,n);}catch(e){}if(!dataRef.current.members.find((m)=>m.name===n)){const role=dataRef.current.members.length===0?"admin":"member";commit((d)=>({...d,members:[...d.members,{name:n,role,updatedAt:Date.now()}]}),[{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:"팀 합류",detail:ROLES.find((r)=>r.id===role).label}]);}};
-  const openNew=(status)=>setDraft({_new:true,id:uid(),title:"",channel:data.channels[0]?.id||"공통",type:"채널운영",owner:me,due:"",priority:"mid",memo:"",progress:0,status:status||"todo",tags:[],checklist:[],links:[],comments:[],issues:[],repeat:"none",archived:false,deleted:false});
-  const openTask=(t)=>setDraft({...t,tags:[...(t.tags||[])],checklist:[...(t.checklist||[])],links:[...(t.links||[])],comments:[...(t.comments||[])],issues:[...(t.issues||[])]});
+  const openNew=(status)=>setDraft({_new:true,id:uid(),boardId:curBoard,title:"",channel:data.channels[0]?.id||"공통",type:"채널운영",owner:me,start:"",due:"",priority:"mid",memo:"",progress:0,status:status||"todo",tags:[],checklist:[],links:[],comments:[],issues:[],repeat:"none",archived:false,deleted:false});
+  const openTask=(t)=>setDraft({...t,boardId:t.boardId||"공용",start:t.start||"",tags:[...(t.tags||[])],checklist:[...(t.checklist||[])],links:[...(t.links||[])],comments:[...(t.comments||[])],issues:[...(t.issues||[])]});
 
   const duplicateTask=(t)=>{
     const now=Date.now();
@@ -496,7 +528,7 @@ function Board() {
     setDraft(null);
   };
 
-  const moveTask=(task,statusId)=>{if(!canEdit||task.status===statusId)return;const now=Date.now();const logs=[mkLog("상태 변경",task,`${COLUMNS.find((c)=>c.id===task.status)?.label} -> ${COLUMNS.find((c)=>c.id===statusId)?.label}`)];let spawn=null;if(statusId==="done"&&task.repeat&&task.repeat!=="none"){spawn={...task,id:uid(),status:"todo",due:nextDue(task.due,task.repeat),checklist:(task.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}commit((d)=>{let tasks=d.tasks.map((t)=>t.id===task.id?{...t,status:statusId,updatedAt:now,updatedBy:me,doneAt:statusId==="done"?(t.doneAt||now):null}:t);if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);};
+  const moveTask=(task,statusId)=>{if(!canEdit||task.status===statusId)return;const now=Date.now();const logs=[mkLog("상태 변경",task,`${COLUMNS.find((c)=>c.id===task.status)?.label} -> ${COLUMNS.find((c)=>c.id===statusId)?.label}`)];let spawn=null;if(statusId==="done"&&task.repeat&&task.repeat!=="none"){spawn={...task,id:uid(),status:"todo",due:nextDue(task.due,task.repeat),checklist:(task.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}commit((d)=>{let tasks=d.tasks.map((t)=>t.id===task.id?{...t,status:statusId,updatedAt:now,updatedBy:me,doneAt:statusId==="done"?(t.doneAt||now):null}:t);if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);if(statusId==="done"&&task.status!=="done"){setConfirmBox({kind:"archiveOne",taskId:task.id,taskTitle:task.title});}};
   const removeTask=(task)=>{commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,deleted:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("업무 삭제",task)]);setDraft(null);};
   const setArchivedFlag=(task,flag)=>commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,archived:flag,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog(flag?"아카이브":"아카이브 해제",task)]);
   const archiveDone=()=>{const targets=live.filter((t)=>t.status==="done");if(!targets.length){setConfirmBox(null);return;}const ids=new Set(targets.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.map((t)=>ids.has(t.id)?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("완료 일괄 보관",null,`${targets.length}건`)]);setConfirmBox(null);};
@@ -523,7 +555,7 @@ function Board() {
     if(!rDraft.title.trim())return;
     const now=Date.now(); const isNew=rDraft._new; const clean={...rDraft}; delete clean._new;
     commit((d)=>{const list=d.routines||[];const ex=list.some((r)=>r.id===clean.id);
-      const rec={...clean,checkins:clean.checkins||{},issues:clean.issues||[],createdAt:clean.createdAt||now,updatedAt:now,updatedBy:me};
+      const rec={...clean,checkins:clean.checkins||{},issues:clean.issues||[],fixedChecks:clean.fixedChecks||[],fixedState:clean.fixedState||{},createdAt:clean.createdAt||now,updatedAt:now,updatedBy:me};
       return{...d,routines:ex?list.map((r)=>r.id===rec.id?rec:r):[...list,rec]};},
       [{id:uid(),ts:now,who:me||"익명",taskId:clean.id,taskTitle:clean.title,action:isNew?"반복업무 생성":"반복업무 수정",detail:clean.when}]);
     setRDraft(null);
@@ -566,9 +598,9 @@ function Board() {
   const allIssues=useMemo(()=>{
     const out=[];
     routines.forEach((r)=>(r.issues||[]).forEach((i)=>out.push({...i,routineId:r.id,routineTitle:r.title,owner:r.owner,src:"반복"})));
-    live.forEach((t)=>(t.issues||[]).forEach((i)=>out.push({...i,taskId:t.id,routineTitle:t.title,owner:t.owner,src:"업무"})));
+    data.tasks.filter((t)=>!t.deleted&&!t.archived).forEach((t)=>(t.issues||[]).forEach((i)=>out.push({...i,taskId:t.id,routineTitle:t.title,owner:t.owner,src:"업무"})));
     return out.sort((a,b)=>b.ts-a.ts);
-  },[routines,live]);
+  },[routines,data.tasks]);
 
   const week=useMemo(()=>weekOf(rDate),[rDate]);
   const dayRate=useCallback((date)=>{
@@ -598,7 +630,7 @@ function Board() {
         <div className="cfoot">
           <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
             {t.owner?<span className="ownerchip">{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
-            {t.due&&<span className={"due"+(late?" late":soon?" soon":"")}>{t.due.slice(5)}{late?` +${Math.abs(d)}d`:""}</span>}
+            {t.due&&<span className={"due"+(late?" late":soon?" soon":"")}>{t.start?t.start.slice(5)+"~":""}{t.due.slice(5)}{late?` +${Math.abs(d)}d`:""}</span>}
           </span>
           <span style={{display:"flex",gap:6,alignItems:"center"}}>
             <span className="icons">{ck.length>0&&<span>☑{ckDone}/{ck.length}</span>}{!!(t.comments||[]).length&&<span>💬{t.comments.length}</span>}{!!(t.links||[]).length&&<span>🔗{t.links.length}</span>}</span>
@@ -632,12 +664,20 @@ function Board() {
       <div className="page">
 
       {view==="board"&&(<>
+        <div className="boardtabs">
+          {BOARDS.map((b)=>(
+            <button key={b} className={"boardtab"+(curBoard===b?" sel":"")} onClick={()=>setCurBoard(b)}>
+              {b==="공용"?"공용 보드":b+" 보드"}
+              <em>{data.tasks.filter((t)=>!t.deleted&&!t.archived&&(t.boardId||"공용")===b).length}</em>
+            </button>
+          ))}
+        </div>
         <div className="metrics">
-          <button className="metric cl" onClick={()=>{setOnlyMine(false);setOnlyLate(false);}}><span className="k">전체</span><span className="v">{stats.total}</span></button>
+          <button className="metric cl" onClick={()=>{setOnlyLate(false);}}><span className="k">전체</span><span className="v">{stats.total}</span></button>
           <div className="metric"><span className="k">진행중</span><span className="v">{stats.doing}</span></div>
-          <div className="metric"><span className="k">7일 내 마감</span><span className={"v"+(stats.week?" wa":"")}>{stats.week}</span></div>
-          <button className="metric cl" onClick={()=>{setOnlyLate(true);setOnlyMine(false);}}><span className="k">지연</span><span className={"v"+(stats.late?" al":"")}>{stats.late}</span></button>
-          <button className="metric cl" onClick={()=>{setOnlyMine(true);setOnlyLate(false);}}><span className="k">내 미완료</span><span className="v">{stats.mine}</span></button>
+          <div className="metric"><span className="k">마감 하루 전</span><span className={"v"+(stats.tomorrow?" wa":"")}>{stats.tomorrow}</span></div>
+          <button className="metric cl" onClick={()=>{setOnlyLate(true);}}><span className="k">지연</span><span className={"v"+(stats.late?" al":"")}>{stats.late}</span></button>
+          <div className="metric"><span className="k">미완료</span><span className="v">{stats.open}</span></div>
         </div>
         <div className="strip">{distTotal===0?<i style={{width:"100%",background:"#E4E7E2"}} />:dist.map((c)=><i key={c.id} style={{width:(c.n/distTotal)*100+"%",background:c.color}} />)}</div>
         <div className="legend">{dist.length===0?<span className="leg" style={{color:"#8F959C"}}>미완료 없음</span>:dist.map((c)=><span key={c.id} className="leg"><b style={{background:c.color}} />{c.id} {c.n}</span>)}</div>
@@ -645,6 +685,12 @@ function Board() {
           <input className="inp" placeholder="검색" value={q} onChange={(e)=>setQ(e.target.value)} style={{width:120}} />
           <select className="sel" value={fOwner} onChange={(e)=>setFOwner(e.target.value)}><option value="전체">담당자 전체</option>{owners.map((o)=><option key={o} value={o}>{o}</option>)}</select>
           <select className="sel" value={sortBy} onChange={(e)=>setSortBy(e.target.value)}><option value="due">마감일순</option><option value="pri">우선순위순</option><option value="upd">최근수정순</option></select>
+          <span className="datefilt">
+            <input type="date" className="sel" value={dateFrom} onChange={(e)=>setDateFrom(e.target.value)} title="시작 날짜" />
+            <span style={{color:"var(--ink3)"}}>~</span>
+            <input type="date" className="sel" value={dateTo} onChange={(e)=>setDateTo(e.target.value)} title="종료 날짜" />
+            {(dateFrom||dateTo)&&<button className="chip" onClick={()=>{setDateFrom("");setDateTo("");}}>날짜 해제</button>}
+          </span>
           <button className={"chip tog"+(onlyMine?" sel":"")} onClick={()=>setOnlyMine((v)=>!v)}>내 업무</button>
           <button className={"chip tog"+(onlyLate?" sel":"")} onClick={()=>setOnlyLate((v)=>!v)}>지연만</button>
           {allTags.length>0&&<select className="sel" value={fTag} onChange={(e)=>setFTag(e.target.value)}><option value="전체">태그 전체</option>{allTags.map((g)=><option key={g} value={g}>{g}</option>)}</select>}
@@ -697,8 +743,14 @@ function Board() {
 
       {view==="routine"&&(()=>{
         const sel=selR?routineById(selR):null;
-        const grouped={"오전":routines.filter((r)=>r.when==="오전"),"오후":routines.filter((r)=>r.when!=="오전")};
-        const doneToday=routines.filter((r)=>(r.checkins||{})[rDate]).length;
+        const rFiltered=routines.filter((r)=>{
+          if(rOwner!=="전체"&&r.owner!==rOwner)return false;
+          if(rQuery.trim()){const kw=rQuery.trim().toLowerCase();if(!`${r.title} ${r.memo||""} ${r.owner||""}`.toLowerCase().includes(kw))return false;}
+          return true;
+        });
+        const grouped={"오전":rFiltered.filter((r)=>r.when==="오전"),"오후":rFiltered.filter((r)=>r.when!=="오전")};
+        const doneToday=rFiltered.filter((r)=>(r.checkins||{})[rDate]).length;
+        const rOwners=[...new Set(routines.map((r)=>r.owner).filter(Boolean))].sort();
         return (
         <div className="rwrap">
           <div>
@@ -707,13 +759,21 @@ function Board() {
                 <div>
                   <div style={{fontSize:14,fontWeight:800}}>반복 업무</div>
                   <div style={{fontFamily:"monospace",fontSize:11,color:"#8F959C",marginTop:3}}>
-                    {rDate.replace(/-/g,".")} · 오늘 {doneToday}/{routines.length}
+                    {rDate.replace(/-/g,".")} · 오늘 {doneToday}/{rFiltered.length}
                   </div>
                 </div>
                 <div style={{display:"flex",gap:6}}>
                   <button className="btn ghost" onClick={()=>setRDate(todayStr())}>오늘</button>
-                  {canEdit&&<button className="btn" onClick={()=>setRDraft({_new:true,id:uid(),title:"",when:"오전",owner:me,memo:"",checkins:{},issues:[]})}>+ 추가</button>}
+                  {canEdit&&<button className="btn" onClick={()=>setRDraft({_new:true,id:uid(),title:"",when:"오전",owner:me,memo:"",checkins:{},issues:[],fixedChecks:[]})}>+ 추가</button>}
                 </div>
+              </div>
+              <div className="rfilters">
+                <input className="inp" placeholder="반복업무 검색" value={rQuery} onChange={(e)=>setRQuery(e.target.value)} style={{flex:1,minWidth:120}} />
+                <select className="sel" value={rOwner} onChange={(e)=>setROwner(e.target.value)}>
+                  <option value="전체">담당자 전체</option>
+                  {rOwners.map((o)=><option key={o} value={o}>{o}</option>)}
+                </select>
+                <input type="date" className="sel" value={rDate} onChange={(e)=>e.target.value&&setRDate(e.target.value)} />
               </div>
               <div className="wkstrip">
                 {week.map((d)=>{
@@ -821,6 +881,42 @@ function Board() {
                     style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13,minHeight:70,lineHeight:1.5,resize:"vertical"}} />
                 </div>
 
+                <div className="sect"><h4>고정 체크리스트 <span style={{fontWeight:500,color:"var(--ink3)"}}>· {rDate.slice(5).replace("-","/")}</span></h4>
+                  <p className="hint" style={{marginBottom:8}}>항목은 매일 고정으로 뜨고, 체크 여부는 날짜별로 따로 기록됩니다.</p>
+                  {(sel.fixedChecks||[]).length===0&&<span className="hint">항목이 없습니다. 아래에서 추가하세요.</span>}
+                  {(sel.fixedChecks||[]).map((fc)=>{
+                    const dayKey=rDate;
+                    const done=!!((sel.fixedState||{})[dayKey]||{})[fc.id];
+                    return (
+                      <div key={fc.id} className="fcitem">
+                        <button className={"fccheck"+(done?" on":"")} disabled={!canEdit} onClick={()=>{
+                          commit((d)=>({...d,routines:(d.routines||[]).map((x)=>{
+                            if(x.id!==sel.id)return x;
+                            const fs={...(x.fixedState||{})};
+                            const day={...(fs[dayKey]||{})};
+                            if(day[fc.id])delete day[fc.id]; else day[fc.id]={by:me||"익명",ts:Date.now()};
+                            fs[dayKey]=day;
+                            return {...x,fixedState:fs,updatedAt:Date.now()};
+                          })}),[]);
+                        }}>{done?"✓":""}</button>
+                        <span style={{flex:1,fontSize:13,textDecoration:done?"line-through":"none",color:done?"var(--ink3)":"inherit"}}>{fc.text}</span>
+                        {canEdit&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15}} onClick={()=>{
+                          commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,fixedChecks:(x.fixedChecks||[]).filter((y)=>y.id!==fc.id),updatedAt:Date.now()}:x)}),[]);
+                        }}>×</button>}
+                      </div>
+                    );
+                  })}
+                  {canEdit&&<div className="addrow">
+                    <input placeholder="체크 항목 입력 후 Enter" onKeyDown={(e)=>{
+                      if(e.nativeEvent.isComposing||e.key!=="Enter")return;
+                      const v=e.target.value.trim();if(!v)return;
+                      const item={id:uid(),text:v};
+                      commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,fixedChecks:[...(x.fixedChecks||[]),item],updatedAt:Date.now()}:x)}),[]);
+                      e.target.value="";
+                    }} />
+                  </div>}
+                </div>
+
                 <div className="sect"><h4>이슈{openIss.length>0&&` · 미해결 ${openIss.length}`}</h4>
                   {(sel.issues||[]).length===0&&<span className="hint">등록된 이슈가 없습니다</span>}
                   {(sel.issues||[]).map((i)=>(
@@ -853,9 +949,9 @@ function Board() {
       {view==="issue"&&(
         <div>
           <div className="panel"><h3>이슈 모아보기</h3>
-            <p className="sub">반복 업무에서 등록된 이슈가 전부 모입니다. 체크하면 해결 처리됩니다.</p>
+            <p className="sub">반복 업무와 일반 업무에서 등록된 이슈가 전부 모입니다. 이슈를 클릭하면 히스토리를 기록할 수 있습니다.</p>
             <div style={{display:"flex",gap:7}}>
-              {[{id:"open",label:`미해결 ${allIssues.filter((i)=>!i.resolved).length}`},{id:"done",label:`해결 ${allIssues.filter((i)=>i.resolved).length}`},{id:"all",label:`전체 ${allIssues.length}`}].map((f)=>(
+              {[{id:"all",label:`전체 ${allIssues.length}`},{id:"done",label:`해결 ${allIssues.filter((i)=>i.resolved).length}`},{id:"open",label:`미해결 ${allIssues.filter((i)=>!i.resolved).length}`}].map((f)=>(
                 <button key={f.id} className={"chip"+(issueFilter===f.id?" sel":"")} onClick={()=>setIssueFilter(f.id)}>{f.label}</button>
               ))}
             </div>
@@ -863,16 +959,17 @@ function Board() {
           {(()=>{
             const list=allIssues.filter((i)=>issueFilter==="all"?true:issueFilter==="open"?!i.resolved:i.resolved);
             if(!list.length)return <div className="empty">해당하는 이슈가 없습니다</div>;
+            const toggleAny=(i)=>{
+              if(i.routineId)toggleIssue(i.routineId,i.id);
+              else commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===i.taskId?{...t,issues:(t.issues||[]).map((x)=>x.id===i.id?{...x,resolved:!x.resolved,resolvedBy:me}:x),updatedAt:Date.now()}:t)}),[]);
+            };
             return list.map((i)=>(
               <div key={i.id} className={"issrow"+(i.resolved?" done":"")}>
-                <button className="issck" onClick={()=>{
-                  if(i.routineId)toggleIssue(i.routineId,i.id);
-                  else commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===i.taskId?{...t,issues:(t.issues||[]).map((x)=>x.id===i.id?{...x,resolved:!x.resolved}:x),updatedAt:Date.now()}:t)}),[]);
-                }}>{i.resolved?"✓":""}</button>
-                <div style={{flex:1,minWidth:0}}>
-                  <div className="isstext">{i.text}</div>
+                <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setIssueDetail(i)}>
+                  <div className="isstext">{i.text}{(i.history||[]).length>0&&<span style={{fontSize:11,color:"var(--pri)",marginLeft:6,fontWeight:700}}>💬{(i.history||[]).length}</span>}</div>
                   <div className="issmeta"><b style={{color:i.src==="업무"?"#0055CC":"#1F845A"}}>{i.src}</b> · {i.routineTitle} · {i.author} · {fmtTs(i.ts)}{i.owner&&` · 담당 ${i.owner}`}</div>
                 </div>
+                <button className={"issbtn"+(i.resolved?"":" active")} onClick={()=>toggleAny(i)}>{i.resolved?"해결됨 ✓":"미해결"}</button>
                 <button className="btn ghost" onClick={()=>{
                   if(i.routineId){setView("routine");setSelR(i.routineId);}
                   else{const t=data.tasks.find((x)=>x.id===i.taskId);if(t){setView("board");openTask(t);}}
@@ -884,8 +981,13 @@ function Board() {
       )}
 
       {view==="list"&&(()=>{
-        const STCOL={todo:"#579BFC",doing:"#FDAB3D",review:"#A25DDC",done:"#00C875"};
+        const STCOL={todo:"#579BFC",doing:"#FDAB3D",review:"#A25DDC",issuecol:"#E2445C",done:"#00C875"};
         const PRCOL={high:"#333E85",mid:"#5559DF",low:"#579BFC"};
+        const mdVisible=visible.filter((t)=>{
+          if(listDateFrom&&(!t.due||t.due<listDateFrom))return false;
+          if(listDateTo&&(!t.due||t.due>listDateTo))return false;
+          return true;
+        });
         const patch=(t,k,v)=>{
           if(!canEdit)return;
           const now=Date.now();
@@ -895,8 +997,8 @@ function Board() {
             [mkLog("셀 수정",t,`${k} → ${v}`)]);
         };
         const groups=grpBy==="status"
-          ? COLUMNS.map((c)=>({key:c.id,label:c.label,color:STCOL[c.id],items:visible.filter((t)=>t.status===c.id)}))
-          : data.channels.map((c)=>({key:c.id,label:c.id,color:c.color,items:visible.filter((t)=>t.channel===c.id)})).filter((g)=>g.items.length>0);
+          ? COLUMNS.map((c)=>({key:c.id,label:c.label,color:STCOL[c.id],items:mdVisible.filter((t)=>t.status===c.id)}))
+          : data.channels.map((c)=>({key:c.id,label:c.id,color:c.color,items:mdVisible.filter((t)=>t.channel===c.id)})).filter((g)=>g.items.length>0);
         return (
         <div>
           <div className="mdtoolbar">
@@ -914,10 +1016,14 @@ function Board() {
               <option value="전체">담당자 전체</option>
               {owners.map((o)=><option key={o} value={o}>{o}</option>)}
             </select>
-            <button className={"chip tog"+(onlyMine?" sel":"")} onClick={()=>setOnlyMine((v)=>!v)}>내 업무</button>
-            <button className={"chip tog"+(onlyLate?" sel":"")} onClick={()=>setOnlyLate((v)=>!v)}>지연만</button>
+            <span className="mdsep" />
+            <span className="mdlbl">마감</span>
+            <input type="date" className="sel" value={listDateFrom} onChange={(e)=>setListDateFrom(e.target.value)} />
+            <span style={{color:"var(--ink3)"}}>~</span>
+            <input type="date" className="sel" value={listDateTo} onChange={(e)=>setListDateTo(e.target.value)} />
+            {(listDateFrom||listDateTo)&&<button className="chip" onClick={()=>{setListDateFrom("");setListDateTo("");}}>해제</button>}
             <span className="spacer" />
-            <span className="mdlbl">{visible.length}건</span>
+            <span className="mdlbl">{mdVisible.length}건</span>
           </div>
 
           {groups.map((g)=>{
@@ -1168,11 +1274,69 @@ function Board() {
         </div></div>
       )}
 
+      {issueDetail&&(()=>{
+        const findLive=allIssues.find((x)=>x.id===issueDetail.id)||issueDetail;
+        const i=findLive;
+        const addHistory=(text)=>{
+          const t=text.trim();if(!t)return;
+          const entry={id:uid(),text:t,author:me||"익명",ts:Date.now()};
+          if(i.routineId){
+            commit((d)=>({...d,routines:(d.routines||[]).map((r)=>r.id===i.routineId?{...r,issues:(r.issues||[]).map((x)=>x.id===i.id?{...x,history:[...(x.history||[]),entry]}:x),updatedAt:Date.now()}:r)}),[]);
+          }else{
+            commit((d)=>({...d,tasks:d.tasks.map((tk)=>tk.id===i.taskId?{...tk,issues:(tk.issues||[]).map((x)=>x.id===i.id?{...x,history:[...(x.history||[]),entry]}:x),updatedAt:Date.now()}:tk)}),[]);
+          }
+          setIssueDetail({...i,history:[...(i.history||[]),entry]});
+        };
+        const toggleR=()=>{
+          if(i.routineId)toggleIssue(i.routineId,i.id);
+          else commit((d)=>({...d,tasks:d.tasks.map((tk)=>tk.id===i.taskId?{...tk,issues:(tk.issues||[]).map((x)=>x.id===i.id?{...x,resolved:!x.resolved,resolvedBy:me}:x),updatedAt:Date.now()}:tk)}),[]);
+          setIssueDetail({...i,resolved:!i.resolved});
+        };
+        return (
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setIssueDetail(null)}><div className="modal">
+          <h2>이슈 상세</h2>
+          <div className="modal-body">
+            <div style={{background:"#F5F6F8",borderRadius:8,padding:"12px 14px",marginBottom:16}}>
+              <div style={{fontSize:15,fontWeight:700,marginBottom:6}}>{i.text}</div>
+              <div className="issmeta"><b style={{color:i.src==="업무"?"#0055CC":"#1F845A"}}>{i.src}</b> · {i.routineTitle} · 등록 {i.author} · {fmtTs(i.ts)}{i.owner&&` · 담당 ${i.owner}`}</div>
+              <button className={"issbtn"+(i.resolved?"":" active")} style={{marginTop:10}} onClick={toggleR}>{i.resolved?"해결됨 ✓ (누르면 미해결)":"미해결 (누르면 해결)"}</button>
+            </div>
+            <div className="sect" style={{marginTop:0,borderTop:"none"}}><h4>히스토리 · 진행 기록</h4>
+              {(i.history||[]).length===0&&<span className="hint">아직 기록이 없습니다. 아래에 진행 상황을 적어보세요.</span>}
+              {(i.history||[]).map((h)=>(
+                <div key={h.id} className="cmt">
+                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}</div>
+                  <p>{h.text}</p>
+                </div>
+              ))}
+              {canEdit&&<div className="addrow">
+                <input placeholder="진행 상황·조치 내용 입력 후 Enter" onKeyDown={(e)=>{
+                  if(e.nativeEvent.isComposing||e.key!=="Enter")return;
+                  addHistory(e.target.value);e.target.value="";
+                }} />
+              </div>}
+            </div>
+          </div>
+          <div className="modal-foot">
+            <span className="spacer" />
+            <button className="btn ghost" onClick={()=>setIssueDetail(null)}>닫기</button>
+          </div>
+        </div></div>
+        );
+      })()}
+
       {confirmBox&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setConfirmBox(null)}><div className="modal sm">
-          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":"완료 업무를 보관할까요?"}</h2>
-          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
-          <div className="mfoot"><span className="spacer" /><button className="btn ghost" onClick={()=>setConfirmBox(null)}>취소</button><button className={confirmBox.kind==="purge"?"btn warn":"btn"} onClick={()=>confirmBox.kind==="purge"?purgeArchive():archiveDone()}>{confirmBox.kind==="purge"?"영구 삭제":"보관하기"}</button></div>
+          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":"완료 업무를 보관할까요?"}</h2>
+          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요? 보드에서 사라지고 보관함에서 볼 수 있습니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
+          <div className="mfoot"><span className="spacer" />
+            <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":"취소"}</button>
+            <button className={confirmBox.kind==="purge"?"btn warn":"btn"} onClick={()=>{
+              if(confirmBox.kind==="purge")purgeArchive();
+              else if(confirmBox.kind==="archiveOne"){const tid=confirmBox.taskId;commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===tid?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("아카이브",{id:tid,title:confirmBox.taskTitle})]);setConfirmBox(null);}
+              else archiveDone();
+            }}>{confirmBox.kind==="purge"?"영구 삭제":"보관하기"}</button>
+          </div>
         </div></div>
       )}
 
@@ -1212,6 +1376,7 @@ function Board() {
                 </div>
               )}
             </div>
+            <div className="fld"><label>시작일</label><input type="date" disabled={!canEdit} value={draft.start||""} onChange={(e)=>setDraft({...draft,start:e.target.value})} /></div>
             <div className="fld"><label>마감일</label><input type="date" disabled={!canEdit} value={draft.due} onChange={(e)=>setDraft({...draft,due:e.target.value})} /></div>
           </div>
           <div className="r3">
