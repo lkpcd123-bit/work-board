@@ -372,35 +372,40 @@ const CSS = `
 .fccheck.on{background:var(--ok);border-color:var(--ok);color:#fff;}
 .fccheck:disabled{opacity:.4;}
 
+
 /* ══ 체크리스트 탭 ══ */
-.cktabs{display:flex;gap:6px;align-items:center;margin-bottom:16px;flex-wrap:wrap;}
-.cktab{background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;color:var(--ink2);display:inline-flex;align-items:center;gap:7px;}
-.cktab:hover{border-color:var(--pri);}
-.cktab.sel{background:var(--pri);color:#fff;border-color:var(--pri);}
-.cktab em{font-style:normal;font-size:12px;background:rgba(0,0,0,.12);padding:1px 7px;border-radius:9px;}
-.cktab.sel em{background:rgba(255,255,255,.25);}
-.ckgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start;}
-.ckcard{background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh);padding:13px 15px;}
-.ckcard.over{border-color:#E2445C;box-shadow:0 0 0 1px #E2445C,var(--sh);}
-.ckcard.done{opacity:.62;}
-.ckhead{display:flex;align-items:flex-start;gap:11px;}
-.ckbox{width:24px;height:24px;border:2px solid var(--line2);border-radius:6px;background:var(--card);font-size:13px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;}
+.ckcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start;}
+.ckcol{background:#EBECF0;border-radius:12px;padding:12px;}
+.ckcolhead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 12px;}
+.ckcoltitle{font-size:15px;font-weight:800;display:inline-flex;align-items:center;gap:8px;letter-spacing:-.01em;}
+.ckcoltitle em{font-style:normal;font-size:12.5px;color:var(--ink3);background:#DFE1E6;padding:1px 8px;border-radius:10px;font-weight:700;}
+.ckplus{width:30px;height:30px;border-radius:7px;background:#DFE1E6;color:var(--ink2);font-size:19px;font-weight:400;line-height:1;display:flex;align-items:center;justify-content:center;}
+.ckplus:hover{background:#0C66E4;color:#fff;}
+.ckclear{font-size:11.5px;color:var(--danger);font-weight:700;padding:0 6px;background:none;}
+.ckclear:hover{text-decoration:underline;}
+.ckcolbody{display:flex;flex-direction:column;gap:8px;min-height:40px;}
+.ckempty{text-align:center;font-size:12.5px;color:var(--ink3);padding:20px 8px;}
+.ckrow{background:var(--card);border-radius:8px;box-shadow:var(--sh);padding:11px 13px;}
+.ckrow:hover{box-shadow:var(--sh2);}
+.ckrow.over{box-shadow:0 0 0 1.5px #E2445C,var(--sh);}
+.ckrow.done{opacity:.6;}
+.ckrowmain{display:flex;align-items:flex-start;gap:11px;}
+.ckbox{width:22px;height:22px;border:2px solid var(--line2);border-radius:6px;background:var(--card);font-size:12px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;}
 .ckbox:hover{border-color:var(--ok);}
 .ckbox.on{background:var(--ok);border-color:var(--ok);color:#fff;}
-.ckbox.sm{width:19px;height:19px;font-size:11px;}
+.ckbox.sm{width:18px;height:18px;font-size:10px;}
 .ckbox:disabled{opacity:.5;}
-.cktitle{font-size:14.5px;font-weight:700;line-height:1.4;word-break:keep-all;margin-bottom:4px;}
-.ckcard.done .cktitle{text-decoration:line-through;color:var(--ink3);}
+.cktitle{font-size:14px;font-weight:700;line-height:1.4;word-break:keep-all;margin-bottom:4px;}
+.ckrow.done .cktitle{text-decoration:line-through;color:var(--ink3);}
 .cktitle.red{color:#E2445C;}
-.ckmeta{display:flex;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--ink3);font-weight:600;}
-.ckmeta .red{color:#E2445C;font-weight:800;}
-.ckexp{background:#EBECF0;border-radius:6px;padding:4px 9px;font-size:11.5px;font-weight:700;color:var(--ink2);white-space:nowrap;flex-shrink:0;}
-.ckexp:hover{background:#DFE1E6;}
-.cksubs{margin-top:11px;padding-top:11px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px;}
+.ckmeta{display:flex;gap:5px;flex-wrap:wrap;font-size:12.5px;color:var(--ink3);font-weight:600;}
+.ckmeta.red{color:#E2445C;font-weight:800;}
+.ckunderline{height:2px;background:linear-gradient(90deg,var(--line2),transparent);border-radius:2px;margin-top:8px;width:70%;}
+.ckexp{background:none;color:var(--ink3);font-size:11px;padding:2px 5px;flex-shrink:0;}
+.ckexp:hover{color:var(--pri);}
+.cksubs{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px;padding-left:33px;}
 .cksub{display:flex;align-items:center;gap:8px;font-size:13px;}
-.ckdesc{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink2);line-height:1.55;white-space:pre-wrap;}
-@media(max-width:1100px){.ckgrid{grid-template-columns:repeat(2,minmax(0,1fr));}}
-@media(max-width:680px){.ckgrid{grid-template-columns:1fr;}}
+@media(max-width:1100px){.ckcols{grid-template-columns:1fr;}}
 
 `;
 
@@ -455,7 +460,6 @@ function Board() {
   const [rOwner, setROwner] = useState("전체");
   const [rQuery, setRQuery] = useState("");
   const [issueDetail, setIssueDetail] = useState(null);
-  const [ckTab, setCkTab] = useState("checklist");
   const [ckDraft, setCkDraft] = useState(null);
   const [ckExpand, setCkExpand] = useState({});
   const [listDateFrom, setListDateFrom] = useState("");
@@ -1011,61 +1015,62 @@ function Board() {
         </div>
         );})()}
 
-      {view==="checklist"&&(()=>{
-        const items=ckByTab(ckTab);
-        const isCL=ckTab==="checklist";
-        return (
-        <div>
-          <div className="cktabs">
-            {CKTABS.map((t)=>(
-              <button key={t.id} className={"cktab"+(ckTab===t.id?" sel":"")} onClick={()=>setCkTab(t.id)}>
-                {t.label}<em>{checkitems.filter((c)=>c.tab===t.id&&!c.done).length}</em>
-              </button>
-            ))}
-            <span className="spacer" />
-            {isCL&&canEdit&&items.length>0&&<button className="chip" onClick={()=>setConfirmBox({kind:"clearCk",tab:ckTab})}>전체 지우기</button>}
-            {canEdit&&<button className="btn" onClick={()=>setCkDraft({_new:true,id:uid(),tab:ckTab,title:"",start:"",due:"",desc:"",done:false,subs:isCL?[]:undefined})}>+ 추가</button>}
-          </div>
-
-          {items.length===0&&<div className="empty">항목이 없습니다. + 추가로 만들어보세요.</div>}
-          <div className="ckgrid">
-            {items.map((c)=>{
-              const dd=dayDiff(c.due);const over=dd!==null&&dd<0&&!c.done;
-              const subs=c.subs||[];const subDone=subs.filter((s)=>s.done).length;
-              const exp=ckExpand[c.id];
-              return (
-                <div key={c.id} className={"ckcard"+(c.done?" done":"")+(over?" over":"")}>
-                  <div className="ckhead">
-                    <button className={"ckbox"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCk(c)}>{c.done?"✓":""}</button>
-                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setCkDraft({...c,subs:c.subs?[...c.subs]:(isCL?[]:undefined)})}>
-                      <div className={"cktitle"+(over?" red":"")}>{c.title}</div>
-                      <div className="ckmeta">
-                        {c.start&&<span>{c.start.slice(5)}</span>}
-                        {(c.start&&c.due)&&<span>~</span>}
-                        {c.due&&<span className={over?"red":""}>{c.due.slice(5)}{over?` (${Math.abs(dd)}일 지남)`:""}</span>}
-                        {isCL&&subs.length>0&&<span>· 체크 {subDone}/{subs.length}</span>}
-                      </div>
-                    </div>
-                    {isCL&&subs.length>0&&<button className="ckexp" onClick={()=>setCkExpand({...ckExpand,[c.id]:!exp})}>{exp?"숨김 ▲":"펼침 ▼"}</button>}
+      {view==="checklist"&&(
+        <div className="ckcols">
+          {CKTABS.map((tab)=>{
+            const isCL=tab.id==="checklist";
+            const items=ckByTab(tab.id);
+            return (
+              <div key={tab.id} className="ckcol">
+                <div className="ckcolhead">
+                  <div className="ckcoltitle">{tab.label}<em>{items.filter((c)=>!c.done).length}</em></div>
+                  <div style={{display:"flex",gap:5}}>
+                    {isCL&&canEdit&&items.length>0&&<button className="ckclear" onClick={()=>setConfirmBox({kind:"clearCk",tab:tab.id})}>전체 지우기</button>}
+                    {canEdit&&<button className="ckplus" onClick={()=>setCkDraft({_new:true,id:uid(),tab:tab.id,title:"",start:"",due:"",desc:"",done:false,subs:isCL?[]:undefined})}>+</button>}
                   </div>
-                  {isCL&&exp&&subs.length>0&&(
-                    <div className="cksubs">
-                      {subs.map((s)=>(
-                        <div key={s.id} className="cksub">
-                          <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"✓":""}</button>
-                          <span style={{textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {c.desc&&<div className="ckdesc">{c.desc}</div>}
                 </div>
-              );
-            })}
-          </div>
+                <div className="ckcolbody">
+                  {items.length===0&&<div className="ckempty">항목이 없습니다</div>}
+                  {items.map((c)=>{
+                    const dd=dayDiff(c.due);const over=dd!==null&&dd<0&&!c.done;
+                    const subs=c.subs||[];const subDone=subs.filter((s)=>s.done).length;
+                    const exp=ckExpand[c.id];
+                    return (
+                      <div key={c.id} className={"ckrow"+(c.done?" done":"")+(over?" over":"")}>
+                        <div className="ckrowmain">
+                          <button className={"ckbox"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCk(c)}>{c.done?"✓":""}</button>
+                          <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setCkDraft({...c,subs:c.subs?[...c.subs]:(isCL?[]:undefined)})}>
+                            <div className={"cktitle"+(over?" red":"")}>{c.title}</div>
+                            <div className={"ckmeta"+(over?" red":"")}>
+                              {c.start&&<span>{c.start.slice(5).replace("-","월 ")}일</span>}
+                              {(c.start&&c.due)&&<span>~</span>}
+                              {c.due&&<span>{c.due.slice(5).replace("-","월 ")}일{over?` (${Math.abs(dd)}일 지남)`:""}</span>}
+                              {!c.start&&!c.due&&<span style={{color:"var(--ink3)"}}>기한 없음</span>}
+                              {isCL&&subs.length>0&&<span>· {subDone}/{subs.length}</span>}
+                            </div>
+                            <div className="ckunderline" />
+                          </div>
+                          {isCL&&subs.length>0&&<button className="ckexp" onClick={(e)=>{e.stopPropagation();setCkExpand({...ckExpand,[c.id]:!exp});}}>{exp?"▲":"▼"}</button>}
+                        </div>
+                        {isCL&&exp&&subs.length>0&&(
+                          <div className="cksubs">
+                            {subs.map((s)=>(
+                              <div key={s.id} className="cksub">
+                                <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"✓":""}</button>
+                                <span style={{textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
-        );
-      })()}
+      )}
 
 
       {view==="issue"&&(
