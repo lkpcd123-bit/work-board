@@ -414,8 +414,6 @@ function Board() {
   const [curBoard, setCurBoard] = useState("공용");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [rDateFrom, setRDateFrom] = useState("");
-  const [rDateTo, setRDateTo] = useState("");
   const [rOwner, setROwner] = useState("전체");
   const [rQuery, setRQuery] = useState("");
   const [issueDetail, setIssueDetail] = useState(null);
