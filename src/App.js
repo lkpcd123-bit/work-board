@@ -206,9 +206,10 @@ const CSS = `
 .modal-body{flex:1;overflow-y:auto;padding:20px 24px;}
 .modal-foot{padding:16px 24px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;}
 .modal.sm{max-width:520px;}
-.modal.sm .modal-body{padding:28px 32px;}
-.modal.sm h2{padding:28px 32px 20px;font-size:21px;}
-.modal.sm .modal-foot{padding:20px 32px 24px;}
+.modal.sm h2{padding:36px 40px 16px;font-size:22px;text-align:center;border-bottom:none;}
+.modal.sm .modal-body{padding:0 40px 8px;text-align:center;font-size:15px;color:var(--ink2);line-height:1.8;}
+.modal.sm .modal-foot{padding:24px 40px 36px;justify-content:center;gap:12px;}
+.modal.sm .modal-foot .spacer{display:none;}
 .fld{margin-bottom:14px;}
 .fld label{display:block;font-size:12.5px;font-weight:700;color:var(--ink3);margin-bottom:6px;}
 .fld input,.fld select,.fld textarea{width:100%;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:9px 11px;font-size:14.5px;color:var(--ink);}
