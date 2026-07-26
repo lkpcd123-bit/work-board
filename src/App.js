@@ -25,6 +25,7 @@ const COLUMNS = [
   { id: "done", label: "완료" },
 ];
 const BOARDS = ["공용","김현민","김찬"];
+const CKTABS = [{id:"checklist",label:"체크리스트"},{id:"event",label:"행사 원복"},{id:"product",label:"상품 원복"}];
 const DEFAULT_CHANNELS = [
   { id: "공통", color: "#7A8189" },
   { id: "자사몰", color: "#3355C9" },
@@ -49,15 +50,16 @@ const weekOf=(ds)=>{const d=new Date(ds+"T00:00:00");const dow=d.getDay();const 
 const DOW=["월","화","수","목","금","토","일"];
 const monthGrid=(y,m)=>{const first=new Date(y,m,1);const startPad=(first.getDay()+6)%7;const last=new Date(y,m+1,0).getDate();const cells=[];for(let i=0;i<startPad;i++)cells.push(null);for(let i=1;i<=last;i++){const mm=String(m+1).padStart(2,"0"),dd=String(i).padStart(2,"0");cells.push(`${y}-${mm}-${dd}`);}while(cells.length%7!==0)cells.push(null);return cells;};
 const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
-const emptyData = () => ({ tasks:[],routines:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
   const rm=new Map(); [...(r.routines||[]),...(l.routines||[])].forEach(t=>{const p=rm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))rm.set(t.id,t);});
+  const cm=new Map(); [...(r.checkitems||[]),...(l.checkitems||[])].forEach(t=>{const p=cm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))cm.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],routines:[...rm.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
+  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
 }
 
 const CSS = `
@@ -370,6 +372,36 @@ const CSS = `
 .fccheck.on{background:var(--ok);border-color:var(--ok);color:#fff;}
 .fccheck:disabled{opacity:.4;}
 
+/* ══ 체크리스트 탭 ══ */
+.cktabs{display:flex;gap:6px;align-items:center;margin-bottom:16px;flex-wrap:wrap;}
+.cktab{background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;color:var(--ink2);display:inline-flex;align-items:center;gap:7px;}
+.cktab:hover{border-color:var(--pri);}
+.cktab.sel{background:var(--pri);color:#fff;border-color:var(--pri);}
+.cktab em{font-style:normal;font-size:12px;background:rgba(0,0,0,.12);padding:1px 7px;border-radius:9px;}
+.cktab.sel em{background:rgba(255,255,255,.25);}
+.ckgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start;}
+.ckcard{background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh);padding:13px 15px;}
+.ckcard.over{border-color:#E2445C;box-shadow:0 0 0 1px #E2445C,var(--sh);}
+.ckcard.done{opacity:.62;}
+.ckhead{display:flex;align-items:flex-start;gap:11px;}
+.ckbox{width:24px;height:24px;border:2px solid var(--line2);border-radius:6px;background:var(--card);font-size:13px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;}
+.ckbox:hover{border-color:var(--ok);}
+.ckbox.on{background:var(--ok);border-color:var(--ok);color:#fff;}
+.ckbox.sm{width:19px;height:19px;font-size:11px;}
+.ckbox:disabled{opacity:.5;}
+.cktitle{font-size:14.5px;font-weight:700;line-height:1.4;word-break:keep-all;margin-bottom:4px;}
+.ckcard.done .cktitle{text-decoration:line-through;color:var(--ink3);}
+.cktitle.red{color:#E2445C;}
+.ckmeta{display:flex;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--ink3);font-weight:600;}
+.ckmeta .red{color:#E2445C;font-weight:800;}
+.ckexp{background:#EBECF0;border-radius:6px;padding:4px 9px;font-size:11.5px;font-weight:700;color:var(--ink2);white-space:nowrap;flex-shrink:0;}
+.ckexp:hover{background:#DFE1E6;}
+.cksubs{margin-top:11px;padding-top:11px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px;}
+.cksub{display:flex;align-items:center;gap:8px;font-size:13px;}
+.ckdesc{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink2);line-height:1.55;white-space:pre-wrap;}
+@media(max-width:1100px){.ckgrid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:680px){.ckgrid{grid-template-columns:1fr;}}
+
 `;
 
 function LoginScreen() {
@@ -423,6 +455,9 @@ function Board() {
   const [rOwner, setROwner] = useState("전체");
   const [rQuery, setRQuery] = useState("");
   const [issueDetail, setIssueDetail] = useState(null);
+  const [ckTab, setCkTab] = useState("checklist");
+  const [ckDraft, setCkDraft] = useState(null);
+  const [ckExpand, setCkExpand] = useState({});
   const [listDateFrom, setListDateFrom] = useState("");
   const [listDateTo, setListDateTo] = useState("");
   const [rDate, setRDate] = useState(todayStr());
@@ -612,6 +647,28 @@ function Board() {
     return routines.filter((r)=>(r.checkins||{})[date]).length/routines.length;
   },[routines]);
 
+  /* ── 체크리스트 ── */
+  const checkitems=useMemo(()=>(data.checkitems||[]).filter((c)=>!c.deleted),[data.checkitems]);
+  const ckByTab=useCallback((tab)=>checkitems.filter((c)=>c.tab===tab).slice().sort((a,b)=>{
+    const da=a.due||"9999",db=b.due||"9999";
+    if(a.done!==b.done)return a.done?1:-1;
+    return da<db?-1:da>db?1:0;
+  }),[checkitems]);
+
+  const saveCk=()=>{
+    if(!ckDraft.title.trim())return;
+    const now=Date.now();const isNew=ckDraft._new;const clean={...ckDraft};delete clean._new;
+    commit((d)=>{const list=d.checkitems||[];const ex=list.some((c)=>c.id===clean.id);
+      const rec={...clean,updatedAt:now,updatedBy:me,createdAt:clean.createdAt||now};
+      return{...d,checkitems:ex?list.map((c)=>c.id===rec.id?rec:c):[...list,rec]};},
+      [{id:uid(),ts:now,who:me||"익명",taskId:clean.id,taskTitle:clean.title,action:isNew?"체크항목 생성":"체크항목 수정",detail:CKTABS.find((t)=>t.id===clean.tab)?.label||""}]);
+    setCkDraft(null);
+  };
+  const toggleCk=(c)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:!x.done,doneAt:!x.done?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);};
+  const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크항목 삭제",detail:""}]);setCkDraft(null);};
+  const clearCkTab=(tab)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.tab===tab&&!x.deleted?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:null,taskTitle:"",action:"체크리스트 전체삭제",detail:CKTABS.find((t)=>t.id===tab)?.label||""}]);};
+  const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
+
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
@@ -661,7 +718,7 @@ function Board() {
         <button className="ghostw" onClick={()=>load()}>새로고침</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -953,6 +1010,63 @@ function Board() {
           </div>
         </div>
         );})()}
+
+      {view==="checklist"&&(()=>{
+        const items=ckByTab(ckTab);
+        const isCL=ckTab==="checklist";
+        return (
+        <div>
+          <div className="cktabs">
+            {CKTABS.map((t)=>(
+              <button key={t.id} className={"cktab"+(ckTab===t.id?" sel":"")} onClick={()=>setCkTab(t.id)}>
+                {t.label}<em>{checkitems.filter((c)=>c.tab===t.id&&!c.done).length}</em>
+              </button>
+            ))}
+            <span className="spacer" />
+            {isCL&&canEdit&&items.length>0&&<button className="chip" onClick={()=>setConfirmBox({kind:"clearCk",tab:ckTab})}>전체 지우기</button>}
+            {canEdit&&<button className="btn" onClick={()=>setCkDraft({_new:true,id:uid(),tab:ckTab,title:"",start:"",due:"",desc:"",done:false,subs:isCL?[]:undefined})}>+ 추가</button>}
+          </div>
+
+          {items.length===0&&<div className="empty">항목이 없습니다. + 추가로 만들어보세요.</div>}
+          <div className="ckgrid">
+            {items.map((c)=>{
+              const dd=dayDiff(c.due);const over=dd!==null&&dd<0&&!c.done;
+              const subs=c.subs||[];const subDone=subs.filter((s)=>s.done).length;
+              const exp=ckExpand[c.id];
+              return (
+                <div key={c.id} className={"ckcard"+(c.done?" done":"")+(over?" over":"")}>
+                  <div className="ckhead">
+                    <button className={"ckbox"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCk(c)}>{c.done?"✓":""}</button>
+                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setCkDraft({...c,subs:c.subs?[...c.subs]:(isCL?[]:undefined)})}>
+                      <div className={"cktitle"+(over?" red":"")}>{c.title}</div>
+                      <div className="ckmeta">
+                        {c.start&&<span>{c.start.slice(5)}</span>}
+                        {(c.start&&c.due)&&<span>~</span>}
+                        {c.due&&<span className={over?"red":""}>{c.due.slice(5)}{over?` (${Math.abs(dd)}일 지남)`:""}</span>}
+                        {isCL&&subs.length>0&&<span>· 체크 {subDone}/{subs.length}</span>}
+                      </div>
+                    </div>
+                    {isCL&&subs.length>0&&<button className="ckexp" onClick={()=>setCkExpand({...ckExpand,[c.id]:!exp})}>{exp?"숨김 ▲":"펼침 ▼"}</button>}
+                  </div>
+                  {isCL&&exp&&subs.length>0&&(
+                    <div className="cksubs">
+                      {subs.map((s)=>(
+                        <div key={s.id} className="cksub">
+                          <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"✓":""}</button>
+                          <span style={{textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {c.desc&&<div className="ckdesc">{c.desc}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        );
+      })()}
+
 
       {view==="issue"&&(
         <div>
@@ -1353,17 +1467,60 @@ function Board() {
         );
       })()}
 
+      {ckDraft&&(()=>{
+        const isCL=ckDraft.tab==="checklist";
+        return (
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setCkDraft(null)}><div className="modal">
+          <h2>{ckDraft._new?"새 항목":"항목 상세"} · {CKTABS.find((t)=>t.id===ckDraft.tab)?.label}</h2>
+          <div className="modal-body">
+            <div className="fld"><label>제목</label><input autoFocus value={ckDraft.title} onChange={(e)=>setCkDraft({...ckDraft,title:e.target.value})} placeholder="예) 여름 특가전 배너 원복" /></div>
+            <div className="r2">
+              <div className="fld"><label>시작일</label><input type="date" value={ckDraft.start||""} onChange={(e)=>setCkDraft({...ckDraft,start:e.target.value})} /></div>
+              <div className="fld"><label>종료일 (마감)</label><input type="date" value={ckDraft.due||""} onChange={(e)=>setCkDraft({...ckDraft,due:e.target.value})} /></div>
+            </div>
+            <div className="fld"><label>설명</label><textarea value={ckDraft.desc||""} onChange={(e)=>setCkDraft({...ckDraft,desc:e.target.value})} placeholder="원복 대상, 절차, 참고 링크" /></div>
+            {isCL&&(
+              <div className="sect"><h4>체크리스트</h4>
+                {(ckDraft.subs||[]).length===0&&<span className="hint">하위 체크 항목이 없습니다</span>}
+                {(ckDraft.subs||[]).map((s)=>(
+                  <div key={s.id} className="fcitem">
+                    <button className={"fccheck"+(s.done?" on":"")} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"✓":""}</button>
+                    <span style={{flex:1,fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
+                    <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.filter((x)=>x.id!==s.id)})}>×</button>
+                  </div>
+                ))}
+                <div className="addrow">
+                  <input placeholder="체크 항목 입력 후 Enter" onKeyDown={(e)=>{
+                    if(e.nativeEvent.isComposing||e.key!=="Enter")return;
+                    const v=e.target.value.trim();if(!v)return;
+                    setCkDraft({...ckDraft,subs:[...(ckDraft.subs||[]),{id:uid(),text:v,done:false}]});e.target.value="";
+                  }} />
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="modal-foot">
+            {!ckDraft._new&&<button className="del" onClick={()=>removeCk(ckDraft)}>삭제</button>}
+            <span className="spacer" />
+            <button className="btn ghost" onClick={()=>setCkDraft(null)}>닫기</button>
+            <button className="btn-save" onClick={saveCk}>저장</button>
+          </div>
+        </div></div>
+        );
+      })()}
+
       {confirmBox&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setConfirmBox(null)}><div className="modal sm">
-          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":"완료 업무를 보관할까요?"}</h2>
-          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요? 보드에서 사라지고 보관함에서 볼 수 있습니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
+          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":confirmBox.kind==="clearCk"?"전체 지울까요?":"완료 업무를 보관할까요?"}</h2>
+          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요? 보드에서 사라지고 보관함에서 볼 수 있습니다.`:confirmBox.kind==="clearCk"?`${CKTABS.find((t)=>t.id===confirmBox.tab)?.label} 탭의 모든 항목이 삭제됩니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
           <div className="mfoot"><span className="spacer" />
             <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":"취소"}</button>
-            <button className={confirmBox.kind==="purge"?"btn warn":"btn-save"} onClick={()=>{
+            <button className={confirmBox.kind==="purge"||confirmBox.kind==="clearCk"?"btn warn":"btn-save"} onClick={()=>{
               if(confirmBox.kind==="purge")purgeArchive();
+              else if(confirmBox.kind==="clearCk"){clearCkTab(confirmBox.tab);setConfirmBox(null);}
               else if(confirmBox.kind==="archiveOne"){const tid=confirmBox.taskId;commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===tid?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("아카이브",{id:tid,title:confirmBox.taskTitle})]);setConfirmBox(null);}
               else archiveDone();
-            }}>{confirmBox.kind==="purge"?"영구 삭제":"보관하기"}</button>
+            }}>{confirmBox.kind==="purge"?"영구 삭제":confirmBox.kind==="clearCk"?"전체 삭제":"보관하기"}</button>
           </div>
         </div></div>
       )}
