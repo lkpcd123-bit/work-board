@@ -503,8 +503,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:remote.checkitems||[]}:emptyData();      const next=mergeData(base,dataRef.current);
-      if(logEntries&&logEntries.length)next.log=[...logEntries,...(next.log||[])].slice(0,LOG_CAP);
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[]}:emptyData();      if(logEntries&&logEntries.length)next.log=[...logEntries,...(next.log||[])].slice(0,LOG_CAP);
       next.updatedAt=Date.now();
       await setDoc(BOARD_REF(),next); setData(next); setSaveState("saved"); setTimeout(()=>setSaveState("idle"),1500);
     } catch(e){setSaveState("error");} finally{busyRef.current=false;}
@@ -661,7 +660,7 @@ function Board() {
   const saveCk=()=>{
     if(!ckDraft.title.trim())return;
     const now=Date.now();const isNew=!!ckDraft._new;
-    const rec={...ckDraft,updatedAt:now,updatedBy:me,createdAt:ckDraft.createdAt||now};
+    const rec={...ckDraft,updatedAt:now,updatedBy:me,createdAt:ckDraft.createdAt||now,subs:ckDraft.subs||[],history:ckDraft.history||[]};
     delete rec._new;
     commit((d)=>{const list=d.checkitems||[];const ex=list.some((c)=>c.id===rec.id);
       return{...d,checkitems:ex?list.map((c)=>c.id===rec.id?rec:c):[...list,rec]};},
