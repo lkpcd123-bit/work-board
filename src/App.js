@@ -499,13 +499,16 @@ function Board() {
   }, []);
 
   const commit = useCallback(async (mutator, logEntries) => {
-    busyRef.current=true; setSaveState("saving"); setData(mutator(dataRef.current));
+    busyRef.current=true; setSaveState("saving");
+    const optimistic=mutator(dataRef.current); setData(optimistic);
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[]}:emptyData();      if(logEntries&&logEntries.length)next.log=[...logEntries,...(next.log||[])].slice(0,LOG_CAP);
-      next.updatedAt=Date.now();
-      await setDoc(BOARD_REF(),next); setData(next); setSaveState("saved"); setTimeout(()=>setSaveState("idle"),1500);
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[]}:emptyData();
+      const merged=mergeData(base,optimistic);
+      if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
+      merged.updatedAt=Date.now();
+      await setDoc(BOARD_REF(),merged); setData(merged); setSaveState("saved"); setTimeout(()=>setSaveState("idle"),1500);
     } catch(e){setSaveState("error");} finally{busyRef.current=false;}
   }, []);
 
