@@ -661,16 +661,17 @@ function Board() {
 
   const saveCk=()=>{
     if(!ckDraft.title.trim())return;
-    const now=Date.now();const isNew=ckDraft._new;const clean={...ckDraft};delete clean._new;
-    commit((d)=>{const list=d.checkitems||[];const ex=list.some((c)=>c.id===clean.id);
-      const rec={...clean,updatedAt:now,updatedBy:me,createdAt:clean.createdAt||now};
+    const now=Date.now();const isNew=!!ckDraft._new;
+    const rec={...ckDraft,updatedAt:now,updatedBy:me,createdAt:ckDraft.createdAt||now};
+    delete rec._new;
+    commit((d)=>{const list=d.checkitems||[];const ex=list.some((c)=>c.id===rec.id);
       return{...d,checkitems:ex?list.map((c)=>c.id===rec.id?rec:c):[...list,rec]};},
-      [{id:uid(),ts:now,who:me||"익명",taskId:clean.id,taskTitle:clean.title,action:isNew?"체크항목 생성":"체크항목 수정",detail:CKTABS.find((t)=>t.id===clean.tab)?.label||""}]);
+      [{id:uid(),ts:now,who:me||"익명",taskId:rec.id,taskTitle:rec.title,action:isNew?"체크항목 생성":"체크항목 수정",detail:CKTABS.find((t)=>t.id===rec.tab)?.label||""}]);
     setCkDraft(null);
   };
   const toggleCk=(c)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:!x.done,doneAt:!x.done?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);};
   const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크항목 삭제",detail:""}]);setCkDraft(null);};
-  const clearCkTab=(tab)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.tab===tab&&!x.deleted?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:null,taskTitle:"",action:"체크리스트 전체삭제",detail:CKTABS.find((t)=>t.id===tab)?.label||""}]);};
+  const clearCkTab=(tab)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.tab===tab&&!x.deleted?{...x,done:false,doneAt:null,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:null,taskTitle:"",action:"체크 전체 해제",detail:CKTABS.find((t)=>t.id===tab)?.label||""}]);};
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
 
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
@@ -1025,8 +1026,7 @@ function Board() {
                 <div className="ckcolhead">
                   <div className="ckcoltitle">{tab.label}<em>{items.filter((c)=>!c.done).length}</em></div>
                   <div style={{display:"flex",gap:5}}>
-                    {isCL&&canEdit&&items.some((c)=>c.done)&&<button className="ckclear" onClick={()=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.tab===tab.id&&x.done?{...x,done:false,doneAt:null,updatedAt:Date.now()}:x)}),[])}}>체크 초기화</button>}
-                    {isCL&&canEdit&&items.length>0&&<button className="ckclear" onClick={()=>setConfirmBox({kind:"clearCk",tab:tab.id})}>전체 지우기</button>}
+                    {isCL&&canEdit&&items.length>0&&<button className="ckclear" onClick={()=>setConfirmBox({kind:"clearCk",tab:tab.id})}>전체 체크 해제</button>}
                     {canEdit&&<button className="ckplus" onClick={()=>setCkDraft({_new:true,id:uid(),tab:tab.id,title:"",start:"",due:"",desc:"",done:false,subs:isCL?[]:undefined})}>+</button>}
                   </div>
                 </div>
@@ -1486,11 +1486,15 @@ function Board() {
             </div>
             <div className="fld"><label>설명</label><textarea value={ckDraft.desc||""} onChange={(e)=>setCkDraft({...ckDraft,desc:e.target.value})} placeholder="원복 대상, 절차, 참고 링크" /></div>
             {isCL&&(
-              <div className="sect"><h4>체크리스트</h4>
+              <div className="sect">
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                  <h4 style={{margin:0}}>체크리스트</h4>
+                  {(ckDraft.subs||[]).some((s)=>s.done)&&<button className="ckclear" onClick={()=>setCkDraft({...ckDraft,subs:(ckDraft.subs||[]).map((s)=>({...s,done:false}))})}>체크 전체 해제</button>}
+                </div>
                 {(ckDraft.subs||[]).length===0&&<span className="hint">하위 체크 항목이 없습니다</span>}
                 {(ckDraft.subs||[]).map((s)=>(
                   <div key={s.id} className="fcitem">
-                    <button className="fccheck" onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})} />
+                    <button className={"fccheck"+(s.done?" on":"")} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"✓":""}</button>
                     <span style={{flex:1,fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
                     <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.filter((x)=>x.id!==s.id)})}>×</button>
                   </div>
@@ -1504,6 +1508,24 @@ function Board() {
                 </div>
               </div>
             )}
+            <div className="sect"><h4>히스토리</h4>
+              {(ckDraft.history||[]).length===0&&<span className="hint">진행 기록이 없습니다</span>}
+              {(ckDraft.history||[]).map((h)=>(
+                <div key={h.id} className="cmt">
+                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}</div>
+                  <p>{h.text}</p>
+                </div>
+              ))}
+              <div className="addrow">
+                <input placeholder="진행 상황·메모 입력 후 Enter" onKeyDown={(e)=>{
+                  if(e.nativeEvent.isComposing||e.key!=="Enter")return;
+                  const v=e.target.value.trim();if(!v)return;
+                  const entry={id:uid(),text:v,author:me||"익명",ts:Date.now()};
+                  setCkDraft({...ckDraft,history:[...(ckDraft.history||[]),entry]});
+                  e.target.value="";
+                }} />
+              </div>
+            </div>
           </div>
           <div className="modal-foot">
             {!ckDraft._new&&<button className="del" onClick={()=>removeCk(ckDraft)}>삭제</button>}
