@@ -204,12 +204,13 @@ const CSS = `
 /* ── 모달 ── */
 .mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:flex-start;justify-content:center;padding:36px 14px;overflow-y:auto;z-index:50;}
 .modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:0;display:flex;flex-direction:column;max-height:90vh;}
-.modal h2{font-size:19px;font-weight:800;margin:0;padding:20px 24px 16px;border-bottom:1px solid var(--line);letter-spacing:-.02em;}
-.modal-body{flex:1;overflow-y:auto;padding:20px 24px;}
-.modal-foot{padding:16px 24px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;}
+.modal h2{font-size:19px;font-weight:800;margin:0;padding:24px 28px 18px;border-bottom:1px solid var(--line);letter-spacing:-.02em;}
+.modal-body{flex:1;overflow-y:auto;padding:24px 28px;}
+.modal-foot{padding:18px 28px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;}
 .modal.sm{max-width:520px;}
 .modal.sm h2{padding:36px 40px 16px;font-size:22px;text-align:center;border-bottom:none;}
 .modal.sm .modal-body{padding:0 40px 8px;text-align:center;font-size:15px;color:var(--ink2);line-height:1.8;}
+.modal.sm .modal-body .fld{text-align:left;}
 .modal.sm .modal-foot{padding:24px 40px 36px;justify-content:center;gap:12px;}
 .modal.sm .modal-foot .spacer{display:none;}
 .fld{margin-bottom:14px;}
@@ -389,13 +390,11 @@ const CSS = `
 .ckrow:hover{box-shadow:var(--sh2);}
 .ckrow.over{box-shadow:0 0 0 1.5px #E2445C,var(--sh);}
 .ckrow.done{opacity:.6;}
-.ckrow[draggable=true]{cursor:grab;}
-.ckrow.dragging{opacity:.4;cursor:grabbing;box-shadow:0 0 0 2px var(--pri),var(--sh);}
 .ckrowmain{display:flex;align-items:flex-start;gap:11px;}
-.ckbox{width:24px;height:24px;border:2px solid #A9B0A6;border-radius:6px;background:#fff;font-size:13px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.02);}
-.ckbox:hover{border-color:var(--ok);background:#F5FBF7;}
+.ckbox{width:22px;height:22px;border:2px solid var(--line2);border-radius:6px;background:var(--card);font-size:12px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.ckbox:hover{border-color:var(--ok);}
 .ckbox.on{background:var(--ok);border-color:var(--ok);color:#fff;}
-.ckbox.sm{width:19px;height:19px;font-size:11px;}
+.ckbox.sm{width:18px;height:18px;font-size:10px;}
 .ckbox:disabled{opacity:.5;}
 .cktitle{font-size:14px;font-weight:700;line-height:1.4;word-break:keep-all;margin-bottom:4px;}
 .ckrow.done .cktitle{text-decoration:line-through;color:var(--ink3);}
@@ -455,7 +454,6 @@ function Board() {
   const [signupPw2, setSignupPw2] = useState("");
   const [pwChange, setPwChange] = useState(null);
   const [newType, setNewType] = useState("");
-  const [ckDrag, setCkDrag] = useState(null);
   const [confirmBox, setConfirmBox] = useState(null);
   const [newChannel, setNewChannel] = useState("");
   const [newSub, setNewSub] = useState("");
@@ -550,6 +548,7 @@ function Board() {
   const sortFn=useCallback((a,b)=>{ if(sortBy==="due"){if(!a.due&&!b.due)return 0;if(!a.due)return 1;if(!b.due)return -1;return a.due<b.due?-1:1;} if(sortBy==="pri"){const r=(t)=>PRIORITIES.find((p)=>p.id===t.priority)?.rank??1;return r(a)-r(b);} return(b.updatedAt||0)-(a.updatedAt||0); },[sortBy]);
   const visible=useMemo(()=>applyFilters(live).slice().sort(sortFn),[live,applyFilters,sortFn]);
   const stats=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return{total:live.length,doing:live.filter((t)=>t.status==="doing").length,tomorrow:o.filter((t)=>dayDiff(t.due)===1).length,late:o.filter((t)=>{const d=dayDiff(t.due);return d!==null&&d<0;}).length,open:o.length};},[live]);
+  const dist=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return data.channels.filter((c)=>!c.parent).map((c)=>({...c,n:o.filter((t)=>t.channel===c.id||(data.channels.find((x)=>x.id===t.channel)||{}).parent===c.id).length})).filter((c)=>c.n>0);},[live,data.channels]);
 
   const saveMe=async(name)=>{const n=name.trim();if(!n)return;setMe(n);setAskName(false);try{localStorage.setItem(ME_KEY,n);}catch(e){}if(!dataRef.current.members.find((m)=>m.name===n)){const role=dataRef.current.members.length===0?"admin":"member";commit((d)=>({...d,members:[...d.members,{name:n,role,updatedAt:Date.now()}]}),[{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:"팀 합류",detail:ROLES.find((r)=>r.id===role).label}]);}};
 
@@ -696,12 +695,8 @@ function Board() {
   /* ── 체크리스트 ── */
   const checkitems=useMemo(()=>(data.checkitems||[]).filter((c)=>!c.deleted),[data.checkitems]);
   const ckByTab=useCallback((tab)=>checkitems.filter((c)=>c.tab===tab).slice().sort((a,b)=>{
-    if(a.done!==b.done)return a.done?1:-1;
-    const ao=a.order,bo=b.order;
-    if(ao!=null&&bo!=null)return ao-bo;
-    if(ao!=null)return -1;
-    if(bo!=null)return 1;
     const da=a.due||"9999",db=b.due||"9999";
+    if(a.done!==b.done)return a.done?1:-1;
     return da<db?-1:da>db?1:0;
   }),[checkitems]);
 
@@ -715,23 +710,17 @@ function Board() {
       [{id:uid(),ts:now,who:me||"익명",taskId:rec.id,taskTitle:rec.title,action:isNew?"체크항목 생성":"체크항목 수정",detail:CKTABS.find((t)=>t.id===rec.tab)?.label||""}]);
     setCkDraft(null);
   };
-  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);if(willDone)setConfirmBox({kind:"archiveCk",ckId:c.id,ckTitle:c.title});};
-  const reorderCk=(tab,fromId,toId)=>{
-    if(!canEdit||fromId===toId)return;
-    const ordered=ckByTab(tab).filter((c)=>!c.done);
-    const fromIdx=ordered.findIndex((c)=>c.id===fromId);
-    const toIdx=ordered.findIndex((c)=>c.id===toId);
-    if(fromIdx<0||toIdx<0)return;
-    const arr=[...ordered];
-    const [moved]=arr.splice(fromIdx,1);
-    arr.splice(toIdx,0,moved);
-    const now=Date.now();
-    commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>{
-      const pos=arr.findIndex((a)=>a.id===x.id);
-      return pos>=0?{...x,order:pos,updatedAt:now}:x;
-    })}),[]);
-  };
+  const toggleCk=(c)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:!x.done,doneAt:!x.done?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);};
   const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크항목 삭제",detail:""}]);setCkDraft(null);};
+  const duplicateCk=(c)=>{
+    const now=Date.now();
+    const copy={...c,id:uid(),title:c.title+" (복사)",done:false,doneAt:null,order:null,
+      subs:(c.subs||[]).map((s)=>({...s,id:uid(),done:false})),
+      history:[],createdAt:now,updatedAt:now};
+    delete copy._new;
+    commit((d)=>({...d,checkitems:[...(d.checkitems||[]),copy]}),[{id:uid(),ts:now,who:me||"익명",taskId:copy.id,taskTitle:copy.title,action:"체크항목 복사",detail:`원본: ${c.title}`}]);
+    setCkDraft(null);
+  };
   const clearCkTab=(tab)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.tab===tab&&!x.deleted?{...x,done:false,doneAt:null,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:null,taskTitle:"",action:"체크 전체 해제",detail:CKTABS.find((t)=>t.id===tab)?.label||""}]);};
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
 
@@ -1135,12 +1124,7 @@ function Board() {
                     const subs=c.subs||[];const subDone=subs.filter((s)=>s.done).length;
                     const exp=ckExpand[c.id];
                     return (
-                      <div key={c.id} draggable={canEdit&&!c.done}
-                        onDragStart={()=>setCkDrag(c.id)}
-                        onDragOver={(e)=>{e.preventDefault();}}
-                        onDrop={()=>{if(ckDrag)reorderCk(tab.id,ckDrag,c.id);setCkDrag(null);}}
-                        onDragEnd={()=>setCkDrag(null)}
-                        className={"ckrow"+(c.done?" done":"")+(over?" over":"")+(ckDrag===c.id?" dragging":"")}>
+                      <div key={c.id} className={"ckrow"+(c.done?" done":"")+(over?" over":"")}>
                         <div className="ckrowmain">
                           <button className={"ckbox"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCk(c)}>{c.done?"✓":""}</button>
                           <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setCkDraft({...c,subs:c.subs?[...c.subs]:(isCL?[]:undefined)})}>
@@ -1667,6 +1651,7 @@ function Board() {
           </div>
           <div className="modal-foot">
             {!ckDraft._new&&<button className="del" onClick={()=>removeCk(ckDraft)}>삭제</button>}
+            {!ckDraft._new&&<button className="btn ghost" onClick={()=>duplicateCk(ckDraft)}>복사</button>}
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setCkDraft(null)}>닫기</button>
             <button className="btn-save" onClick={saveCk}>저장</button>
@@ -1677,17 +1662,16 @@ function Board() {
 
       {confirmBox&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setConfirmBox(null)}><div className="modal sm">
-          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":confirmBox.kind==="clearCk"?"전체 지울까요?":confirmBox.kind==="archiveCk"?"목록에서 정리할까요?":"완료 업무를 보관할까요?"}</h2>
-          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요? 보드에서 사라지고 보관함에서 볼 수 있습니다.`:confirmBox.kind==="clearCk"?`${CKTABS.find((t)=>t.id===confirmBox.tab)?.label} 탭의 모든 항목이 삭제됩니다.`:confirmBox.kind==="archiveCk"?`"${confirmBox.ckTitle}" 항목을 완료 처리했습니다. 목록에서 삭제할까요? (남겨두면 아래쪽에 완료 상태로 표시됩니다)`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
+          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":confirmBox.kind==="clearCk"?"전체 지울까요?":"완료 업무를 보관할까요?"}</h2>
+          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요? 보드에서 사라지고 보관함에서 볼 수 있습니다.`:confirmBox.kind==="clearCk"?`${CKTABS.find((t)=>t.id===confirmBox.tab)?.label} 탭의 모든 항목이 삭제됩니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
           <div className="mfoot"><span className="spacer" />
-            <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":confirmBox.kind==="archiveCk"?"남겨두기":"취소"}</button>
+            <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":"취소"}</button>
             <button className={confirmBox.kind==="purge"||confirmBox.kind==="clearCk"?"btn warn":"btn-save"} onClick={()=>{
               if(confirmBox.kind==="purge")purgeArchive();
               else if(confirmBox.kind==="clearCk"){clearCkTab(confirmBox.tab);setConfirmBox(null);}
-              else if(confirmBox.kind==="archiveCk"){const cid=confirmBox.ckId;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===cid?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:cid,taskTitle:confirmBox.ckTitle,action:"체크항목 정리",detail:""}]);setConfirmBox(null);}
               else if(confirmBox.kind==="archiveOne"){const tid=confirmBox.taskId;commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===tid?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("아카이브",{id:tid,title:confirmBox.taskTitle})]);setConfirmBox(null);}
               else archiveDone();
-            }}>{confirmBox.kind==="purge"?"영구 삭제":confirmBox.kind==="clearCk"?"전체 삭제":confirmBox.kind==="archiveCk"?"삭제":"보관하기"}</button>
+            }}>{confirmBox.kind==="purge"?"영구 삭제":confirmBox.kind==="clearCk"?"전체 삭제":"보관하기"}</button>
           </div>
         </div></div>
       )}
