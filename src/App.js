@@ -1388,17 +1388,19 @@ function Board() {
       {rDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setRDraft(null)}><div className="modal sm">
           <h2>{rDraft._new?"새 반복 업무":"반복 업무 수정"}</h2>
-          <div className="fld"><label>업무명</label><input autoFocus value={rDraft.title} onChange={(e)=>setRDraft({...rDraft,title:e.target.value})} placeholder="예) 쿠팡 전 상품 가격·아이템위너 확인" /></div>
-          <div className="r2">
-            <div className="fld"><label>시간대</label><select value={rDraft.when} onChange={(e)=>setRDraft({...rDraft,when:e.target.value})}><option value="오전">오전</option><option value="오후">오후</option></select></div>
-            <div className="fld"><label>담당자</label><input list="wb-owners" value={rDraft.owner||""} onChange={(e)=>setRDraft({...rDraft,owner:e.target.value})} placeholder="이름" /></div>
+          <div className="modal-body">
+            <div className="fld"><label>업무명</label><input autoFocus value={rDraft.title} onChange={(e)=>setRDraft({...rDraft,title:e.target.value})} placeholder="예) 쿠팡 전 상품 가격·아이템위너 확인" /></div>
+            <div className="r2">
+              <div className="fld"><label>시간대</label><select value={rDraft.when} onChange={(e)=>setRDraft({...rDraft,when:e.target.value})}><option value="오전">오전</option><option value="오후">오후</option></select></div>
+              <div className="fld"><label>담당자</label><input list="wb-owners" value={rDraft.owner||""} onChange={(e)=>setRDraft({...rDraft,owner:e.target.value})} placeholder="이름" /></div>
+            </div>
+            <div className="fld"><label>비고 · 메모</label><textarea value={rDraft.memo||""} onChange={(e)=>setRDraft({...rDraft,memo:e.target.value})} placeholder="확인 절차, 기준값, 참고 링크" /></div>
           </div>
-          <div className="fld"><label>비고 · 메모</label><textarea value={rDraft.memo||""} onChange={(e)=>setRDraft({...rDraft,memo:e.target.value})} placeholder="확인 절차, 기준값, 참고 링크" /></div>
-          <div className="mfoot">
+          <div className="modal-foot">
             {!rDraft._new&&isAdmin&&<button className="del" onClick={()=>removeRoutine(rDraft)}>삭제</button>}
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setRDraft(null)}>취소</button>
-            <button className="btn" onClick={saveRoutine} disabled={!rDraft.title.trim()}>저장</button>
+            <button className="btn-save" onClick={saveRoutine}>저장</button>
           </div>
         </div></div>
       )}
