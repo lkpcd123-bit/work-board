@@ -160,7 +160,7 @@ const CSS = `
 .clabel{height:8px;border-radius:4px;margin-bottom:8px;}
 .cmeta{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11.5px;color:var(--ink3);flex-wrap:wrap;font-weight:600;}
 .cmeta .ch{color:var(--ch);font-weight:700;}
-.ctitle{font-size:14.5px;font-weight:600;line-height:1.4;margin-bottom:9px;word-break:keep-all;color:var(--ink);}
+.ctitle{font-size:16px;font-weight:700;line-height:1.45;margin-bottom:9px;word-break:keep-all;color:var(--ink);}
 .card.done .ctitle{color:var(--ink3);text-decoration:line-through;}
 .ctags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
 .tag{font-size:11.5px;font-weight:600;background:#E9F2FF;color:#0055CC;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;}
@@ -726,7 +726,6 @@ function Board() {
     return(
       <div key={t.id} className={"card"+(late?" late":"")+(t.status==="done"?" done":"")+(dragId===t.id?" drag":"")} style={{"--ch":chColor(t.channel)}}
         draggable={canEdit} onDragStart={(e)=>{setDragId(t.id);e.dataTransfer.effectAllowed="move";}} onDragEnd={()=>{setDragId(null);setOverCol(null);}} onClick={()=>openTask(t)}>
-        <div className="clabel" style={{background:chColor(t.channel)}} />
         <div className="cmeta"><span className="ch">{t.channel}</span><span>·</span><span>{t.type}</span>{t.repeat&&t.repeat!=="none"&&<><span>·</span><span>↻{REPEATS.find((r)=>r.id===t.repeat)?.label}</span></>}</div>
         <p className="ctitle">{t.title}</p>
         {!!(t.tags||[]).length&&<div className="ctags">{t.tags.map((g)=><span key={g} className="tag">{g}</span>)}</div>}
@@ -827,8 +826,6 @@ function Board() {
           <button className="metric cl" onClick={()=>{setOnlyLate(true);}}><span className="k">지연</span><span className={"v"+(stats.late?" al":"")}>{stats.late}</span></button>
           <div className="metric"><span className="k">미완료</span><span className="v">{stats.open}</span></div>
         </div>
-        <div className="strip">{distTotal===0?<i style={{width:"100%",background:"#E4E7E2"}} />:dist.map((c)=><i key={c.id} style={{width:(c.n/distTotal)*100+"%",background:c.color}} />)}</div>
-        <div className="legend">{dist.length===0?<span className="leg" style={{color:"#8F959C"}}>미완료 없음</span>:dist.map((c)=><span key={c.id} className="leg"><b style={{background:c.color}} />{c.id} {c.n}</span>)}</div>
         <div className="tools">
           <input className="inp" placeholder="검색" value={q} onChange={(e)=>setQ(e.target.value)} style={{width:120}} />
           <select className="sel" value={fOwner} onChange={(e)=>setFOwner(e.target.value)}><option value="전체">담당자 전체</option>{owners.map((o)=><option key={o} value={o}>{o}</option>)}</select>
