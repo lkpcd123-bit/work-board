@@ -379,8 +379,8 @@ const CSS = `
 .ckcolhead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 12px;}
 .ckcoltitle{font-size:15px;font-weight:800;display:inline-flex;align-items:center;gap:8px;letter-spacing:-.01em;}
 .ckcoltitle em{font-style:normal;font-size:12.5px;color:var(--ink3);background:#DFE1E6;padding:1px 8px;border-radius:10px;font-weight:700;}
-.ckplus{width:30px;height:30px;border-radius:7px;background:#DFE1E6;color:var(--ink2);font-size:19px;font-weight:400;line-height:1;display:flex;align-items:center;justify-content:center;}
-.ckplus:hover{background:#0C66E4;color:#fff;}
+.ckplus{width:30px;height:30px;border-radius:7px;background:#0C66E4;color:#fff;font-size:19px;font-weight:400;line-height:1;display:flex;align-items:center;justify-content:center;}
+.ckplus:hover{background:#0055CC;color:#fff;}
 .ckclear{font-size:11.5px;color:var(--danger);font-weight:700;padding:0 6px;background:none;}
 .ckclear:hover{text-decoration:underline;}
 .ckcolbody{display:flex;flex-direction:column;gap:8px;min-height:40px;}
