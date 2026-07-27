@@ -50,7 +50,7 @@ const weekOf=(ds)=>{const d=new Date(ds+"T00:00:00");const dow=d.getDay();const 
 const DOW=["월","화","수","목","금","토","일"];
 const monthGrid=(y,m)=>{const first=new Date(y,m,1);const startPad=(first.getDay()+6)%7;const last=new Date(y,m+1,0).getDate();const cells=[];for(let i=0;i<startPad;i++)cells.push(null);for(let i=1;i<=last;i++){const mm=String(m+1).padStart(2,"0"),dd=String(i).padStart(2,"0");cells.push(`${y}-${mm}-${dd}`);}while(cells.length%7!==0)cells.push(null);return cells;};
 const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -58,9 +58,8 @@ function mergeData(r,l) {
   const cm=new Map(); [...(r.checkitems||[]),...(l.checkitems||[])].forEach(t=>{const p=cm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))cm.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
-  for(const [k,v] of mm){ if(v.deleted) mm.delete(k); }
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
+  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
 }
 
 const CSS = `
@@ -161,7 +160,7 @@ const CSS = `
 .clabel{height:8px;border-radius:4px;margin-bottom:8px;}
 .cmeta{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11.5px;color:var(--ink3);flex-wrap:wrap;font-weight:600;}
 .cmeta .ch{color:var(--ch);font-weight:700;}
-.ctitle{font-size:16px;font-weight:700;line-height:1.45;margin-bottom:9px;word-break:keep-all;color:var(--ink);}
+.ctitle{font-size:14.5px;font-weight:600;line-height:1.4;margin-bottom:9px;word-break:keep-all;color:var(--ink);}
 .card.done .ctitle{color:var(--ink3);text-decoration:line-through;}
 .ctags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
 .tag{font-size:11.5px;font-weight:600;background:#E9F2FF;color:#0055CC;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;}
@@ -453,6 +452,7 @@ function Board() {
   const [signupMode, setSignupMode] = useState(false);
   const [signupPw2, setSignupPw2] = useState("");
   const [pwChange, setPwChange] = useState(null);
+  const [newType, setNewType] = useState("");
   const [confirmBox, setConfirmBox] = useState(null);
   const [newChannel, setNewChannel] = useState("");
   const [newSub, setNewSub] = useState("");
@@ -726,6 +726,7 @@ function Board() {
     return(
       <div key={t.id} className={"card"+(late?" late":"")+(t.status==="done"?" done":"")+(dragId===t.id?" drag":"")} style={{"--ch":chColor(t.channel)}}
         draggable={canEdit} onDragStart={(e)=>{setDragId(t.id);e.dataTransfer.effectAllowed="move";}} onDragEnd={()=>{setDragId(null);setOverCol(null);}} onClick={()=>openTask(t)}>
+        <div className="clabel" style={{background:chColor(t.channel)}} />
         <div className="cmeta"><span className="ch">{t.channel}</span><span>·</span><span>{t.type}</span>{t.repeat&&t.repeat!=="none"&&<><span>·</span><span>↻{REPEATS.find((r)=>r.id===t.repeat)?.label}</span></>}</div>
         <p className="ctitle">{t.title}</p>
         {!!(t.tags||[]).length&&<div className="ctags">{t.tags.map((g)=><span key={g} className="tag">{g}</span>)}</div>}
@@ -826,6 +827,8 @@ function Board() {
           <button className="metric cl" onClick={()=>{setOnlyLate(true);}}><span className="k">지연</span><span className={"v"+(stats.late?" al":"")}>{stats.late}</span></button>
           <div className="metric"><span className="k">미완료</span><span className="v">{stats.open}</span></div>
         </div>
+        <div className="strip">{distTotal===0?<i style={{width:"100%",background:"#E4E7E2"}} />:dist.map((c)=><i key={c.id} style={{width:(c.n/distTotal)*100+"%",background:c.color}} />)}</div>
+        <div className="legend">{dist.length===0?<span className="leg" style={{color:"#8F959C"}}>미완료 없음</span>:dist.map((c)=><span key={c.id} className="leg"><b style={{background:c.color}} />{c.id} {c.n}</span>)}</div>
         <div className="tools">
           <input className="inp" placeholder="검색" value={q} onChange={(e)=>setQ(e.target.value)} style={{width:120}} />
           <select className="sel" value={fOwner} onChange={(e)=>setFOwner(e.target.value)}><option value="전체">담당자 전체</option>{owners.map((o)=><option key={o} value={o}>{o}</option>)}</select>
@@ -1377,14 +1380,14 @@ function Board() {
       {view==="team"&&(<>
         <div className="panel"><h3>팀원과 권한</h3><p className="sub">관리자/멤버/뷰어 3단계.</p>
           {data.members.length===0&&<div className="empty">팀원이 없습니다</div>}
-          {data.members.filter((m)=>!m.deleted).map((m)=>(
+          {data.members.map((m)=>(
             <div key={m.name} className="mrow" style={{borderTop:"1px solid var(--line)"}}>
               <span style={{fontWeight:600,fontSize:13,minWidth:90}}>{m.name}{m.name===me&&<span style={{fontSize:10,color:"#8F959C",fontFamily:"monospace"}}> (나)</span>}</span>
               <span style={{fontSize:11,fontFamily:"monospace",color:m.pw?"var(--ok)":"var(--warn)"}}>{m.pw?"🔒 설정됨":"⚠ 비번없음"}</span>
               <select className="sel" value={m.role} disabled={!isAdmin} onChange={(e)=>{const role=e.target.value;commit((d)=>({...d,members:d.members.map((x)=>x.name===m.name?{...x,role,updatedAt:Date.now()}:x)}),[mkLog("권한 변경",null,`${m.name} -> ${ROLES.find((r)=>r.id===role).label}`)]);}}>
                 {ROLES.map((r)=><option key={r.id} value={r.id}>{r.label}</option>)}
               </select>
-              <span className="spacer" />{isAdmin&&m.name!==me&&<button className="del" onClick={()=>{if(window.confirm(`"${m.name}" 님을 팀에서 내보낼까요? 로그인할 수 없게 됩니다.`))commit((d)=>({...d,members:d.members.map((x)=>x.name===m.name?{...x,deleted:true,pw:null,updatedAt:Date.now()}:x)}),[mkLog("팀원 삭제",null,m.name)]);}}>내보내기</button>}
+              <span className="spacer" />{isAdmin&&m.name!==me&&<button className="del" onClick={()=>{if(window.confirm(`"${m.name}" 님을 팀에서 내보낼까요? 로그인할 수 없게 됩니다.`))commit((d)=>({...d,members:d.members.filter((x)=>x.name!==m.name)}),[mkLog("팀원 삭제",null,m.name)]);}}>내보내기</button>}
             </div>
           ))}
         </div>
@@ -1444,6 +1447,23 @@ function Board() {
             </div>
           )}
         </div>
+        <div className="panel"><h3>업무 유형</h3><p className="sub">업무 상세에서 선택할 수 있는 유형을 추가·삭제합니다.</p>
+          <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+            {(data.types||TYPES).map((t)=>(
+              <span key={t} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#EBECF0",borderRadius:16,padding:"5px 12px",fontSize:13,fontWeight:600,color:"var(--ink2)"}}>
+                {t}
+                {isAdmin&&(data.types||TYPES).length>1&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}} onClick={()=>{commit((d)=>({...d,types:(d.types||TYPES).filter((x)=>x!==t),typesUpdatedAt:Date.now()}),[mkLog("업무유형 삭제",null,t)]);}}>×</button>}
+              </span>
+            ))}
+          </div>
+          {isAdmin&&(
+            <div className="addrow" style={{marginTop:12}}>
+              <input placeholder="새 업무 유형 입력 후 추가" value={newType} onChange={(e)=>setNewType(e.target.value)} />
+              <button onClick={()=>{const t=newType.trim();if(!t)return;if((data.types||TYPES).includes(t)){alert("이미 있는 유형입니다.");return;}commit((d)=>({...d,types:[...(d.types||TYPES),t],typesUpdatedAt:Date.now()}),[mkLog("업무유형 추가",null,t)]);setNewType("");}}>추가</button>
+            </div>
+          )}
+        </div>
+
         <div className="panel"><h3>백업</h3><p className="sub">주기적으로 내려받아 두세요.</p>
           <div style={{display:"flex",gap:7}}>
             <button className="btn ghost" onClick={exportJson}>JSON 내려받기</button>
@@ -1665,7 +1685,7 @@ function Board() {
                 </optgroup>;
               })}
             </select></div>
-            <div className="fld"><label>업무 유형</label><select disabled={!canEdit} value={draft.type} onChange={(e)=>setDraft({...draft,type:e.target.value})}>{TYPES.map((t)=><option key={t} value={t}>{t}</option>)}</select></div>
+            <div className="fld"><label>업무 유형</label><select disabled={!canEdit} value={draft.type} onChange={(e)=>setDraft({...draft,type:e.target.value})}>{(data.types||TYPES).map((t)=><option key={t} value={t}>{t}</option>)}</select></div>
           </div>
           <div className="fld"><label>담당자</label>
             <input list="wb-owners" value={draft.owner} onChange={(e)=>setDraft({...draft,owner:e.target.value})} placeholder="이름 직접 입력 또는 목록 선택" style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13}} />
