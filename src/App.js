@@ -1028,8 +1028,7 @@ function Board() {
                   <div className="ckcoltitle">{tab.label}<em>{items.filter((c)=>!c.done).length}</em></div>
                   <div style={{display:"flex",gap:5}}>
                     {isCL&&canEdit&&items.length>0&&<button className="ckclear" onClick={()=>setConfirmBox({kind:"clearCk",tab:tab.id})}>전체 체크 해제</button>}
-                    {canEdit&&<button className="ckplus" onClick={()=>setCkDraft({_new:true,id:uid(),tab:tab.id,title:"",start:"",due:"",desc:"",done:false,subs:isCL?[]:undefined})}>+</button>}
-                  </div>
+                    {canEdit&&<button className="ckplus" style={{background:"#0C66E4",color:"#fff"}} onClick={()=>setCkDraft({_new:true,id:uid(),tab:tab.id,title:"",start:"",due:"",desc:"",done:false,subs:isCL?[]:undefined})}>+</button>}                  </div>
                 </div>
                 <div className="ckcolbody">
                   {items.length===0&&<div className="ckempty">항목이 없습니다</div>}
