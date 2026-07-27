@@ -202,7 +202,7 @@ const CSS = `
 .mrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}
 
 /* ── 모달 ── */
-.mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:flex-start;justify-content:center;padding:36px 14px;overflow-y:auto;z-index:50;}
+.mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:center;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:50;}
 .modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:0;display:flex;flex-direction:column;max-height:90vh;}
 .modal h2{font-size:19px;font-weight:800;margin:0;padding:24px 28px 18px;border-bottom:1px solid var(--line);letter-spacing:-.02em;}
 .modal-body{flex:1;overflow-y:auto;padding:24px 28px;}
@@ -240,13 +240,13 @@ const CSS = `
 .hint{font-size:13px;color:var(--ink3);}
 
 /* ── 진행률 ── */
-.prow{display:flex;align-items:center;gap:12px;}
-.ppct{font-size:26px;font-weight:800;color:var(--ok);min-width:66px;letter-spacing:-.02em;}
+.prow{display:flex;align-items:center;gap:10px;}
+.ppct{font-size:20px;font-weight:800;color:var(--ok);min-width:48px;letter-spacing:-.02em;text-align:left;}
 .prange{flex:1;-webkit-appearance:none;appearance:none;height:7px;background:#DFE1E6;outline:none;border-radius:4px;}
 .prange::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid var(--ok);cursor:pointer;box-shadow:var(--sh);}
 .prange::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid var(--ok);cursor:pointer;}
 .pbadge{font-size:12.5px;font-weight:700;border-radius:20px;padding:5px 12px;background:#EBECF0;color:var(--ink2);white-space:nowrap;}
-.pticks{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink3);margin-top:5px;padding-left:78px;font-weight:600;}
+.pticks{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink3);margin-top:5px;padding-left:58px;font-weight:600;}
 
 /* ── 반복 업무 ── */
 .rwrap{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start;}
@@ -1743,7 +1743,11 @@ function Board() {
                     {(c.subs||[]).map((s)=>(
                       <div key={s.id} className="item" style={{padding:"3px 0"}}>
                         <input type="checkbox" checked={s.done} style={{width:"auto"}} onChange={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:x.subs.map((y)=>y.id===s.id?{...y,done:!y.done}:y)}:x)})} />
-                        <span style={{flex:1,fontSize:12.5,textDecoration:s.done?"line-through":"none",color:s.done?"#8F959C":"inherit"}}>{s.text}</span>
+                        {s.editing
+                          ? <input defaultValue={s.text} autoFocus style={{flex:1,fontSize:12.5,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 7px"}}
+                              onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:x.subs.map((y)=>y.id===s.id?{...y,text:v,editing:false}:y)}:x)});}if(e.key==="Escape")setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:x.subs.map((y)=>y.id===s.id?{...y,editing:false}:y)}:x)});}}
+                              onBlur={(e)=>{const v=e.target.value.trim();if(v)setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:x.subs.map((y)=>y.id===s.id?{...y,text:v,editing:false}:y)}:x)});}} />
+                          : <span style={{flex:1,fontSize:12.5,textDecoration:s.done?"line-through":"none",color:s.done?"#8F959C":"inherit",cursor:canEdit?"pointer":"default"}} onClick={()=>canEdit&&setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:x.subs.map((y)=>y.id===s.id?{...y,editing:true}:y)}:x)})}>{s.text}</span>}
                         <button style={{background:"none",border:"none",cursor:"pointer",color:"#8F959C"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:x.subs.filter((y)=>y.id!==s.id)}:x)})}>×</button>
                       </div>
                     ))}
