@@ -136,8 +136,8 @@ const CSS = `
 .chip.sel{background:var(--pri);color:#fff;border-color:var(--pri);}
 .chip.tog.sel{background:var(--ok);border-color:var(--ok);}
 .chip.back{background:var(--ink2);color:#fff;border-color:var(--ink2);}
-.btn{background:var(--pri);color:#fff;padding:8px 16px;font-size:14px;font-weight:700;border-radius:6px;}
-.btn:hover{background:var(--pri-d);}
+.btn{background:#0C66E4;color:#fff;padding:8px 16px;font-size:14px;font-weight:700;border-radius:6px;}
+.btn:hover{background:#0055CC;}
 .btn:disabled{opacity:.4;cursor:default;}
 .btn.ghost{background:#EBECF0;color:var(--ink2);font-weight:600;}
 .btn.ghost:hover{background:#DFE1E6;}
@@ -831,7 +831,7 @@ function Board() {
                 </div>
                 <div style={{display:"flex",gap:6}}>
                   <button className="btn ghost" onClick={()=>setRDate(todayStr())}>오늘</button>
-                  {canEdit&&<button className="btn" onClick={()=>setRDraft({_new:true,id:uid(),title:"",when:"오전",owner:me,memo:"",checkins:{},issues:[],fixedChecks:[]})}>+ 추가</button>}
+                  {canEdit&&<button className="btn-save" onClick={()=>setRDraft({_new:true,id:uid(),title:"",when:"오전",owner:me,memo:"",checkins:{},issues:[],fixedChecks:[]})}>+ 추가</button>}
                 </div>
               </div>
               <div className="rfilters">
