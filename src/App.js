@@ -448,6 +448,10 @@ function Board() {
   const [overCol, setOverCol] = useState(null);
   const [askName, setAskName] = useState(false);
   const [nameInput, setNameInput] = useState("");
+  const [loginPw, setLoginPw] = useState("");
+  const [signupMode, setSignupMode] = useState(false);
+  const [signupPw2, setSignupPw2] = useState("");
+  const [pwChange, setPwChange] = useState(null);
   const [confirmBox, setConfirmBox] = useState(null);
   const [newChannel, setNewChannel] = useState("");
   const [newSub, setNewSub] = useState("");
@@ -488,7 +492,7 @@ function Board() {
   useEffect(() => {
     (async()=>{
       await load();
-      try { const n=localStorage.getItem(ME_KEY)||""; if(n)setMe(n); else setAskName(true); } catch(e){setAskName(true);}
+      try { const n=localStorage.getItem(ME_KEY)||""; if(n)setMe(n); } catch(e){}
       setReady(true);
     })();
   }, [load]);
@@ -546,6 +550,41 @@ function Board() {
   const distTotal=dist.reduce((s,c)=>s+c.n,0);
 
   const saveMe=async(name)=>{const n=name.trim();if(!n)return;setMe(n);setAskName(false);try{localStorage.setItem(ME_KEY,n);}catch(e){}if(!dataRef.current.members.find((m)=>m.name===n)){const role=dataRef.current.members.length===0?"admin":"member";commit((d)=>({...d,members:[...d.members,{name:n,role,updatedAt:Date.now()}]}),[{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:"팀 합류",detail:ROLES.find((r)=>r.id===role).label}]);}};
+
+  const doLogin=()=>{
+    const n=nameInput.trim();if(!n){alert("이름을 입력하세요.");return;}
+    const mem=dataRef.current.members.find((m)=>m.name===n);
+    if(!mem){alert("등록되지 않은 이름입니다. 신규 등록을 눌러 계정을 만드세요.");return;}
+    if(mem.pw&&mem.pw!==loginPw){alert("비밀번호가 틀렸습니다.");setLoginPw("");return;}
+    if(!mem.pw){alert("비밀번호가 설정되지 않은 계정입니다. 신규 등록에서 비밀번호를 먼저 설정하세요.");return;}
+    setMe(n);try{localStorage.setItem(ME_KEY,n);}catch(e){}
+    setLoginPw("");setNameInput("");
+  };
+  const doSignup=()=>{
+    const n=nameInput.trim();if(!n){alert("이름을 입력하세요.");return;}
+    if(loginPw.length<4){alert("비밀번호는 4자 이상으로 설정하세요.");return;}
+    if(loginPw!==signupPw2){alert("비밀번호가 일치하지 않습니다.");return;}
+    const exist=dataRef.current.members.find((m)=>m.name===n);
+    if(exist&&exist.pw){alert("이미 비밀번호가 설정된 이름입니다. 로그인을 사용하세요.");return;}
+    const role=dataRef.current.members.length===0?"admin":(exist?exist.role:"member");
+    commit((d)=>{const list=d.members||[];const ex=list.find((m)=>m.name===n);
+      return{...d,members:ex?list.map((m)=>m.name===n?{...m,pw:loginPw,updatedAt:Date.now()}:m):[...list,{name:n,role,pw:loginPw,updatedAt:Date.now()}]};},
+      [{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:exist?"비밀번호 설정":"계정 생성",detail:ROLES.find((r)=>r.id===role).label}]);
+    setMe(n);try{localStorage.setItem(ME_KEY,n);}catch(e){}
+    setLoginPw("");setSignupPw2("");setNameInput("");setSignupMode(false);
+  };
+  const logout=()=>{setMe("");try{localStorage.removeItem(ME_KEY);}catch(e){}};
+  const changePw=()=>{
+    if(!pwChange)return;
+    const {cur,next,next2}=pwChange;
+    const mem=dataRef.current.members.find((m)=>m.name===me);
+    if(!mem){setPwChange(null);return;}
+    if(mem.pw&&mem.pw!==cur){alert("현재 비밀번호가 틀렸습니다.");return;}
+    if(next.length<4){alert("새 비밀번호는 4자 이상으로 설정하세요.");return;}
+    if(next!==next2){alert("새 비밀번호가 일치하지 않습니다.");return;}
+    commit((d)=>({...d,members:d.members.map((m)=>m.name===me?{...m,pw:next,updatedAt:Date.now()}:m)}),[{id:uid(),ts:Date.now(),who:me,taskId:null,taskTitle:"",action:"비밀번호 변경",detail:""}]);
+    setPwChange(null);alert("비밀번호가 변경되었습니다.");
+  };
   const openNew=(status)=>setDraft({_new:true,id:uid(),boardId:curBoard,title:"",channel:data.channels[0]?.id||"공통",type:"채널운영",owner:me,start:"",due:"",priority:"mid",memo:"",progress:0,status:status||"todo",tags:[],checklist:[],links:[],comments:[],issues:[],repeat:"none",archived:false,deleted:false});
   const openTask=(t)=>setDraft({...t,boardId:t.boardId||"공용",start:t.start||"",tags:[...(t.tags||[])],checklist:[...(t.checklist||[])],links:[...(t.links||[])],comments:[...(t.comments||[])],issues:[...(t.issues||[])]});
 
@@ -710,18 +749,59 @@ function Board() {
 
   if(!ready)return<div className="wb"><style>{CSS}</style><div className="eyebrow">Team Work Board</div><p style={{fontFamily:"monospace",fontSize:12,color:"#8F959C"}}>보드를 불러오는 중</p></div>;
 
+  if(!me){
+    return (
+      <div className="wb"><style>{CSS}</style>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:20}}>
+          <div className="modal" style={{maxWidth:400,margin:0}}>
+            <h2>{signupMode?"신규 계정 등록":"로그인"}</h2>
+            <div className="modal-body">
+              <div className="fld"><label>이름</label>
+                <input list="wb-memlist" autoFocus value={nameInput} onChange={(e)=>setNameInput(e.target.value)}
+                  onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"&&!signupMode)doLogin();}}
+                  placeholder="예) 김현민" />
+                <datalist id="wb-memlist">{data.members.map((m)=><option key={m.name} value={m.name} />)}</datalist>
+              </div>
+              <div className="fld"><label>비밀번호</label>
+                <input type="password" value={loginPw} onChange={(e)=>setLoginPw(e.target.value)}
+                  onKeyDown={(e)=>{if(e.key==="Enter"&&!signupMode)doLogin();}}
+                  placeholder="비밀번호" />
+              </div>
+              {signupMode&&(
+                <div className="fld"><label>비밀번호 확인</label>
+                  <input type="password" value={signupPw2} onChange={(e)=>setSignupPw2(e.target.value)}
+                    onKeyDown={(e)=>{if(e.key==="Enter")doSignup();}}
+                    placeholder="비밀번호 다시 입력" />
+                </div>
+              )}
+              {data.members.length===0&&!signupMode&&<p className="hint" style={{color:"var(--pri)"}}>첫 사용자입니다. 신규 등록으로 관리자 계정을 만드세요.</p>}
+            </div>
+            <div className="modal-foot">
+              <button className="btn ghost" onClick={()=>{setSignupMode(!signupMode);setLoginPw("");setSignupPw2("");}}>{signupMode?"← 로그인으로":"신규 등록"}</button>
+              <span className="spacer" />
+              {signupMode
+                ? <button className="btn-save" onClick={doSignup}>계정 만들기</button>
+                : <button className="btn-save" onClick={doLogin}>로그인</button>}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return(
     <div className="wb">
       <style>{CSS}</style>
       <div className="topbar">
         <div className="brand"><span className="logo">W</span>업무 보드</div>
         <span className="spacer" />
-        <button className="who" onClick={()=>{setNameInput(me);setAskName(true);}}>
+        <button className="who" onClick={()=>setPwChange({cur:"",next:"",next2:""})} title="비밀번호 변경">
           <span className="av">{(me||"?").slice(0,1)}</span>
           {me||"이름 설정"}<span className="role">{ROLES.find((r)=>r.id===myRole)?.label}</span>
         </button>
         <span className="save"><i className={"dot "+(saveState==="error"?"err":saveState==="idle"?"":"on")} />{saveState==="saving"?"저장 중":saveState==="saved"?"저장됨":saveState==="error"?"저장 실패":saveState==="loading"?"불러오는 중":"동기화됨"}</span>
         <button className="ghostw" onClick={()=>load()}>새로고침</button>
+        <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
         {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
@@ -1302,10 +1382,11 @@ function Board() {
           {data.members.map((m)=>(
             <div key={m.name} className="mrow" style={{borderTop:"1px solid var(--line)"}}>
               <span style={{fontWeight:600,fontSize:13,minWidth:90}}>{m.name}{m.name===me&&<span style={{fontSize:10,color:"#8F959C",fontFamily:"monospace"}}> (나)</span>}</span>
+              <span style={{fontSize:11,fontFamily:"monospace",color:m.pw?"var(--ok)":"var(--warn)"}}>{m.pw?"🔒 설정됨":"⚠ 비번없음"}</span>
               <select className="sel" value={m.role} disabled={!isAdmin} onChange={(e)=>{const role=e.target.value;commit((d)=>({...d,members:d.members.map((x)=>x.name===m.name?{...x,role,updatedAt:Date.now()}:x)}),[mkLog("권한 변경",null,`${m.name} -> ${ROLES.find((r)=>r.id===role).label}`)]);}}>
                 {ROLES.map((r)=><option key={r.id} value={r.id}>{r.label}</option>)}
               </select>
-              <span className="spacer" />{isAdmin&&m.name!==me&&<button className="del" onClick={()=>commit((d)=>({...d,members:d.members.filter((x)=>x.name!==m.name)}),[mkLog("팀원 삭제",null,m.name)])}>내보내기</button>}
+              <span className="spacer" />{isAdmin&&m.name!==me&&<button className="del" onClick={()=>{if(window.confirm(`"${m.name}" 님을 팀에서 내보낼까요? 로그인할 수 없게 됩니다.`))commit((d)=>({...d,members:d.members.filter((x)=>x.name!==m.name)}),[mkLog("팀원 삭제",null,m.name)]);}}>내보내기</button>}
             </div>
           ))}
         </div>
@@ -1376,6 +1457,21 @@ function Board() {
 
       </div>
       <div className="note" style={{margin:"18px 16px 0"}}>데이터는 Firebase(구글)에 실시간 저장됩니다. 계약 조건이나 개인정보는 올리지 마세요.</div>
+
+      {pwChange&&(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setPwChange(null)}><div className="modal sm">
+          <h2>비밀번호 변경</h2>
+          <div className="modal-body">
+            <div className="fld"><label>현재 비밀번호</label><input type="password" value={pwChange.cur} onChange={(e)=>setPwChange({...pwChange,cur:e.target.value})} placeholder="현재 비밀번호" /></div>
+            <div className="fld"><label>새 비밀번호</label><input type="password" value={pwChange.next} onChange={(e)=>setPwChange({...pwChange,next:e.target.value})} placeholder="4자 이상" /></div>
+            <div className="fld"><label>새 비밀번호 확인</label><input type="password" value={pwChange.next2} onChange={(e)=>setPwChange({...pwChange,next2:e.target.value})} onKeyDown={(e)=>{if(e.key==="Enter")changePw();}} placeholder="새 비밀번호 다시 입력" /></div>
+          </div>
+          <div className="modal-foot"><span className="spacer" />
+            <button className="btn ghost" onClick={()=>setPwChange(null)}>취소</button>
+            <button className="btn-save" onClick={changePw}>변경</button>
+          </div>
+        </div></div>
+      )}
 
       {askName&&(
         <div className="mask"><div className="modal sm"><h2>이름을 알려주세요</h2><p className="hint" style={{lineHeight:1.6,marginBottom:14}}>담당자, 댓글, 변경 이력에 이 이름이 남습니다.</p>
