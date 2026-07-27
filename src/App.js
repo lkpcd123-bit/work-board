@@ -58,6 +58,7 @@ function mergeData(r,l) {
   const cm=new Map(); [...(r.checkitems||[]),...(l.checkitems||[])].forEach(t=>{const p=cm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))cm.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
+  for(const [k,v] of mm){ if(v.deleted) mm.delete(k); }
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
   return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
 }
@@ -1379,14 +1380,14 @@ function Board() {
       {view==="team"&&(<>
         <div className="panel"><h3>팀원과 권한</h3><p className="sub">관리자/멤버/뷰어 3단계.</p>
           {data.members.length===0&&<div className="empty">팀원이 없습니다</div>}
-          {data.members.map((m)=>(
+          {data.members.filter((m)=>!m.deleted).map((m)=>(
             <div key={m.name} className="mrow" style={{borderTop:"1px solid var(--line)"}}>
               <span style={{fontWeight:600,fontSize:13,minWidth:90}}>{m.name}{m.name===me&&<span style={{fontSize:10,color:"#8F959C",fontFamily:"monospace"}}> (나)</span>}</span>
               <span style={{fontSize:11,fontFamily:"monospace",color:m.pw?"var(--ok)":"var(--warn)"}}>{m.pw?"🔒 설정됨":"⚠ 비번없음"}</span>
               <select className="sel" value={m.role} disabled={!isAdmin} onChange={(e)=>{const role=e.target.value;commit((d)=>({...d,members:d.members.map((x)=>x.name===m.name?{...x,role,updatedAt:Date.now()}:x)}),[mkLog("권한 변경",null,`${m.name} -> ${ROLES.find((r)=>r.id===role).label}`)]);}}>
                 {ROLES.map((r)=><option key={r.id} value={r.id}>{r.label}</option>)}
               </select>
-              <span className="spacer" />{isAdmin&&m.name!==me&&<button className="del" onClick={()=>{if(window.confirm(`"${m.name}" 님을 팀에서 내보낼까요? 로그인할 수 없게 됩니다.`))commit((d)=>({...d,members:d.members.filter((x)=>x.name!==m.name)}),[mkLog("팀원 삭제",null,m.name)]);}}>내보내기</button>}
+              <span className="spacer" />{isAdmin&&m.name!==me&&<button className="del" onClick={()=>{if(window.confirm(`"${m.name}" 님을 팀에서 내보낼까요? 로그인할 수 없게 됩니다.`))commit((d)=>({...d,members:d.members.map((x)=>x.name===m.name?{...x,deleted:true,pw:null,updatedAt:Date.now()}:x)}),[mkLog("팀원 삭제",null,m.name)]);}}>내보내기</button>}
             </div>
           ))}
         </div>
