@@ -376,7 +376,7 @@ const CSS = `
 /* ══ 체크리스트 탭 ══ */
 .ckcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start;}
 .ckcol{background:#EBECF0;border-radius:12px;padding:12px;}
-.ckcolhead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 12px;}
+.ckcolhead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 4px 12px;min-height:44px;}
 .ckcoltitle{font-size:15px;font-weight:800;display:inline-flex;align-items:center;gap:8px;letter-spacing:-.01em;}
 .ckcoltitle em{font-style:normal;font-size:12.5px;color:var(--ink3);background:#DFE1E6;padding:1px 8px;border-radius:10px;font-weight:700;}
 .ckplus{width:30px;height:30px;border-radius:7px;background:#0C66E4;color:#fff;font-size:19px;font-weight:400;line-height:1;display:flex;align-items:center;justify-content:center;}
