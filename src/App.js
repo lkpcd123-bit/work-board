@@ -390,8 +390,6 @@ const CSS = `
 .ckrow:hover{box-shadow:var(--sh2);}
 .ckrow.over{box-shadow:0 0 0 1.5px #E2445C,var(--sh);}
 .ckrow.done{opacity:.6;}
-.ckrow[draggable=true]{cursor:grab;}
-.ckrow.dragging{opacity:.4;cursor:grabbing;box-shadow:0 0 0 2px var(--pri),var(--sh);}
 .ckrowmain{display:flex;align-items:flex-start;gap:11px;}
 .ckbox{width:22px;height:22px;border:2px solid var(--line2);border-radius:6px;background:var(--card);font-size:12px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;}
 .ckbox:hover{border-color:var(--ok);}
@@ -456,7 +454,6 @@ function Board() {
   const [signupPw2, setSignupPw2] = useState("");
   const [pwChange, setPwChange] = useState(null);
   const [newType, setNewType] = useState("");
-  const [ckDrag, setCkDrag] = useState(null);
   const [confirmBox, setConfirmBox] = useState(null);
   const [newChannel, setNewChannel] = useState("");
   const [newSub, setNewSub] = useState("");
@@ -551,6 +548,7 @@ function Board() {
   const sortFn=useCallback((a,b)=>{ if(sortBy==="due"){if(!a.due&&!b.due)return 0;if(!a.due)return 1;if(!b.due)return -1;return a.due<b.due?-1:1;} if(sortBy==="pri"){const r=(t)=>PRIORITIES.find((p)=>p.id===t.priority)?.rank??1;return r(a)-r(b);} return(b.updatedAt||0)-(a.updatedAt||0); },[sortBy]);
   const visible=useMemo(()=>applyFilters(live).slice().sort(sortFn),[live,applyFilters,sortFn]);
   const stats=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return{total:live.length,doing:live.filter((t)=>t.status==="doing").length,tomorrow:o.filter((t)=>dayDiff(t.due)===1).length,late:o.filter((t)=>{const d=dayDiff(t.due);return d!==null&&d<0;}).length,open:o.length};},[live]);
+  const dist=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return data.channels.filter((c)=>!c.parent).map((c)=>({...c,n:o.filter((t)=>t.channel===c.id||(data.channels.find((x)=>x.id===t.channel)||{}).parent===c.id).length})).filter((c)=>c.n>0);},[live,data.channels]);
 
   const saveMe=async(name)=>{const n=name.trim();if(!n)return;setMe(n);setAskName(false);try{localStorage.setItem(ME_KEY,n);}catch(e){}if(!dataRef.current.members.find((m)=>m.name===n)){const role=dataRef.current.members.length===0?"admin":"member";commit((d)=>({...d,members:[...d.members,{name:n,role,updatedAt:Date.now()}]}),[{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:"팀 합류",detail:ROLES.find((r)=>r.id===role).label}]);}};
 
@@ -697,12 +695,8 @@ function Board() {
   /* ── 체크리스트 ── */
   const checkitems=useMemo(()=>(data.checkitems||[]).filter((c)=>!c.deleted),[data.checkitems]);
   const ckByTab=useCallback((tab)=>checkitems.filter((c)=>c.tab===tab).slice().sort((a,b)=>{
-    if(a.done!==b.done)return a.done?1:-1;
-    const ao=a.order,bo=b.order;
-    if(ao!=null&&bo!=null)return ao-bo;
-    if(ao!=null)return -1;
-    if(bo!=null)return 1;
     const da=a.due||"9999",db=b.due||"9999";
+    if(a.done!==b.done)return a.done?1:-1;
     return da<db?-1:da>db?1:0;
   }),[checkitems]);
 
@@ -716,32 +710,8 @@ function Board() {
       [{id:uid(),ts:now,who:me||"익명",taskId:rec.id,taskTitle:rec.title,action:isNew?"체크항목 생성":"체크항목 수정",detail:CKTABS.find((t)=>t.id===rec.tab)?.label||""}]);
     setCkDraft(null);
   };
-  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);if(willDone)setConfirmBox({kind:"archiveCk",ckId:c.id,ckTitle:c.title});};
-  const reorderCk=(tab,fromId,toId)=>{
-    if(!canEdit||fromId===toId)return;
-    const ordered=ckByTab(tab).filter((c)=>!c.done);
-    const fromIdx=ordered.findIndex((c)=>c.id===fromId);
-    const toIdx=ordered.findIndex((c)=>c.id===toId);
-    if(fromIdx<0||toIdx<0)return;
-    const arr=[...ordered];
-    const [moved]=arr.splice(fromIdx,1);
-    arr.splice(toIdx,0,moved);
-    const now=Date.now();
-    commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>{
-      const pos=arr.findIndex((a)=>a.id===x.id);
-      return pos>=0?{...x,order:pos,updatedAt:now}:x;
-    })}),[]);
-  };
+  const toggleCk=(c)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:!x.done,doneAt:!x.done?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);};
   const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크항목 삭제",detail:""}]);setCkDraft(null);};
-  const duplicateCk=(c)=>{
-    const now=Date.now();
-    const copy={...c,id:uid(),title:c.title+" (복사)",done:false,doneAt:null,order:null,
-      subs:(c.subs||[]).map((s)=>({...s,id:uid(),done:false})),
-      history:[],createdAt:now,updatedAt:now};
-    delete copy._new;
-    commit((d)=>({...d,checkitems:[...(d.checkitems||[]),copy]}),[{id:uid(),ts:now,who:me||"익명",taskId:copy.id,taskTitle:copy.title,action:"체크항목 복사",detail:`원본: ${c.title}`}]);
-    setCkDraft(null);
-  };
   const clearCkTab=(tab)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.tab===tab&&!x.deleted?{...x,done:false,doneAt:null,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:null,taskTitle:"",action:"체크 전체 해제",detail:CKTABS.find((t)=>t.id===tab)?.label||""}]);};
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
 
@@ -1145,12 +1115,7 @@ function Board() {
                     const subs=c.subs||[];const subDone=subs.filter((s)=>s.done).length;
                     const exp=ckExpand[c.id];
                     return (
-                      <div key={c.id} draggable={canEdit&&!c.done}
-                        onDragStart={()=>setCkDrag(c.id)}
-                        onDragOver={(e)=>{e.preventDefault();}}
-                        onDrop={()=>{if(ckDrag)reorderCk(tab.id,ckDrag,c.id);setCkDrag(null);}}
-                        onDragEnd={()=>setCkDrag(null)}
-                        className={"ckrow"+(c.done?" done":"")+(over?" over":"")+(ckDrag===c.id?" dragging":"")}>
+                      <div key={c.id} className={"ckrow"+(c.done?" done":"")+(over?" over":"")}>
                         <div className="ckrowmain">
                           <button className={"ckbox"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCk(c)}>{c.done?"✓":""}</button>
                           <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setCkDraft({...c,subs:c.subs?[...c.subs]:(isCL?[]:undefined)})}>
@@ -1677,7 +1642,6 @@ function Board() {
           </div>
           <div className="modal-foot">
             {!ckDraft._new&&<button className="del" onClick={()=>removeCk(ckDraft)}>삭제</button>}
-            {!ckDraft._new&&<button className="btn ghost" onClick={()=>duplicateCk(ckDraft)}>복사</button>}
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setCkDraft(null)}>닫기</button>
             <button className="btn-save" onClick={saveCk}>저장</button>
@@ -1688,17 +1652,16 @@ function Board() {
 
       {confirmBox&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setConfirmBox(null)}><div className="modal sm">
-          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":confirmBox.kind==="clearCk"?"전체 지울까요?":confirmBox.kind==="archiveCk"?"목록에서 정리할까요?":"완료 업무를 보관할까요?"}</h2>
-          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요? 보드에서 사라지고 보관함에서 볼 수 있습니다.`:confirmBox.kind==="clearCk"?`${CKTABS.find((t)=>t.id===confirmBox.tab)?.label} 탭의 모든 항목이 삭제됩니다.`:confirmBox.kind==="archiveCk"?`"${confirmBox.ckTitle}" 항목을 완료했습니다. 목록에서 삭제할까요? (남겨두면 아래쪽에 완료 상태로 표시됩니다)`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
+          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":confirmBox.kind==="clearCk"?"전체 지울까요?":"완료 업무를 보관할까요?"}</h2>
+          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요? 보드에서 사라지고 보관함에서 볼 수 있습니다.`:confirmBox.kind==="clearCk"?`${CKTABS.find((t)=>t.id===confirmBox.tab)?.label} 탭의 모든 항목이 삭제됩니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
           <div className="mfoot"><span className="spacer" />
-            <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":confirmBox.kind==="archiveCk"?"남겨두기":"취소"}</button>
+            <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":"취소"}</button>
             <button className={confirmBox.kind==="purge"||confirmBox.kind==="clearCk"?"btn warn":"btn-save"} onClick={()=>{
               if(confirmBox.kind==="purge")purgeArchive();
               else if(confirmBox.kind==="clearCk"){clearCkTab(confirmBox.tab);setConfirmBox(null);}
-              else if(confirmBox.kind==="archiveCk"){const cid=confirmBox.ckId;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===cid?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:cid,taskTitle:confirmBox.ckTitle,action:"체크항목 정리",detail:""}]);setConfirmBox(null);}
               else if(confirmBox.kind==="archiveOne"){const tid=confirmBox.taskId;commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===tid?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("아카이브",{id:tid,title:confirmBox.taskTitle})]);setConfirmBox(null);}
               else archiveDone();
-            }}>{confirmBox.kind==="purge"?"영구 삭제":confirmBox.kind==="clearCk"?"전체 삭제":confirmBox.kind==="archiveCk"?"삭제":"보관하기"}</button>
+            }}>{confirmBox.kind==="purge"?"영구 삭제":confirmBox.kind==="clearCk"?"전체 삭제":"보관하기"}</button>
           </div>
         </div></div>
       )}
@@ -1764,41 +1727,58 @@ function Board() {
             {canEdit&&<div className="addrow"><input placeholder="태그 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v&&!(draft.tags||[]).includes(v)){setDraft({...draft,tags:[...(draft.tags||[]),v]});e.target.value="";}}} /></div>}
           </div>
           <div className="sect"><h4>세부 단계{(draft.checklist||[]).length>0&&` (${draft.checklist.filter((c)=>c.done).length}/${draft.checklist.length})`}</h4>
-            {(draft.checklist||[]).map((c)=><div key={c.id} className="item"><input type="checkbox" checked={c.done} disabled={!canEdit} style={{width:"auto"}} onChange={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,done:!x.done}:x)})} /><span style={{flex:1,textDecoration:c.done?"line-through":"none",color:c.done?"#8F959C":"inherit"}}>{c.text}</span>{canEdit&&<button style={{background:"none",border:"none",cursor:"pointer",color:"#8F959C"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.filter((x)=>x.id!==c.id)})}>x</button>}</div>)}
-            {!(draft.checklist||[]).length&&<span className="hint">없음</span>}
-            {canEdit&&<div className="addrow"><input placeholder="단계 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:[...(draft.checklist||[]),{id:uid(),text:v,done:false}]});e.target.value="";}}} /></div>}
-          </div>
-          <div className="sect"><h4>링크 첨부</h4>
-            {(draft.links||[]).map((l)=><div key={l.id} className="item"><span>🔗</span><a href={l.url} target="_blank" rel="noreferrer" style={{flex:1}}>{l.label||l.url}</a>{canEdit&&<button style={{background:"none",border:"none",cursor:"pointer",color:"#8F959C"}} onClick={()=>setDraft({...draft,links:draft.links.filter((x)=>x.id!==l.id)})}>x</button>}</div>)}
-            {!(draft.links||[]).length&&<span className="hint">없음</span>}
-            {canEdit&&<div className="addrow"><input placeholder="링크 붙여넣고 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,links:[...(draft.links||[]),{id:uid(),url:v,label:""}]});e.target.value="";}}} /></div>}
-          </div>
-          <div className="sect"><h4>댓글{(draft.comments||[]).length>0&&` (${draft.comments.length})`}</h4>
-            {(draft.comments||[]).map((c)=>(
-              <div key={c.id} className="cmt">
-                <div className="ch2"><b>{c.author}</b> · {fmtTs(c.ts)}{c.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (수정됨)</span>}</div>
-                {c.editing
-                  ? <div style={{display:"flex",gap:6,marginTop:4}}>
-                      <input defaultValue={c.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14}}
-                        onKeyDown={(e)=>{
-                          if(e.nativeEvent.isComposing)return;
-                          if(e.key==="Enter"&&!e.shiftKey){
-                            const v=e.target.value.trim();if(!v)return;
-                            setDraft({...draft,comments:draft.comments.map((x)=>x.id===c.id?{...x,text:v,edited:true,editing:false}:x)});
-                          }
-                          if(e.key==="Escape")setDraft({...draft,comments:draft.comments.map((x)=>x.id===c.id?{...x,editing:false}:x)});
-                        }} />
-                      <button className="btn ghost" onClick={()=>setDraft({...draft,comments:draft.comments.map((x)=>x.id===c.id?{...x,editing:false}:x)})}>취소</button>
-                    </div>
-                  : <p>{c.text}</p>}
-                <div style={{display:"flex",gap:10,marginTop:3}}>
-                  {(c.author===me||isAdmin)&&!c.editing&&<button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,comments:draft.comments.map((x)=>x.id===c.id?{...x,editing:true}:x)})}>수정</button>}
-                  {(c.author===me||isAdmin)&&<button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,comments:draft.comments.filter((x)=>x.id!==c.id)})}>삭제</button>}
+            {(draft.checklist||[]).map((c)=>(
+              <div key={c.id} style={{marginBottom:6}}>
+                <div className="item">
+                  <input type="checkbox" checked={c.done} disabled={!canEdit} style={{width:"auto"}} onChange={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,done:!x.done}:x)})} />
+                  {c.editing
+                    ? <input defaultValue={c.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"5px 8px",fontSize:13.5}}
+                        onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,editing:false}:x)});}}
+                        onBlur={(e)=>{const v=e.target.value.trim();if(v)setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,text:v,editing:false}:x)});}} />
+                    : <span style={{flex:1,textDecoration:c.done?"line-through":"none",color:c.done?"#8F959C":"inherit",cursor:canEdit?"pointer":"default"}} onClick={()=>canEdit&&setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,editing:true}:x)})}>{c.text}</span>}
+                  {canEdit&&!c.editing&&<button style={{background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",fontSize:11,padding:"0 4px"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,expand:!x.expand}:x)})}>{(c.subs||[]).length>0?`하위 ${(c.subs||[]).filter((s)=>s.done).length}/${(c.subs||[]).length}`:"+하위"}</button>}
+                  {canEdit&&<button style={{background:"none",border:"none",cursor:"pointer",color:"#8F959C"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.filter((x)=>x.id!==c.id)})}>×</button>}
                 </div>
+                {canEdit&&c.expand&&(
+                  <div style={{paddingLeft:26,marginTop:4}}>
+                    {(c.subs||[]).map((s)=>(
+                      <div key={s.id} className="item" style={{padding:"3px 0"}}>
+                        <input type="checkbox" checked={s.done} style={{width:"auto"}} onChange={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:x.subs.map((y)=>y.id===s.id?{...y,done:!y.done}:y)}:x)})} />
+                        <span style={{flex:1,fontSize:12.5,textDecoration:s.done?"line-through":"none",color:s.done?"#8F959C":"inherit"}}>{s.text}</span>
+                        <button style={{background:"none",border:"none",cursor:"pointer",color:"#8F959C"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:x.subs.filter((y)=>y.id!==s.id)}:x)})}>×</button>
+                      </div>
+                    ))}
+                    <div className="addrow" style={{marginTop:3}}><input placeholder="하위 항목 입력 후 Enter" style={{fontSize:12.5}} onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:[...(x.subs||[]),{id:uid(),text:v,done:false}]}:x)});e.target.value="";}}} /></div>
+                  </div>
+                )}
               </div>
             ))}
-            {!(draft.comments||[]).length&&<span className="hint">없음</span>}
-            <div className="addrow"><input placeholder="댓글 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,comments:[...(draft.comments||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}}} /></div>
+            {!(draft.checklist||[]).length&&<span className="hint">없음</span>}
+            {canEdit&&<div className="addrow"><input placeholder="단계 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:[...(draft.checklist||[]),{id:uid(),text:v,done:false,subs:[]}]});e.target.value="";}}} /></div>}
+          </div>
+          <div className="sect"><h4>히스토리</h4>
+            {(draft.history||[]).length===0&&<span className="hint">진행 기록이 없습니다</span>}
+            {(draft.history||[]).map((h)=>(
+              <div key={h.id} className="cmt">
+                <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                {h.editing
+                  ? <div style={{display:"flex",gap:6,marginTop:4}}>
+                      <input defaultValue={h.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14}}
+                        onKeyDown={(e)=>{
+                          if(e.nativeEvent.isComposing)return;
+                          if(e.key==="Enter"){const v=e.target.value.trim();if(v)setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,text:v,edited:true,editing:false}:x)});}
+                          if(e.key==="Escape")setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:false}:x)});
+                        }} />
+                      <button className="btn ghost" onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:false}:x)})}>취소</button>
+                    </div>
+                  : <p>{h.text}</p>}
+                {canEdit&&!h.editing&&<div style={{display:"flex",gap:10,marginTop:3}}>
+                  <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>수정</button>
+                  <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.filter((x)=>x.id!==h.id)})}>삭제</button>
+                </div>}
+              </div>
+            ))}
+            {canEdit&&<div className="addrow"><input placeholder="진행 상황·메모 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}}} /></div>}
           </div>
           <div className="sect"><h4>이슈</h4>
             {(draft.issues||[]).length===0&&<span className="hint">없음</span>}
