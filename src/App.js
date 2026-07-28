@@ -308,9 +308,12 @@ const CSS = `
 /* ── 진행률 ── */
 .prow{display:flex;align-items:center;gap:8px;}
 .ppct{font-size:18px;font-weight:800;color:var(--ok);min-width:44px;letter-spacing:-.02em;text-align:right;}
-.prange{flex:1;-webkit-appearance:none;appearance:none;height:6px;background:#DFE1E6;outline:none;border-radius:4px;padding:0;margin:0;}
-.prange::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--ok);cursor:pointer;box-shadow:var(--sh);}
-.prange::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--ok);cursor:pointer;}
+.prange{flex:1;-webkit-appearance:none;appearance:none;width:100%;height:6px;background:transparent;outline:none;padding:0;margin:0;box-sizing:border-box;display:block;}
+.prange::-webkit-slider-runnable-track{-webkit-appearance:none;width:100%;height:6px;background:#DFE1E6;border-radius:4px;border:none;}
+.prange::-moz-range-track{width:100%;height:6px;background:#DFE1E6;border-radius:4px;border:none;}
+.prange::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--ok);cursor:pointer;box-shadow:var(--sh);margin-top:-6px;}
+.prange::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--ok);cursor:pointer;box-sizing:border-box;}
+.prange::-moz-range-progress{background:transparent;height:6px;border-radius:4px;}
 .pticks{display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);margin-top:4px;font-weight:600;}
 .pbadge{font-size:12.5px;font-weight:700;border-radius:20px;padding:5px 12px;background:#EBECF0;color:var(--ink2);white-space:nowrap;}
 .pticks{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink3);margin-top:5px;padding-left:58px;font-weight:600;}
@@ -679,8 +682,8 @@ function Board() {
     commit((d)=>({...d,members:d.members.map((m)=>m.name===me?{...m,pw:next,updatedAt:Date.now()}:m)}),[{id:uid(),ts:Date.now(),who:me,taskId:null,taskTitle:"",action:"비밀번호 변경",detail:""}]);
     setPwChange(null);alert("비밀번호가 변경되었습니다.");
   };
-  const openNew=(status)=>setDraft({_new:true,id:uid(),boardId:curBoard,title:"",channel:data.channels[0]?.id||"공통",type:"채널운영",owner:me,start:"",due:"",priority:"mid",memo:"",progress:0,status:status||"todo",tags:[],checklist:[],links:[],comments:[],issues:[],repeat:"none",archived:false,deleted:false});
-  const openTask=(t)=>setDraft({...t,boardId:t.boardId||"공용",start:t.start||"",tags:[...(t.tags||[])],checklist:[...(t.checklist||[])],links:[...(t.links||[])],comments:[...(t.comments||[])],issues:[...(t.issues||[])]});
+  const openNew=(status)=>setDraft({_new:true,id:uid(),boardId:curBoard,title:"",channel:data.channels[0]?.id||"공통",brand:"",type:"채널운영",owner:me,start:"",due:"",priority:"mid",memo:"",progress:0,status:status||"todo",tags:[],checklist:[],links:[],comments:[],issues:[],repeat:"none",archived:false,deleted:false});
+  const openTask=(t)=>setDraft({...t,boardId:t.boardId||"공용",brand:t.brand||"",start:t.start||"",tags:[...(t.tags||[])],checklist:[...(t.checklist||[])],links:[...(t.links||[])],comments:[...(t.comments||[])],issues:[...(t.issues||[])]});
 
   const duplicateTask=(t)=>{
     const now=Date.now();
@@ -1983,9 +1986,13 @@ function Board() {
           <h2>{draft._new?"새 업무":"업무 상세"}</h2>
           <div className="modal-body">
           <div className="fld"><label>업무명</label><input autoFocus disabled={!canEdit} value={draft.title} onChange={(e)=>setDraft({...draft,title:e.target.value})} placeholder="예) 쿠팡 락토컷 상세페이지 개편" /></div>
-          <div className="r2">
+          <div className="r3">
+            <div className="fld"><label>브랜드</label><select disabled={!canEdit} value={draft.brand||""} onChange={(e)=>setDraft({...draft,brand:e.target.value})}>
+              <option value="">선택 안 함</option>
+              {subsOf("브랜드").map((k)=><option key={k.id} value={k.id}>{k.id}</option>)}
+            </select></div>
             <div className="fld"><label>채널</label><select disabled={!canEdit} value={draft.channel} onChange={(e)=>setDraft({...draft,channel:e.target.value})}>
-              {topChannels.map((c)=>{
+              {topChannels.filter((c)=>c.id!=="브랜드").map((c)=>{
                 const kids=subsOf(c.id);
                 if(!kids.length)return <option key={c.id} value={c.id}>{c.id}</option>;
                 return <optgroup key={c.id} label={c.id}>
