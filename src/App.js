@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { getAI, getGenerativeModel, GoogleAIBackend, Schema } from "firebase/ai";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDvdroHh6ppTDpwC1LdFadgSaKRcz6zudE",
@@ -15,7 +15,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 initializeAppCheck(fbApp, {
-  provider: new ReCaptchaV3Provider("6LfQLWktAAAAAJA3lO4WTSiZIi536uDGIQjVHmHo"),
+  provider: new ReCaptchaEnterpriseProvider("6LfQLWktAAAAAJA3lO4WTSiZIi536uDGIQjVHmHo"),
   isTokenAutoRefreshEnabled: true,
 });
 
