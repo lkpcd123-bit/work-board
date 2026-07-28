@@ -112,7 +112,7 @@ const weekOf=(ds)=>{const d=new Date(ds+"T00:00:00");const dow=d.getDay();const 
 const DOW=["월","화","수","목","금","토","일"];
 const monthGrid=(y,m)=>{const first=new Date(y,m,1);const startPad=(first.getDay()+6)%7;const last=new Date(y,m+1,0).getDate();const cells=[];for(let i=0;i<startPad;i++)cells.push(null);for(let i=1;i<=last;i++){const mm=String(m+1).padStart(2,"0"),dd=String(i).padStart(2,"0");cells.push(`${y}-${mm}-${dd}`);}while(cells.length%7!==0)cells.push(null);return cells;};
 const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -122,7 +122,8 @@ function mergeData(r,l) {
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
+  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
+    routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
 }
 
 const CSS = `
@@ -549,6 +550,8 @@ function Board() {
   const [aiLoading, setAiLoading] = useState(false);
   const aiChatRef = useRef(null);
   const [newType, setNewType] = useState("");
+  const [newRcat, setNewRcat] = useState("");
+  const [rTitleEdit, setRTitleEdit] = useState(false);
   const [mlyDraft, setMlyDraft] = useState(null);
   const [mlyDate, setMlyDate] = useState(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;});
   const [confirmBox, setConfirmBox] = useState(null);
@@ -607,7 +610,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -906,6 +909,7 @@ function Board() {
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
+  useEffect(()=>{setRTitleEdit(false);},[selR]);
   useEffect(()=>{const h=(e)=>{if(e.key==="Escape"){setDraft(null);setConfirmBox(null);}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 
   const renderCard=(t)=>{
@@ -1081,7 +1085,11 @@ function Board() {
           if(rQuery.trim()){const kw=rQuery.trim().toLowerCase();if(!`${r.title} ${r.memo||""} ${r.owner||""}`.toLowerCase().includes(kw))return false;}
           return true;
         });
-        const grouped={"오전":rFiltered.filter((r)=>r.when==="오전"),"오후":rFiltered.filter((r)=>r.when!=="오전")};
+        const rCats=data.routineCats&&data.routineCats.length?data.routineCats:["오전","오후"];
+        const grouped={};
+        rCats.forEach((cat)=>{grouped[cat]=rFiltered.filter((r)=>r.when===cat);});
+        const etc=rFiltered.filter((r)=>!rCats.includes(r.when));
+        if(etc.length)grouped["미분류"]=etc;
         const doneToday=rFiltered.filter((r)=>(r.checkins||{})[rDate]).length;
         const rOwners=[...new Set(routines.map((r)=>r.owner).filter(Boolean))].sort();
         return (
@@ -1097,7 +1105,7 @@ function Board() {
                 </div>
                 <div style={{display:"flex",gap:6}}>
                   <button className="btn ghost" onClick={()=>setRDate(todayStr())}>오늘</button>
-                  {canEdit&&<button className="btn-save" onClick={()=>setRDraft({_new:true,id:uid(),title:"",when:"오전",owner:me,memo:"",checkins:{},issues:[],fixedChecks:[]})}>+ 추가</button>}
+                  {canEdit&&<button className="btn-save" onClick={()=>setRDraft({_new:true,id:uid(),title:"",when:(data.routineCats&&data.routineCats[0])||"오전",owner:me,memo:"",checkins:{},issues:[],fixedChecks:[]})}>+ 추가</button>}
                 </div>
               </div>
               <div className="rfilters">
@@ -1124,7 +1132,7 @@ function Board() {
             </div>
 
             {routines.length===0&&<div className="empty">반복 업무를 추가해 시작하세요</div>}
-            {["오전","오후"].map((slot)=>grouped[slot].length>0&&(
+            {[...rCats,...(grouped["미분류"]?["미분류"]:[])].map((slot)=>grouped[slot]&&grouped[slot].length>0&&(
               <div key={slot} style={{marginBottom:14}}>
                 <div style={{fontFamily:"monospace",fontSize:10,letterSpacing:".1em",color:"#8F959C",marginBottom:7}}>
                   {slot} <span style={{color:"#C4C9C1"}}>{grouped[slot].length}</span>
@@ -1171,8 +1179,12 @@ function Board() {
               return (
               <div className="panel">
                 <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:14}}>
-                  <div>
-                    <div style={{fontSize:15,fontWeight:800,letterSpacing:"-.02em"}}>{sel.title}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    {rTitleEdit
+                      ? <input defaultValue={sel.title} autoFocus style={{fontSize:15,fontWeight:800,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 8px",width:"100%"}}
+                          onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,title:v,updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("제목 수정",sel,v)]);setRTitleEdit(false);}if(e.key==="Escape")setRTitleEdit(false);}}
+                          onBlur={(e)=>{const v=e.target.value.trim();if(v&&v!==sel.title)commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,title:v,updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("제목 수정",sel,v)]);setRTitleEdit(false);}} />
+                      : <div style={{fontSize:15,fontWeight:800,letterSpacing:"-.02em",cursor:canEdit?"pointer":"default"}} onClick={()=>canEdit&&setRTitleEdit(true)}>{sel.title}</div>}
                     <div style={{fontFamily:"monospace",fontSize:10.5,color:"#8F959C",marginTop:3}}>{sel.when} · 담당 {sel.owner||"미지정"}</div>
                   </div>
                   <button style={{background:"none",border:"none",fontSize:16,color:"#8F959C",cursor:"pointer"}} onClick={()=>setSelR(null)}>×</button>
@@ -1730,6 +1742,23 @@ function Board() {
           )}
         </div>
 
+        <div className="panel"><h3>반복업무 분류</h3><p className="sub">반복업무를 묶어서 보여줄 분류를 자유롭게 만듭니다. (예: 오전/오후 대신 팀별, 채널별 등)</p>
+          <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+            {(data.routineCats&&data.routineCats.length?data.routineCats:["오전","오후"]).map((c)=>(
+              <span key={c} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#EBECF0",borderRadius:16,padding:"5px 12px",fontSize:13,fontWeight:600,color:"var(--ink2)"}}>
+                {c}
+                {isAdmin&&(data.routineCats||["오전","오후"]).length>1&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}} onClick={()=>{commit((d)=>({...d,routineCats:(d.routineCats&&d.routineCats.length?d.routineCats:["오전","오후"]).filter((x)=>x!==c),routineCatsUpdatedAt:Date.now()}),[mkLog("반복업무분류 삭제",null,c)]);}}>×</button>}
+              </span>
+            ))}
+          </div>
+          {isAdmin&&(
+            <div className="addrow" style={{marginTop:12}}>
+              <input placeholder="새 분류 입력 후 추가" value={newRcat} onChange={(e)=>setNewRcat(e.target.value)} />
+              <button onClick={()=>{const c=newRcat.trim();if(!c)return;const cur=data.routineCats&&data.routineCats.length?data.routineCats:["오전","오후"];if(cur.includes(c)){alert("이미 있는 분류입니다.");return;}commit((d)=>({...d,routineCats:[...cur,c],routineCatsUpdatedAt:Date.now()}),[mkLog("반복업무분류 추가",null,c)]);setNewRcat("");}}>추가</button>
+            </div>
+          )}
+        </div>
+
         <div className="panel"><h3>백업</h3><p className="sub">주기적으로 내려받아 두세요.</p>
           <div style={{display:"flex",gap:7}}>
             <button className="btn ghost" onClick={exportJson}>JSON 내려받기</button>
@@ -1770,7 +1799,7 @@ function Board() {
           <div className="modal-body">
             <div className="fld"><label>업무명</label><input autoFocus value={rDraft.title} onChange={(e)=>setRDraft({...rDraft,title:e.target.value})} placeholder="예) 쿠팡 전 상품 가격·아이템위너 확인" /></div>
             <div className="r2">
-              <div className="fld"><label>시간대</label><select value={rDraft.when} onChange={(e)=>setRDraft({...rDraft,when:e.target.value})}><option value="오전">오전</option><option value="오후">오후</option></select></div>
+              <div className="fld"><label>분류</label><select value={rDraft.when} onChange={(e)=>setRDraft({...rDraft,when:e.target.value})}>{(data.routineCats&&data.routineCats.length?data.routineCats:["오전","오후"]).map((c)=><option key={c} value={c}>{c}</option>)}</select></div>
               <div className="fld"><label>담당자</label><input list="wb-owners" value={rDraft.owner||""} onChange={(e)=>setRDraft({...rDraft,owner:e.target.value})} placeholder="이름" /></div>
             </div>
             <div className="fld"><label>비고 · 메모</label><textarea value={rDraft.memo||""} onChange={(e)=>setRDraft({...rDraft,memo:e.target.value})} placeholder="확인 절차, 기준값, 참고 링크" /></div>
