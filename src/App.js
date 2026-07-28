@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { getAI, getGenerativeModel, GoogleAIBackend, Schema } from "firebase/ai";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDvdroHh6ppTDpwC1LdFadgSaKRcz6zudE",
@@ -12,6 +13,60 @@ const firebaseConfig = {
 };
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+
+/* ── AI 비서: Gemini 함수 선언 (조회 전용) ── */
+const aiTools = [{
+  functionDeclarations: [
+    {
+      name: "searchTasks",
+      description: "업무 보드의 업무 목록을 조건으로 검색합니다. 마감일, 담당자, 채널, 상태로 찾을 때 사용합니다.",
+      parameters: Schema.object({
+        properties: {
+          status: Schema.string({ description: "상태 필터: todo, doing, review, issuecol, done 중 하나. 생략하면 전체." }),
+          owner: Schema.string({ description: "담당자 이름. 생략하면 전체 담당자." }),
+          channel: Schema.string({ description: "채널명. 생략하면 전체 채널." }),
+          board: Schema.string({ description: "보드 이름: 공용, 김현민, 김찬 중 하나. 생략하면 전체 보드." }),
+          onlyOverdue: Schema.boolean({ description: "true면 마감이 지난 업무만." }),
+          onlyToday: Schema.boolean({ description: "true면 오늘 마감인 업무만." }),
+        },
+        optionalProperties: ["status", "owner", "channel", "board", "onlyOverdue", "onlyToday"],
+      }),
+    },
+    {
+      name: "searchRoutines",
+      description: "반복 업무 목록과 오늘 체크 여부, 연속 기록을 조회합니다.",
+      parameters: Schema.object({
+        properties: {
+          owner: Schema.string({ description: "담당자 이름. 생략하면 전체." }),
+          onlyUnchecked: Schema.boolean({ description: "true면 오늘 아직 체크 안 한 반복업무만." }),
+        },
+        optionalProperties: ["owner", "onlyUnchecked"],
+      }),
+    },
+    {
+      name: "searchCheckitems",
+      description: "체크리스트(체크리스트/행사 원복/상품 원복) 항목을 조회합니다.",
+      parameters: Schema.object({
+        properties: {
+          tab: Schema.string({ description: "checklist, event, product 중 하나. 생략하면 전체 탭." }),
+          onlyPending: Schema.boolean({ description: "true면 아직 완료 안 한 항목만." }),
+          onlyOverdue: Schema.boolean({ description: "true면 마감(종료일)이 지난 미완료 항목만." }),
+        },
+        optionalProperties: ["tab", "onlyPending", "onlyOverdue"],
+      }),
+    },
+    {
+      name: "searchIssues",
+      description: "업무·반복업무에 등록된 이슈를 조회합니다.",
+      parameters: Schema.object({
+        properties: {
+          onlyUnresolved: Schema.boolean({ description: "true면 미해결 이슈만." }),
+        },
+        optionalProperties: ["onlyUnresolved"],
+      }),
+    },
+  ],
+}];
 const BOARD_REF = () => doc(db, "board", "main");
 const ME_KEY = "wb-me";
 const PASSWORD = "shakebaby2024";
@@ -408,6 +463,25 @@ const CSS = `
 .cksub{display:flex;align-items:center;gap:8px;font-size:13px;}
 @media(max-width:1100px){.ckcols{grid-template-columns:1fr;}}
 
+/* ══ AI 비서 ══ */
+.aiwrap{max-width:720px;margin:0 auto;}
+.aichat{background:var(--card);border-radius:12px;box-shadow:var(--sh);padding:20px;min-height:360px;max-height:520px;overflow-y:auto;margin-bottom:12px;}
+.aiempty{text-align:center;padding:30px 10px;color:var(--ink3);}
+.aiempty p{font-size:13.5px;margin-bottom:14px;font-weight:600;}
+.aisugg{display:flex;flex-direction:column;gap:8px;max-width:320px;margin:0 auto;}
+.aisugg button{background:#F1F2F4;border-radius:8px;padding:9px 14px;font-size:13px;color:var(--ink2);text-align:left;}
+.aisugg button:hover{background:#E4E6E9;}
+.aimsg{display:flex;margin-bottom:12px;}
+.aimsg.user{justify-content:flex-end;}
+.aimsg.ai{justify-content:flex-start;}
+.aibubble{max-width:78%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
+.aimsg.user .aibubble{background:var(--pri);color:#fff;border-bottom-right-radius:4px;}
+.aimsg.ai .aibubble{background:#F1F2F4;color:var(--ink);border-bottom-left-radius:4px;}
+.aithink{color:var(--ink3);font-style:italic;}
+.aiinput{display:flex;gap:8px;}
+.aiinput input{flex:1;background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:11px 14px;font-size:14.5px;}
+.aiinput input:focus{outline:2px solid var(--pri);outline-offset:-1px;}
+
 `;
 
 function LoginScreen() {
@@ -453,6 +527,10 @@ function Board() {
   const [signupMode, setSignupMode] = useState(false);
   const [signupPw2, setSignupPw2] = useState("");
   const [pwChange, setPwChange] = useState(null);
+  const [aiMessages, setAiMessages] = useState([]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const aiChatRef = useRef(null);
   const [newType, setNewType] = useState("");
   const [confirmBox, setConfirmBox] = useState(null);
   const [newChannel, setNewChannel] = useState("");
@@ -714,6 +792,74 @@ function Board() {
   const clearCkTab=(tab)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.tab===tab&&!x.deleted?{...x,done:false,doneAt:null,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:null,taskTitle:"",action:"체크 전체 해제",detail:CKTABS.find((t)=>t.id===tab)?.label||""}]);};
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
 
+  /* ── AI 비서 ── */
+  const runAiFunction = useCallback((name, args) => {
+    const d = dataRef.current;
+    if (name === "searchTasks") {
+      let list = d.tasks.filter((t) => !t.deleted && !t.archived);
+      if (args.board) list = list.filter((t) => (t.boardId || "공용") === args.board);
+      if (args.status) list = list.filter((t) => t.status === args.status);
+      if (args.owner) list = list.filter((t) => t.owner === args.owner);
+      if (args.channel) list = list.filter((t) => t.channel === args.channel);
+      if (args.onlyOverdue) list = list.filter((t) => { const dd = dayDiff(t.due); return dd !== null && dd < 0 && t.status !== "done"; });
+      if (args.onlyToday) list = list.filter((t) => t.due === todayStr());
+      return list.slice(0, 40).map((t) => ({ title: t.title, channel: t.channel, owner: t.owner || "미지정", status: t.status, due: t.due || null, priority: t.priority, progress: t.progress || 0, board: t.boardId || "공용" }));
+    }
+    if (name === "searchRoutines") {
+      let list = routines;
+      if (args.owner) list = list.filter((r) => r.owner === args.owner);
+      const today = todayStr();
+      if (args.onlyUnchecked) list = list.filter((r) => !(r.checkins || {})[today]);
+      return list.slice(0, 40).map((r) => ({ title: r.title, when: r.when, owner: r.owner || "미지정", checkedToday: !!(r.checkins || {})[today], streak: streakOf(r.checkins || {}, today) }));
+    }
+    if (name === "searchCheckitems") {
+      let list = checkitems;
+      if (args.tab) list = list.filter((c) => c.tab === args.tab);
+      if (args.onlyPending) list = list.filter((c) => !c.done);
+      if (args.onlyOverdue) list = list.filter((c) => { const dd = dayDiff(c.due); return dd !== null && dd < 0 && !c.done; });
+      return list.slice(0, 40).map((c) => ({ title: c.title, tab: c.tab, done: c.done, start: c.start || null, due: c.due || null }));
+    }
+    if (name === "searchIssues") {
+      let list = allIssues;
+      if (args.onlyUnresolved) list = list.filter((i) => !i.resolved);
+      return list.slice(0, 40).map((i) => ({ text: i.text, source: i.src, related: i.routineTitle, owner: i.owner || "미지정", resolved: i.resolved }));
+    }
+    return { error: "알 수 없는 함수" };
+  }, [routines, checkitems, allIssues]);
+
+  const sendAiMessage = async () => {
+    const q = aiInput.trim();
+    if (!q || aiLoading) return;
+    setAiInput("");
+    setAiMessages((m) => [...m, { role: "user", text: q }]);
+    setAiLoading(true);
+    try {
+      if (!aiChatRef.current) {
+        const ai = getAI(fbApp, { backend: new GoogleAIBackend() });
+        const model = getGenerativeModel(ai, {
+          model: "gemini-3.5-flash",
+          tools: aiTools,
+          systemInstruction: "당신은 ShakeBaby 팀의 업무보드 AI 비서입니다. 제공된 함수로 실제 업무·반복업무·체크리스트·이슈 데이터를 조회해서, 한국어로 간결하고 정확하게 답하세요. 데이터를 수정하거나 만들 수는 없고 오직 조회만 가능합니다. 숫자와 이름은 함수 결과에 있는 그대로 사용하고 추측하지 마세요.",
+        });
+        aiChatRef.current = model.startChat();
+      }
+      const chat = aiChatRef.current;
+      let result = await chat.sendMessage(q);
+      let calls = result.response.functionCalls();
+      let guard = 0;
+      while (calls && calls.length > 0 && guard < 5) {
+        const responses = calls.map((c) => ({ functionResponse: { name: c.name, response: runAiFunction(c.name, c.args || {}) } }));
+        result = await chat.sendMessage(responses);
+        calls = result.response.functionCalls();
+        guard++;
+      }
+      setAiMessages((m) => [...m, { role: "ai", text: result.response.text() || "답변을 만들지 못했습니다." }]);
+    } catch (e) {
+      setAiMessages((m) => [...m, { role: "ai", text: "오류가 발생했습니다: " + (e.message || "알 수 없는 오류") }]);
+    }
+    setAiLoading(false);
+  };
+
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
@@ -803,7 +949,7 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"ai",label:"AI비서",n:null},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -1150,6 +1296,38 @@ function Board() {
         </div>
       )}
 
+
+      {view==="ai"&&(
+        <div className="aiwrap">
+          <div className="panel" style={{marginBottom:12}}>
+            <h3>AI 비서</h3>
+            <p className="sub">보드·반복업무·체크리스트·이슈 데이터를 조회해서 답합니다. 데이터를 바꾸지는 못합니다.</p>
+          </div>
+          <div className="aichat">
+            {aiMessages.length===0&&(
+              <div className="aiempty">
+                <p>예시로 이렇게 물어보세요</p>
+                <div className="aisugg">
+                  {["오늘 마감인 업무 뭐 있어?","김현민 담당 업무 진행중인 거 알려줘","반복업무 중에 오늘 체크 안 한 거 있어?","미해결 이슈 몇 개야?"].map((s)=>(
+                    <button key={s} onClick={()=>setAiInput(s)}>{s}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {aiMessages.map((m,i)=>(
+              <div key={i} className={"aimsg "+m.role}>
+                <div className="aibubble">{m.text}</div>
+              </div>
+            ))}
+            {aiLoading&&<div className="aimsg ai"><div className="aibubble aithink">생각 중…</div></div>}
+          </div>
+          <div className="aiinput">
+            <input placeholder="질문을 입력하세요" value={aiInput} onChange={(e)=>setAiInput(e.target.value)}
+              onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;sendAiMessage();}} disabled={aiLoading} />
+            <button className="btn-save" onClick={sendAiMessage} disabled={aiLoading||!aiInput.trim()}>전송</button>
+          </div>
+        </div>
+      )}
 
       {view==="issue"&&(
         <div>
