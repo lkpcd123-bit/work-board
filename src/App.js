@@ -32,7 +32,7 @@ const aiTools = [{
           status: Schema.string({ description: "상태 필터: todo, doing, review, issuecol, done 중 하나. 생략하면 전체." }),
           owner: Schema.string({ description: "담당자 이름. 생략하면 전체 담당자." }),
           channel: Schema.string({ description: "채널명. 생략하면 전체 채널." }),
-          board: Schema.string({ description: "보드 이름: 공용, 김현민, 김찬 중 하나. 생략하면 전체 보드." }),
+          board: Schema.string({ description: "보드 이름: 공용, 김현민 중 하나. 생략하면 전체 보드." }),
           onlyOverdue: Schema.boolean({ description: "true면 마감이 지난 업무만." }),
           onlyToday: Schema.boolean({ description: "true면 오늘 마감인 업무만." }),
         },
@@ -86,7 +86,7 @@ const COLUMNS = [
   { id: "issuecol", label: "이슈" },
   { id: "done", label: "완료" },
 ];
-const BOARDS = ["공용","김현민","김찬"];
+const BOARDS = ["공용","김현민"];
 const CKTABS = [{id:"checklist",label:"체크리스트"},{id:"event",label:"행사 원복"},{id:"product",label:"상품 원복"}];
 const DEFAULT_CHANNELS = [
   { id: "공통", color: "#7A8189" },
@@ -112,16 +112,17 @@ const weekOf=(ds)=>{const d=new Date(ds+"T00:00:00");const dow=d.getDay();const 
 const DOW=["월","화","수","목","금","토","일"];
 const monthGrid=(y,m)=>{const first=new Date(y,m,1);const startPad=(first.getDay()+6)%7;const last=new Date(y,m+1,0).getDate();const cells=[];for(let i=0;i<startPad;i++)cells.push(null);for(let i=1;i<=last;i++){const mm=String(m+1).padStart(2,"0"),dd=String(i).padStart(2,"0");cells.push(`${y}-${mm}-${dd}`);}while(cells.length%7!==0)cells.push(null);return cells;};
 const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
   const rm=new Map(); [...(r.routines||[]),...(l.routines||[])].forEach(t=>{const p=rm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))rm.set(t.id,t);});
   const cm=new Map(); [...(r.checkitems||[]),...(l.checkitems||[])].forEach(t=>{const p=cm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))cm.set(t.id,t);});
+  const mm2=new Map(); [...(r.monthlies||[]),...(l.monthlies||[])].forEach(t=>{const p=mm2.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mm2.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
+  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
 }
 
 const CSS = `
@@ -302,11 +303,12 @@ const CSS = `
 .hint{font-size:13px;color:var(--ink3);}
 
 /* ── 진행률 ── */
-.prow{display:flex;align-items:center;gap:10px;}
-.ppct{font-size:20px;font-weight:800;color:var(--ok);min-width:48px;letter-spacing:-.02em;text-align:left;}
-.prange{flex:1;-webkit-appearance:none;appearance:none;height:7px;background:#DFE1E6;outline:none;border-radius:4px;}
-.prange::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid var(--ok);cursor:pointer;box-shadow:var(--sh);}
-.prange::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid var(--ok);cursor:pointer;}
+.prow{display:flex;align-items:center;gap:8px;}
+.ppct{font-size:18px;font-weight:800;color:var(--ok);min-width:44px;letter-spacing:-.02em;text-align:right;}
+.prange{flex:1;-webkit-appearance:none;appearance:none;height:6px;background:#DFE1E6;outline:none;border-radius:4px;padding:0;margin:0;}
+.prange::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--ok);cursor:pointer;box-shadow:var(--sh);}
+.prange::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--ok);cursor:pointer;}
+.pticks{display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);margin-top:4px;font-weight:600;}
 .pbadge{font-size:12.5px;font-weight:700;border-radius:20px;padding:5px 12px;background:#EBECF0;color:var(--ink2);white-space:nowrap;}
 .pticks{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink3);margin-top:5px;padding-left:58px;font-weight:600;}
 
@@ -452,6 +454,8 @@ const CSS = `
 .ckrow:hover{box-shadow:var(--sh2);}
 .ckrow.over{box-shadow:0 0 0 1.5px #E2445C,var(--sh);}
 .ckrow.done{opacity:.6;}
+.ckrow[draggable=true]{cursor:grab;}
+.ckrow.dragging{opacity:.4;cursor:grabbing;box-shadow:0 0 0 2px var(--pri),var(--sh);}
 .ckrowmain{display:flex;align-items:flex-start;gap:11px;}
 .ckbox{width:22px;height:22px;border:2px solid var(--line2);border-radius:6px;background:var(--card);font-size:12px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;}
 .ckbox:hover{border-color:var(--ok);}
@@ -539,6 +543,8 @@ function Board() {
   const [aiLoading, setAiLoading] = useState(false);
   const aiChatRef = useRef(null);
   const [newType, setNewType] = useState("");
+  const [mlyDraft, setMlyDraft] = useState(null);
+  const [mlyDate, setMlyDate] = useState(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;});
   const [confirmBox, setConfirmBox] = useState(null);
   const [newChannel, setNewChannel] = useState("");
   const [newSub, setNewSub] = useState("");
@@ -595,7 +601,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -794,7 +800,9 @@ function Board() {
       [{id:uid(),ts:now,who:me||"익명",taskId:rec.id,taskTitle:rec.title,action:isNew?"체크항목 생성":"체크항목 수정",detail:CKTABS.find((t)=>t.id===rec.tab)?.label||""}]);
     setCkDraft(null);
   };
-  const toggleCk=(c)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:!x.done,doneAt:!x.done?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);};
+  const [ckDrag, setCkDrag] = useState(null);
+  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);if(willDone)setConfirmBox({kind:"archiveCk",ckId:c.id,ckTitle:c.title});};
+  const reorderCk=(tab,fromId,toId)=>{if(!canEdit||fromId===toId)return;const ordered=ckByTab(tab).filter((x)=>!x.done);const fi=ordered.findIndex((x)=>x.id===fromId);const ti=ordered.findIndex((x)=>x.id===toId);if(fi<0||ti<0)return;const arr=[...ordered];const[moved]=arr.splice(fi,1);arr.splice(ti,0,moved);const now=Date.now();commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>{const pos=arr.findIndex((a)=>a.id===x.id);return pos>=0?{...x,order:pos,updatedAt:now}:x;})}),[])};
   const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크항목 삭제",detail:""}]);setCkDraft(null);};
   const clearCkTab=(tab)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.tab===tab&&!x.deleted?{...x,done:false,doneAt:null,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:null,taskTitle:"",action:"체크 전체 해제",detail:CKTABS.find((t)=>t.id===tab)?.label||""}]);};
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
@@ -871,6 +879,23 @@ function Board() {
     }
     setAiLoading(false);
   };
+
+  /* ── 월간 체크리스트 ── */
+  const monthlies=useMemo(()=>(data.monthlies||[]).filter((m)=>!m.deleted),[data.monthlies]);
+  const mlyByMonth=(ym)=>monthlies.filter((m)=>m.month===ym).slice().sort((a,b)=>{if(a.done!==b.done)return a.done?1:-1;return(a.order??999)-(b.order??999);});
+  const saveMly=()=>{
+    if(!mlyDraft.title.trim())return;
+    const now=Date.now();const isNew=!!mlyDraft._new;
+    const rec={...mlyDraft,updatedAt:now,updatedBy:me,createdAt:mlyDraft.createdAt||now,subs:mlyDraft.subs||[],history:mlyDraft.history||[]};
+    delete rec._new;
+    commit((d)=>{const list=d.monthlies||[];const ex=list.some((x)=>x.id===rec.id);
+      return{...d,monthlies:ex?list.map((x)=>x.id===rec.id?rec:x):[...list,rec]};},
+      [{id:uid(),ts:now,who:me||"익명",taskId:rec.id,taskTitle:rec.title,action:isNew?"월간항목 생성":"월간항목 수정",detail:rec.month}]);
+    setMlyDraft(null);
+  };
+  const toggleMly=(m)=>{if(!canEdit)return;const willDone=!m.done;commit((d)=>({...d,monthlies:(d.monthlies||[]).map((x)=>x.id===m.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[]);};
+  const toggleMlySub=(m,sid)=>{if(!canEdit)return;commit((d)=>({...d,monthlies:(d.monthlies||[]).map((x)=>x.id===m.id?{...x,subs:(x.subs||[]).map((s)=>s.id===sid?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
+  const removeMly=(m)=>{commit((d)=>({...d,monthlies:(d.monthlies||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[]);setMlyDraft(null);};
 
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
@@ -961,7 +986,7 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"monthly",label:"월간 체크리스트",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -1252,6 +1277,51 @@ function Board() {
         </div>
         );})()}
 
+      {view==="monthly"&&(
+        <div>
+          <div className="panel" style={{marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <div>
+                <h3 style={{margin:0}}>월간 체크리스트</h3>
+                <p className="sub" style={{margin:"4px 0 0"}}>월별로 해야 할 항목을 관리합니다. 하위 항목을 넣을 수 있습니다.</p>
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <input type="month" className="sel" value={mlyDate} onChange={(e)=>setMlyDate(e.target.value)} />
+                {canEdit&&<button className="btn-save" onClick={()=>setMlyDraft({_new:true,id:uid(),month:mlyDate,title:"",desc:"",done:false,subs:[],history:[]})}>+ 추가</button>}
+              </div>
+            </div>
+          </div>
+          {mlyByMonth(mlyDate).length===0&&<div className="empty">{mlyDate} 항목이 없습니다. + 추가로 만들어보세요.</div>}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {mlyByMonth(mlyDate).map((m)=>{
+              const subs=m.subs||[];const subDone=subs.filter((s)=>s.done).length;
+              return (
+                <div key={m.id} style={{background:"var(--card)",borderRadius:10,boxShadow:"var(--sh)",padding:"13px 16px",opacity:m.done?.65:1}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:11}}>
+                    <button className={"ckbox"+(m.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMly(m)}>{m.done?"✓":""}</button>
+                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setMlyDraft({...m,subs:[...m.subs||[]],history:[...m.history||[]]})}>
+                      <div style={{fontSize:15,fontWeight:700,textDecoration:m.done?"line-through":"none",color:m.done?"var(--ink3)":"inherit"}}>{m.title}</div>
+                      {m.desc&&<div style={{fontSize:12.5,color:"var(--ink3)",marginTop:3}}>{m.desc}</div>}
+                      {subs.length>0&&<div style={{fontSize:12,color:"var(--ink3)",marginTop:4,fontWeight:600}}>하위 {subDone}/{subs.length}</div>}
+                    </div>
+                  </div>
+                  {subs.length>0&&(
+                    <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--line)",display:"flex",flexDirection:"column",gap:6,paddingLeft:35}}>
+                      {subs.map((s)=>(
+                        <div key={s.id} style={{display:"flex",alignItems:"center",gap:8}}>
+                          <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySub(m,s.id)}>{s.done?"✓":""}</button>
+                          <span style={{fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {view==="checklist"&&(
         <div className="ckcols">
           {CKTABS.map((tab)=>{
@@ -1272,7 +1342,10 @@ function Board() {
                     const subs=c.subs||[];const subDone=subs.filter((s)=>s.done).length;
                     const exp=ckExpand[c.id];
                     return (
-                      <div key={c.id} className={"ckrow"+(c.done?" done":"")+(over?" over":"")}>
+                      <div key={c.id} draggable={canEdit&&!c.done}
+                        onDragStart={()=>setCkDrag(c.id)} onDragOver={(e)=>e.preventDefault()}
+                        onDrop={()=>{if(ckDrag)reorderCk(tab.id,ckDrag,c.id);setCkDrag(null);}} onDragEnd={()=>setCkDrag(null)}
+                        className={"ckrow"+(c.done?" done":"")+(over?" over":"")+(ckDrag===c.id?" dragging":"")}>
                         <div className="ckrowmain">
                           <button className={"ckbox"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCk(c)}>{c.done?"✓":""}</button>
                           <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setCkDraft({...c,subs:c.subs?[...c.subs]:(isCL?[]:undefined)})}>
@@ -1775,6 +1848,51 @@ function Board() {
         );
       })()}
 
+      {mlyDraft&&(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMlyDraft(null)}><div className="modal">
+          <h2>{mlyDraft._new?"새 월간 항목":"월간 항목 상세"} · {mlyDraft.month}</h2>
+          <div className="modal-body">
+            <div className="fld"><label>제목</label><input autoFocus value={mlyDraft.title} onChange={(e)=>setMlyDraft({...mlyDraft,title:e.target.value})} placeholder="예) 월 마감 재고 확인" /></div>
+            <div className="fld"><label>설명</label><textarea value={mlyDraft.desc||""} onChange={(e)=>setMlyDraft({...mlyDraft,desc:e.target.value})} placeholder="절차, 기준값, 참고 링크" /></div>
+            <div className="sect">
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <h4 style={{margin:0}}>하위 항목</h4>
+                {(mlyDraft.subs||[]).some((s)=>s.done)&&<button className="ckclear" onClick={()=>setMlyDraft({...mlyDraft,subs:(mlyDraft.subs||[]).map((s)=>({...s,done:false}))})}>체크 전체 해제</button>}
+              </div>
+              {(mlyDraft.subs||[]).length===0&&<span className="hint">하위 항목이 없습니다</span>}
+              {(mlyDraft.subs||[]).map((s)=>(
+                <div key={s.id} className="fcitem">
+                  <button className={"fccheck"+(s.done?" on":"")} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"✓":""}</button>
+                  {s.editing
+                    ? <input defaultValue={s.text} autoFocus style={{flex:1,fontSize:13,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 7px"}}
+                        onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,editing:false}:x)});}}
+                        onBlur={(e)=>{const v=e.target.value.trim();if(v)setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}} />
+                    : <span style={{flex:1,fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",cursor:"pointer"}} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,editing:true}:x)})}>{s.text}</span>}
+                  <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15}} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.filter((x)=>x.id!==s.id)})}>×</button>
+                </div>
+              ))}
+              <div className="addrow"><input placeholder="하위 항목 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,subs:[...(mlyDraft.subs||[]),{id:uid(),text:v,done:false}]});e.target.value="";}} /></div>
+            </div>
+            <div className="sect"><h4>히스토리</h4>
+              {(mlyDraft.history||[]).length===0&&<span className="hint">진행 기록이 없습니다</span>}
+              {(mlyDraft.history||[]).map((h)=>(
+                <div key={h.id} className="cmt">
+                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}</div>
+                  <p>{h.text}</p>
+                </div>
+              ))}
+              <div className="addrow"><input placeholder="진행 상황 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,history:[...(mlyDraft.history||[]),{id:uid(),text:v,author:me||"익명",ts:Date.now()}]});e.target.value="";}} /></div>
+            </div>
+          </div>
+          <div className="modal-foot">
+            {!mlyDraft._new&&<button className="del" onClick={()=>removeMly(mlyDraft)}>삭제</button>}
+            <span className="spacer" />
+            <button className="btn ghost" onClick={()=>setMlyDraft(null)}>닫기</button>
+            <button className="btn-save" onClick={saveMly}>저장</button>
+          </div>
+        </div></div>
+      )}
+
       {ckDraft&&(()=>{
         const isCL=ckDraft.tab==="checklist";
         return (
@@ -1841,16 +1959,17 @@ function Board() {
 
       {confirmBox&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setConfirmBox(null)}><div className="modal sm">
-          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":confirmBox.kind==="clearCk"?"전체 지울까요?":"완료 업무를 보관할까요?"}</h2>
-          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요? 보드에서 사라지고 보관함에서 볼 수 있습니다.`:confirmBox.kind==="clearCk"?`${CKTABS.find((t)=>t.id===confirmBox.tab)?.label} 탭의 모든 항목이 삭제됩니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
+          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":confirmBox.kind==="clearCk"?"전체 지울까요?":confirmBox.kind==="archiveCk"?"목록에서 정리할까요?":"완료 업무를 보관할까요?"}</h2>
+          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요?`:confirmBox.kind==="clearCk"?`${CKTABS.find((t)=>t.id===confirmBox.tab)?.label} 탭의 모든 항목이 삭제됩니다.`:confirmBox.kind==="archiveCk"?`"${confirmBox.ckTitle}" 항목을 완료했습니다. 목록에서 삭제할까요? 남겨두면 완료 상태로 표시됩니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
           <div className="mfoot"><span className="spacer" />
-            <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":"취소"}</button>
+            <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":confirmBox.kind==="archiveCk"?"남겨두기":"취소"}</button>
             <button className={confirmBox.kind==="purge"||confirmBox.kind==="clearCk"?"btn warn":"btn-save"} onClick={()=>{
               if(confirmBox.kind==="purge")purgeArchive();
               else if(confirmBox.kind==="clearCk"){clearCkTab(confirmBox.tab);setConfirmBox(null);}
+              else if(confirmBox.kind==="archiveCk"){const cid=confirmBox.ckId;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===cid?{...x,deleted:true,updatedAt:Date.now()}:x)}),[]);setConfirmBox(null);}
               else if(confirmBox.kind==="archiveOne"){const tid=confirmBox.taskId;commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===tid?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("아카이브",{id:tid,title:confirmBox.taskTitle})]);setConfirmBox(null);}
               else archiveDone();
-            }}>{confirmBox.kind==="purge"?"영구 삭제":confirmBox.kind==="clearCk"?"전체 삭제":"보관하기"}</button>
+            }}>{confirmBox.kind==="purge"?"영구 삭제":confirmBox.kind==="clearCk"?"전체 삭제":confirmBox.kind==="archiveCk"?"삭제":"보관하기"}</button>
           </div>
         </div></div>
       )}
