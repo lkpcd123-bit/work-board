@@ -276,6 +276,9 @@ const CSS = `
 .modal.sm .modal-body .fld{text-align:left;}
 .modal.sm .modal-foot{padding:24px 40px 36px;justify-content:center;gap:12px;}
 .modal.sm .modal-foot .spacer{display:none;}
+.modal.sm p{padding:0 40px;margin:0 0 4px;}
+.modal.sm .mfoot{padding:20px 40px 32px;margin-top:8px;justify-content:center;gap:12px;border-top:1px solid var(--line);}
+.modal.sm .mfoot .spacer{display:none;}
 .fld{margin-bottom:14px;}
 .fld label{display:block;font-size:12.5px;font-weight:700;color:var(--ink3);margin-bottom:6px;}
 .fld input,.fld select,.fld textarea{width:100%;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:9px 11px;font-size:14.5px;color:var(--ink);}
@@ -1343,7 +1346,8 @@ function Board() {
                     const exp=ckExpand[c.id];
                     return (
                       <div key={c.id} draggable={canEdit&&!c.done}
-                        onDragStart={()=>setCkDrag(c.id)} onDragOver={(e)=>e.preventDefault()}
+                        onDragStart={(e)=>{setCkDrag(c.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",c.id);}catch(err){}}}
+                        onDragOver={(e)=>{e.preventDefault();e.dataTransfer.dropEffect="move";}}
                         onDrop={()=>{if(ckDrag)reorderCk(tab.id,ckDrag,c.id);setCkDrag(null);}} onDragEnd={()=>setCkDrag(null)}
                         className={"ckrow"+(c.done?" done":"")+(over?" over":"")+(ckDrag===c.id?" dragging":"")}>
                         <div className="ckrowmain">
