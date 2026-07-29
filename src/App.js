@@ -440,7 +440,8 @@ const CSS = `
 .btn-save:hover{background:#0055CC!important;}
 .issbtn:hover{border-color:var(--ink3);}
 .fcitem{display:flex;align-items:center;gap:9px;padding:5px 0;}
-.fccheck{width:20px;height:20px;border:2px solid var(--line2);border-radius:5px;background:var(--card);font-size:11px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;}
+.fccheck{width:21px;height:21px;border:2px solid #A9B0A6;border-radius:5px;background:#fff;font-size:11px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;}
+.fccheck:hover{border-color:var(--ok);background:#F5FBF7;}
 .fccheck.on{background:var(--ok);border-color:var(--ok);color:#fff;}
 .fccheck:disabled{opacity:.4;}
 
@@ -1965,7 +1966,11 @@ function Board() {
                 {(ckDraft.subs||[]).map((s)=>(
                   <div key={s.id} className="fcitem">
                     <button className={"fccheck"+(s.done?" on":"")} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"✓":""}</button>
-                    <span style={{flex:1,fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
+                    {s.editing
+                      ? <input defaultValue={s.text} autoFocus style={{flex:1,fontSize:13,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 7px"}}
+                          onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,editing:false}:x)});}}
+                          onBlur={(e)=>{const v=e.target.value.trim();if(v)setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}} />
+                      : <span style={{flex:1,fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",cursor:"pointer"}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,editing:true}:x)})}>{s.text}</span>}
                     <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.filter((x)=>x.id!==s.id)})}>×</button>
                   </div>
                 ))}
