@@ -536,6 +536,9 @@ function Board() {
   const [newRcat, setNewRcat] = useState("");
   const [rTitleEdit, setRTitleEdit] = useState(false);
   const [fcEditId, setFcEditId] = useState(null);
+  const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
+  const prevTasksRef = useRef(null);
+  const notifiedRef = useRef(new Set());
   const [mlyDraft, setMlyDraft] = useState(null);
   const [mlyDate, setMlyDate] = useState(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;});
   const [confirmBox, setConfirmBox] = useState(null);
@@ -903,6 +906,64 @@ function Board() {
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
   useEffect(()=>{setRTitleEdit(false);setFcEditId(null);},[selR]);
+
+  /* ── 알림 (공용 보드 전용, 탭 열려있을 때만) ── */
+  const notify=useCallback((title,body)=>{
+    if(!notifOn||typeof Notification==="undefined")return;
+    try{const n=new Notification(title,{body,icon:"/favicon.ico"});n.onclick=()=>{window.focus();n.close();};}catch(e){}
+  },[notifOn]);
+
+  const enableNotif=()=>{
+    if(typeof Notification==="undefined"){alert("이 브라우저는 알림을 지원하지 않습니다.");return;}
+    if(Notification.permission==="granted"){setNotifOn(true);return;}
+    Notification.requestPermission().then((p)=>{setNotifOn(p==="granted");if(p!=="granted")alert("알림이 차단됐습니다. 브라우저 주소창 왼쪽 자물쇠 아이콘에서 알림을 허용해주세요.");});
+  };
+
+  useEffect(()=>{
+    if(!notifOn){prevTasksRef.current=data.tasks;return;}
+    const prev=prevTasksRef.current;
+    if(prev){
+      const prevMap=new Map(prev.map((t)=>[t.id,t]));
+      data.tasks.forEach((t)=>{
+        if((t.boardId||"공용")!=="공용"||t.deleted)return;
+        const p=prevMap.get(t.id);
+        if(!p){
+          if(t.owner===me&&t.createdBy&&t.createdBy!==me)notify("새 업무가 배정됐어요",`${t.createdBy}님이 "${t.title}" 업무를 배정했습니다.`);
+          return;
+        }
+        if(t.updatedBy===me)return;
+        if(t.owner===me&&p.owner!==me)notify("새 업무가 배정됐어요",`${t.updatedBy||"팀원"}님이 "${t.title}" 업무를 배정했습니다.`);
+        if(t.status==="doing"&&p.status!=="doing"&&t.createdBy===me)notify("업무가 시작됐어요",`${t.owner||"담당자"}님이 "${t.title}"를 진행중으로 옮겼습니다.`);
+        if((t.memo||"").trim()&&(t.memo||"")!==(p.memo||"")&&(t.owner===me||t.createdBy===me))notify("메모가 등록됐어요",`"${t.title}": ${t.memo.slice(0,50)}`);
+      });
+    }
+    prevTasksRef.current=data.tasks;
+  },[data.tasks,notifOn,me,notify]);
+
+  useEffect(()=>{
+    if(!notifOn)return;
+    const check=()=>{
+      const today=todayStr();
+      data.tasks.forEach((t)=>{
+        if((t.boardId||"공용")!=="공용"||t.deleted||t.archived||t.status==="done"||t.owner!==me||!t.due)return;
+        const dd=dayDiff(t.due);if(dd===null)return;
+        let key=null,ttl=null,body=null;
+        if(dd<0){key=`overdue:${t.id}:${today}`;ttl="마감이 지났어요";body=`"${t.title}" 마감 ${Math.abs(dd)}일 지남`;}
+        else if(dd===0){key=`due0:${t.id}:${today}`;ttl="오늘 마감이에요";body=`"${t.title}"`;}
+        else if(dd===1){key=`due1:${t.id}:${today}`;ttl="마감이 임박했어요";body=`"${t.title}" 내일 마감`;}
+        if(key&&!notifiedRef.current.has(key)){notify(ttl,body);notifiedRef.current.add(key);}
+      });
+      routines.forEach((r)=>{
+        if(r.owner!==me)return;
+        if((r.checkins||{})[today])return;
+        const key=`unchecked:${r.id}:${today}`;
+        if(!notifiedRef.current.has(key)){notify("반복업무 미체크",`"${r.title}" 오늘 아직 체크하지 않았어요.`);notifiedRef.current.add(key);}
+      });
+    };
+    check();
+    const iv=setInterval(check,5*60*1000);
+    return()=>clearInterval(iv);
+  },[notifOn,data.tasks,routines,me,notify]);
   useEffect(()=>{const h=(e)=>{if(e.key==="Escape"){setDraft(null);setConfirmBox(null);}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 
   const renderCard=(t)=>{
@@ -986,6 +1047,8 @@ function Board() {
         </button>
         <span className="save"><i className={"dot "+(saveState==="error"?"err":saveState==="idle"?"":"on")} />{saveState==="saving"?"저장 중":saveState==="saved"?"저장됨":saveState==="error"?"저장 실패":saveState==="loading"?"불러오는 중":"동기화됨"}</span>
         <button className="ghostw" onClick={()=>load()}>새로고침</button>
+        {!notifOn&&<button className="ghostw" onClick={enableNotif}>🔔 알림 켜기</button>}
+        {notifOn&&<span style={{fontSize:12,color:"var(--ok)",fontWeight:700,display:"inline-flex",alignItems:"center",gap:4}}>🔔 알림 켜짐</span>}
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
