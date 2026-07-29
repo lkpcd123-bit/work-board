@@ -232,6 +232,7 @@ const CSS = `
 .cfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink2);font-weight:500;}
 .avm{display:none;}
 .ownerchip{background:#E9F2FF;color:#0055CC;font-size:12px;font-weight:700;padding:3px 10px;border-radius:10px;white-space:nowrap;}
+.ownerchip.me{background:#F1E9FF;color:#6B3FA0;}
 .due{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:#EBECF0;font-size:11.5px;font-weight:600;}
 .due.late{background:#FFECEB;color:var(--danger);}
 .due.soon{background:#FFF7D6;color:var(--warn);}
@@ -975,7 +976,7 @@ function Board() {
         })()}
         <div className="cfoot">
           <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
-            {t.owner?<span className="ownerchip">{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
+            {t.owner?<span className={"ownerchip"+(t.owner===me?" me":"")}>{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
             {t.due&&<span className={"due"+(late?" late":soon?" soon":"")}>{t.start?t.start.slice(5)+"~":""}{t.due.slice(5)}{late?` +${Math.abs(d)}d`:""}</span>}
           </span>
           <span style={{display:"flex",gap:6,alignItems:"center"}}>
