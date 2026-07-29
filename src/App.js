@@ -117,21 +117,19 @@ const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Dat
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
 const addDays=(ds,n)=>{const d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
-const weekOf=(ds)=>{const d=new Date(ds+"T00:00:00");const dow=d.getDay();const mon=dow===0?-6:1-dow;const start=addDays(ds,mon);return Array.from({length:7},(_,i)=>addDays(start,i));};
-const DOW=["월","화","수","목","금","토","일"];
-const monthGrid=(y,m)=>{const first=new Date(y,m,1);const startPad=(first.getDay()+6)%7;const last=new Date(y,m+1,0).getDate();const cells=[];for(let i=0;i<startPad;i++)cells.push(null);for(let i=1;i<=last;i++){const mm=String(m+1).padStart(2,"0"),dd=String(i).padStart(2,"0");cells.push(`${y}-${mm}-${dd}`);}while(cells.length%7!==0)cells.push(null);return cells;};
 const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
   const rm=new Map(); [...(r.routines||[]),...(l.routines||[])].forEach(t=>{const p=rm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))rm.set(t.id,t);});
   const cm=new Map(); [...(r.checkitems||[]),...(l.checkitems||[])].forEach(t=>{const p=cm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))cm.set(t.id,t);});
   const mm2=new Map(); [...(r.monthlies||[]),...(l.monthlies||[])].forEach(t=>{const p=mm2.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mm2.set(t.id,t);});
+  const ri=new Map(); [...(r.rItems||[]),...(l.rItems||[])].forEach(t=>{const p=ri.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))ri.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
+  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
     routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
 }
 
@@ -512,6 +510,23 @@ const CSS = `
 .aiinput input{flex:1;background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:11px 14px;font-size:14.5px;}
 .aiinput input:focus{outline:2px solid var(--pri);outline-offset:-1px;}
 
+/* ══ 반복업무 3단 구조 ══ */
+.ritop{background:var(--card);border-radius:10px;box-shadow:var(--sh);margin-bottom:12px;overflow:hidden;}
+.rihead{display:flex;align-items:center;gap:9px;padding:13px 16px;cursor:pointer;background:#F5F6F5;}
+.rihead:hover{background:#EFF1EE;}
+.ricatname{font-size:15px;font-weight:800;flex:1;}
+.ricount{font-size:12px;color:var(--ink3);font-weight:700;font-family:monospace;}
+.richev{font-size:11px;color:var(--ink3);width:14px;text-align:center;}
+.richev.sm{font-size:10px;}
+.risub{border-top:1px solid var(--line);}
+.risubhead{display:flex;align-items:center;gap:8px;padding:10px 16px 10px 32px;cursor:pointer;}
+.risubhead:hover{background:#FAFBFA;}
+.risubname{font-size:13.5px;font-weight:700;flex:1;color:var(--ink2);}
+.rirow{display:flex;align-items:center;gap:10px;padding:8px 16px 8px 52px;border-top:1px solid #F0F1EF;}
+.rirow:hover{background:#FAFBFA;}
+.riedit{background:none;border:none;color:var(--ink3);font-size:11.5px;cursor:pointer;padding:2px 6px;opacity:0;transition:opacity .1s;}
+.rirow:hover .riedit{opacity:1;}
+
 `;
 
 export default function App() {
@@ -546,8 +561,9 @@ function Board() {
   const aiChatRef = useRef(null);
   const [newType, setNewType] = useState("");
   const [newRcat, setNewRcat] = useState("");
-  const [rTitleEdit, setRTitleEdit] = useState(false);
-  const [fcEditId, setFcEditId] = useState(null);
+  const [riDate, setRiDate] = useState(todayStr());
+  const [riCollapse, setRiCollapse] = useState({});
+  const [riAdd, setRiAdd] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const prevTasksRef = useRef(null);
   const notifiedRef = useRef(new Set());
@@ -562,17 +578,11 @@ function Board() {
   const [curBoard, setCurBoard] = useState("공용");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [rOwner, setROwner] = useState("전체");
-  const [rQuery, setRQuery] = useState("");
   const [issueDetail, setIssueDetail] = useState(null);
   const [ckDraft, setCkDraft] = useState(null);
   const [ckExpand, setCkExpand] = useState({});
   const [listDateFrom, setListDateFrom] = useState("");
   const [listDateTo, setListDateTo] = useState("");
-  const [rDate, setRDate] = useState(todayStr());
-  const [selR, setSelR] = useState(null);
-  const [rDraft, setRDraft] = useState(null);
-  const [issueText, setIssueText] = useState("");
   const [issueFilter, setIssueFilter] = useState("open");
   const dataRef = useRef(data); dataRef.current = data;
   const busyRef = useRef(false);
@@ -609,7 +619,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -729,52 +739,11 @@ function Board() {
     },[mkLog(parent?"하위 채널 추가":"채널 추가",null,parent?`${parent} > ${id}`:id)]);
     setTimeout(()=>{addingRef.current=false;},600);
   };
-  /* ── 반복 업무 ── */
+  /* ── 반복 업무 (구버전 데이터, AI비서 조회용으로만 유지) ── */
   const routines = useMemo(()=>(data.routines||[]).filter((r)=>!r.deleted),[data.routines]);
-  const routineById=(id)=>routines.find((r)=>r.id===id);
-
-  const saveRoutine=()=>{
-    if(!rDraft.title.trim())return;
-    const now=Date.now(); const isNew=rDraft._new; const clean={...rDraft}; delete clean._new;
-    commit((d)=>{const list=d.routines||[];const ex=list.some((r)=>r.id===clean.id);
-      const rec={...clean,checkins:clean.checkins||{},issues:clean.issues||[],fixedChecks:clean.fixedChecks||[],fixedState:clean.fixedState||{},createdAt:clean.createdAt||now,updatedAt:now,updatedBy:me};
-      return{...d,routines:ex?list.map((r)=>r.id===rec.id?rec:r):[...list,rec]};},
-      [{id:uid(),ts:now,who:me||"익명",taskId:clean.id,taskTitle:clean.title,action:isNew?"반복업무 생성":"반복업무 수정",detail:clean.when}]);
-    setRDraft(null);
-  };
-
-  const toggleCheck=(r,date)=>{
-    if(!canEdit)return;
-    const has=!!(r.checkins||{})[date];
-    const now=Date.now();
-    commit((d)=>({...d,routines:(d.routines||[]).map((x)=>{
-      if(x.id!==r.id)return x;
-      const c={...(x.checkins||{})};
-      if(has)delete c[date]; else c[date]={by:me||"익명",ts:now};
-      return{...x,checkins:c,updatedAt:now,updatedBy:me};
-    })}),[{id:uid(),ts:now,who:me||"익명",taskId:r.id,taskTitle:r.title,action:has?"체크 해제":"체크 완료",detail:date}]);
-  };
-
-  const removeRoutine=(r)=>{
-    commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===r.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),
-      [{id:uid(),ts:Date.now(),who:me||"익명",taskId:r.id,taskTitle:r.title,action:"반복업무 삭제",detail:""}]);
-    setSelR(null); setRDraft(null);
-  };
-
-  const addIssue=(r,text)=>{
-    const t=text.trim(); if(!t)return;
-    const iss={id:uid(),text:t,author:me||"익명",ts:Date.now(),date:rDate,resolved:false};
-    commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===r.id?{...x,issues:[iss,...(x.issues||[])],updatedAt:Date.now()}:x)}),
-      [{id:uid(),ts:Date.now(),who:me||"익명",taskId:r.id,taskTitle:r.title,action:"이슈 등록",detail:t.slice(0,30)}]);
-    setIssueText("");
-  };
 
   const toggleIssue=(rid,iid)=>{
     commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id!==rid?x:{...x,issues:(x.issues||[]).map((i)=>i.id===iid?{...i,resolved:!i.resolved,resolvedBy:me}:i),updatedAt:Date.now()})}),[]);
-  };
-
-  const delIssue=(rid,iid)=>{
-    commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id!==rid?x:{...x,issues:(x.issues||[]).filter((i)=>i.id!==iid),updatedAt:Date.now()})}),[]);
   };
 
   const allIssues=useMemo(()=>{
@@ -783,12 +752,6 @@ function Board() {
     data.tasks.filter((t)=>!t.deleted&&!t.archived).forEach((t)=>(t.issues||[]).forEach((i)=>out.push({...i,taskId:t.id,routineTitle:t.title,owner:t.owner,src:"업무"})));
     return out.sort((a,b)=>b.ts-a.ts);
   },[routines,data.tasks]);
-
-  const week=useMemo(()=>weekOf(rDate),[rDate]);
-  const dayRate=useCallback((date)=>{
-    if(!routines.length)return 0;
-    return routines.filter((r)=>(r.checkins||{})[date]).length/routines.length;
-  },[routines]);
 
   /* ── 체크리스트 ── */
   const checkitems=useMemo(()=>(data.checkitems||[]).filter((c)=>!c.deleted),[data.checkitems]);
@@ -937,10 +900,47 @@ function Board() {
   const toggleMlySub=(m,sid)=>{if(!canEdit)return;commit((d)=>({...d,monthlies:(d.monthlies||[]).map((x)=>x.id===m.id?{...x,subs:(x.subs||[]).map((s)=>s.id===sid?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
   const removeMly=(m)=>{commit((d)=>({...d,monthlies:(d.monthlies||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[]);setMlyDraft(null);};
 
+  /* ── 반복업무 3단(대분류>중분류>소분류) ── */
+  const rItems=useMemo(()=>(data.rItems||[]).filter((x)=>!x.deleted),[data.rItems]);
+  const riTree=useMemo(()=>{
+    const cats=[];
+    rItems.forEach((it)=>{
+      let cat=cats.find((c)=>c.name===it.cat);
+      if(!cat){cat={name:it.cat,subs:[]};cats.push(cat);}
+      let sub=cat.subs.find((s)=>s.name===it.sub);
+      if(!sub){sub={name:it.sub,items:[]};cat.subs.push(sub);}
+      sub.items.push(it);
+    });
+    cats.forEach((c)=>c.subs.forEach((s)=>s.items.sort((a,b)=>(a.order??999)-(b.order??999))));
+    return cats;
+  },[rItems]);
+  const riCatNames=useMemo(()=>[...new Set(rItems.map((x)=>x.cat))].filter(Boolean).sort(),[rItems]);
+  const riSubNames=useMemo(()=>(cat)=>[...new Set(rItems.filter((x)=>x.cat===cat).map((x)=>x.sub))].filter(Boolean).sort(),[rItems]);
+  const saveRi=()=>{
+    const {cat,sub,title}=riAdd;
+    if(!cat?.trim()||!sub?.trim()||!title?.trim()){alert("대분류·중분류·소분류를 모두 입력하세요.");return;}
+    const now=Date.now();
+    if(riAdd.id){
+      commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===riAdd.id?{...x,cat:cat.trim(),sub:sub.trim(),title:title.trim(),updatedAt:now}:x)}),[mkLog("반복항목 수정",null,title)]);
+    }else{
+      const rec={id:uid(),cat:cat.trim(),sub:sub.trim(),title:title.trim(),checkins:{},createdAt:now,updatedAt:now,createdBy:me};
+      commit((d)=>({...d,rItems:[...(d.rItems||[]),rec]}),[mkLog("반복항목 추가",null,title)]);
+    }
+    setRiAdd(null);
+  };
+  const toggleRi=(it,date)=>{
+    if(!canEdit)return;
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>{
+      if(x.id!==it.id)return x;
+      const ck={...(x.checkins||{})};
+      if(ck[date])delete ck[date]; else ck[date]={by:me||"익명",ts:Date.now()};
+      return {...x,checkins:ck,updatedAt:Date.now()};
+    })}),[]);
+  };
+  const removeRi=(it)=>{commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===it.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("반복항목 삭제",null,it.title)]);setRiAdd(null);};
+
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
-
-  useEffect(()=>{setRTitleEdit(false);setFcEditId(null);},[selR]);
 
   /* ── 알림 (공용 보드 전용, 탭 열려있을 때만) ── */
   const notify=useCallback((title,body)=>{
@@ -1080,7 +1080,7 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:routines.length},{id:"monthly",label:"월간 체크리스트",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 체크리스트",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -1163,225 +1163,70 @@ function Board() {
       )}
 
       {view==="routine"&&(()=>{
-        const sel=selR?routineById(selR):null;
-        const rFiltered=routines.filter((r)=>{
-          if(rOwner!=="전체"&&r.owner!==rOwner)return false;
-          if(rQuery.trim()){const kw=rQuery.trim().toLowerCase();if(!`${r.title} ${r.memo||""} ${r.owner||""}`.toLowerCase().includes(kw))return false;}
-          return true;
-        });
-        const rCats=data.routineCats&&data.routineCats.length?data.routineCats:["오전","오후"];
-        const grouped={};
-        rCats.forEach((cat)=>{grouped[cat]=rFiltered.filter((r)=>r.when===cat);});
-        const etc=rFiltered.filter((r)=>!rCats.includes(r.when));
-        if(etc.length)grouped["미분류"]=etc;
-        const doneToday=rFiltered.filter((r)=>(r.checkins||{})[rDate]).length;
-        const rOwners=[...new Set(routines.map((r)=>r.owner).filter(Boolean))].sort();
+        const toggleCollapse=(key)=>setRiCollapse((p)=>({...p,[key]:!p[key]}));
+        const totalToday=rItems.length;
+        const doneToday=rItems.filter((it)=>(it.checkins||{})[riDate]).length;
         return (
-        <div className="rwrap">
-          <div>
-            <div className="panel" style={{padding:14,marginBottom:12}}>
-              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:10}}>
-                <div>
-                  <div style={{fontSize:14,fontWeight:800}}>반복 업무</div>
-                  <div style={{fontFamily:"monospace",fontSize:11,color:"#8F959C",marginTop:3}}>
-                    {rDate.replace(/-/g,".")} · 오늘 {doneToday}/{rFiltered.length}
-                  </div>
-                </div>
-                <div style={{display:"flex",gap:6}}>
-                  <button className="btn ghost" onClick={()=>setRDate(todayStr())}>오늘</button>
-                  {canEdit&&<button className="btn-save" onClick={()=>setRDraft({_new:true,id:uid(),title:"",when:(data.routineCats&&data.routineCats[0])||"오전",owner:me,memo:"",checkins:{},issues:[],fixedChecks:[]})}>+ 추가</button>}
-                </div>
+        <div>
+          <div className="panel" style={{padding:14,marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:800}}>반복 업무</div>
+                <div style={{fontFamily:"monospace",fontSize:11,color:"#8F959C",marginTop:3}}>{riDate.replace(/-/g,".")} · {doneToday}/{totalToday}</div>
               </div>
-              <div className="rfilters">
-                <input className="inp" placeholder="반복업무 검색" value={rQuery} onChange={(e)=>setRQuery(e.target.value)} style={{flex:1,minWidth:120}} />
-                <select className="sel" value={rOwner} onChange={(e)=>setROwner(e.target.value)}>
-                  <option value="전체">담당자 전체</option>
-                  {rOwners.map((o)=><option key={o} value={o}>{o}</option>)}
-                </select>
-                <input type="date" className="sel" value={rDate} onChange={(e)=>e.target.value&&setRDate(e.target.value)} />
-              </div>
-              <div className="wkstrip">
-                {week.map((d)=>{
-                  const rate=dayRate(d); const isSel=d===rDate; const isToday=d===todayStr();
-                  const deg=Math.round(rate*360);
-                  return (
-                    <button key={d} className={"wkday"+(isSel?" sel":"")} onClick={()=>setRDate(d)}>
-                      <span className="dw">{DOW[(new Date(d+"T00:00:00").getDay()+6)%7]}</span>
-                      <span className={"dn"+(isToday?" td":"")}>{Number(d.slice(8))}</span>
-                      <span className="ring" style={{background:`conic-gradient(#1B4D3E ${deg}deg, #E4E7E2 ${deg}deg)`}}><i /></span>
-                    </button>
-                  );
-                })}
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <input type="date" className="sel" value={riDate} onChange={(e)=>e.target.value&&setRiDate(e.target.value)} />
+                <button className="btn ghost" onClick={()=>setRiDate(todayStr())}>오늘</button>
+                {canEdit&&<button className="btn-save" onClick={()=>setRiAdd({cat:"",sub:"",title:""})}>+ 항목 추가</button>}
               </div>
             </div>
+          </div>
 
-            {routines.length===0&&<div className="empty">반복 업무를 추가해 시작하세요</div>}
-            {[...rCats,...(grouped["미분류"]?["미분류"]:[])].map((slot)=>grouped[slot]&&grouped[slot].length>0&&(
-              <div key={slot} style={{marginBottom:14}}>
-                <div style={{fontFamily:"monospace",fontSize:10,letterSpacing:".1em",color:"#8F959C",marginBottom:7}}>
-                  {slot} <span style={{color:"#C4C9C1"}}>{grouped[slot].length}</span>
+          {riTree.length===0&&<div className="empty">등록된 항목이 없습니다. + 항목 추가로 시작하세요.</div>}
+
+          {riTree.map((cat)=>{
+            const catKey=`c:${cat.name}`;
+            const catItems=cat.subs.flatMap((s)=>s.items);
+            const catDone=catItems.filter((it)=>(it.checkins||{})[riDate]).length;
+            const catOpen=!riCollapse[catKey];
+            return (
+              <div key={cat.name} className="ritop">
+                <div className="rihead" onClick={()=>toggleCollapse(catKey)}>
+                  <span className="richev">{catOpen?"▾":"▸"}</span>
+                  <span className="ricatname">{cat.name}</span>
+                  <span className="ricount">{catDone}/{catItems.length}</span>
                 </div>
-                {grouped[slot].map((r)=>{
-                  const ck=r.checkins||{}; const on=!!ck[rDate];
-                  const total=Object.keys(ck).length; const st=streakOf(ck,rDate);
-                  const openIss=(r.issues||[]).filter((i)=>!i.resolved).length;
+                {catOpen&&cat.subs.map((sub)=>{
+                  const subKey=`s:${cat.name}:${sub.name}`;
+                  const subOpen=!riCollapse[subKey];
+                  const subDone=sub.items.filter((it)=>(it.checkins||{})[riDate]).length;
                   return (
-                    <div key={r.id} className={"rrow"+(on?" on":"")+(selR===r.id?" sel":"")} onClick={()=>setSelR(r.id)}>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div className="rtitle">{r.title}</div>
-                        <div className="rmeta">
-                          <span>총 {total}일</span><span>연속 {st}일</span>
-                          {r.owner&&<span>· {r.owner}</span>}
-                          {openIss>0&&<span style={{color:"#B4342F",fontWeight:600}}>⚠ 이슈 {openIss}</span>}
-                          {on&&ck[rDate].by&&<span style={{color:"#1B4D3E"}}>✓ {ck[rDate].by}</span>}
-                        </div>
+                    <div key={sub.name} className="risub">
+                      <div className="risubhead" onClick={()=>toggleCollapse(subKey)}>
+                        <span className="richev sm">{subOpen?"▾":"▸"}</span>
+                        <span className="risubname">{sub.name}</span>
+                        <span className="ricount">{subDone}/{sub.items.length}</span>
                       </div>
-                      <button className={"rcheck"+(on?" on":"")} disabled={!canEdit}
-                        onClick={(e)=>{e.stopPropagation();toggleCheck(r,rDate);}}>{on?"✓":""}</button>
+                      {subOpen&&sub.items.map((it)=>{
+                        const checked=!!(it.checkins||{})[riDate];
+                        return (
+                          <div key={it.id} className="rirow">
+                            <button className={"ckbox"+(checked?" on":"")} disabled={!canEdit} onClick={()=>toggleRi(it,riDate)}>{checked?"✓":""}</button>
+                            <span style={{flex:1,fontSize:13.5,textDecoration:checked?"line-through":"none",color:checked?"var(--ink3)":"inherit"}}>{it.title}</span>
+                            {checked&&it.checkins[riDate].by&&<span style={{fontSize:11,color:"var(--ink3)"}}>{it.checkins[riDate].by}</span>}
+                            {canEdit&&<button className="riedit" onClick={()=>setRiAdd({id:it.id,cat:it.cat,sub:it.sub,title:it.title})}>수정</button>}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
               </div>
-            ))}
-          </div>
-
-          <div className="rside">
-            {!sel&&<div className="panel" style={{textAlign:"center",padding:"36px 18px"}}>
-              <div style={{fontSize:20,marginBottom:8}}>↻</div>
-              <div style={{fontSize:13,fontWeight:700,marginBottom:6}}>반복 업무를 선택하세요</div>
-              <div className="hint" style={{lineHeight:1.6}}>월간 체크 수, 총 체크 수, 비율과 연속 기록,<br/>담당자·비고·이슈가 여기에 표시됩니다.</div>
-            </div>}
-            {sel&&(()=>{
-              const ck=sel.checkins||{};
-              const y=Number(rDate.slice(0,4)),m=Number(rDate.slice(5,7))-1;
-              const cells=monthGrid(y,m);
-              const monthKeys=Object.keys(ck).filter((k)=>k.startsWith(rDate.slice(0,7)));
-              const daysInMonth=new Date(y,m+1,0).getDate();
-              const total=Object.keys(ck).length;
-              const st=streakOf(ck,rDate);
-              const openIss=(sel.issues||[]).filter((i)=>!i.resolved);
-              return (
-              <div className="panel">
-                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:14}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    {rTitleEdit
-                      ? <input defaultValue={sel.title} autoFocus style={{fontSize:15,fontWeight:800,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 8px",width:"100%"}}
-                          onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,title:v,updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("제목 수정",sel,v)]);setRTitleEdit(false);}if(e.key==="Escape")setRTitleEdit(false);}}
-                          onBlur={(e)=>{const v=e.target.value.trim();if(v&&v!==sel.title)commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,title:v,updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("제목 수정",sel,v)]);setRTitleEdit(false);}} />
-                      : <div style={{fontSize:15,fontWeight:800,letterSpacing:"-.02em",cursor:canEdit?"pointer":"default"}} onClick={()=>canEdit&&setRTitleEdit(true)}>{sel.title}</div>}
-                    <div style={{fontFamily:"monospace",fontSize:10.5,color:"#8F959C",marginTop:3}}>{sel.when} · 담당 {sel.owner||"미지정"}</div>
-                  </div>
-                  <button style={{background:"none",border:"none",fontSize:16,color:"#8F959C",cursor:"pointer"}} onClick={()=>setSelR(null)}>×</button>
-                </div>
-
-                <div className="rstats">
-                  <div className="rstat"><span className="k">월간 체크</span><span className="v">{monthKeys.length}일</span></div>
-                  <div className="rstat"><span className="k">총 체크</span><span className="v">{total}일</span></div>
-                  <div className="rstat"><span className="k">월 달성률</span><span className="v">{Math.round(monthKeys.length/daysInMonth*100)}%</span></div>
-                  <div className="rstat"><span className="k">연속</span><span className="v">{st}일</span></div>
-                </div>
-
-                <div className="calhead">
-                  <button onClick={()=>setRDate(addDays(rDate.slice(0,8)+"01",-1))}>‹</button>
-                  <span>{y}년 {m+1}월</span>
-                  <button onClick={()=>{const nd=new Date(y,m+1,1);setRDate(nd.toISOString().slice(0,10));}}>›</button>
-                </div>
-                <div className="cal">
-                  {DOW.map((d)=><span key={d} className="cdw">{d}</span>)}
-                  {cells.map((c,i)=>{
-                    if(!c)return <span key={i} className="ccell mute" />;
-                    const on=!!ck[c]; const isToday=c===todayStr(); const isSel=c===rDate;
-                    return <button key={i} className={"ccell"+(on?" on":"")+(isToday?" td":"")+(isSel?" sel":"")}
-                      title={on?`${ck[c].by} 체크`:""} onClick={()=>{setRDate(c);}}
-                      onDoubleClick={()=>toggleCheck(sel,c)}>{on?"✓":Number(c.slice(8))}</button>;
-                  })}
-                </div>
-                <div className="hint" style={{marginTop:6,fontSize:10.5}}>날짜를 더블클릭하면 체크가 토글됩니다.</div>
-
-                <div className="sect"><h4>담당자</h4>
-                  <input list="wb-owners" disabled={!canEdit} defaultValue={sel.owner||""}
-                    onBlur={(e)=>{const v=e.target.value.trim();if(v===(sel.owner||""))return;commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,owner:v,updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("담당자 변경",sel,v)]);}}
-                    placeholder="담당자 이름" style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13}} />
-                </div>
-
-                <div className="sect"><h4>비고 · 메모</h4>
-                  <textarea disabled={!canEdit} defaultValue={sel.memo||""} placeholder="이 반복 업무에 대한 참고 사항, 절차, 확인 포인트"
-                    onBlur={(e)=>{const v=e.target.value;if(v===(sel.memo||""))return;commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,memo:v,updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("메모 수정",sel,"")]);}}
-                    style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13,minHeight:70,lineHeight:1.5,resize:"vertical"}} />
-                </div>
-
-                <div className="sect"><h4>고정 체크리스트 <span style={{fontWeight:500,color:"var(--ink3)"}}>· {rDate.slice(5).replace("-","/")}</span></h4>
-                  <p className="hint" style={{marginBottom:8}}>항목은 매일 고정으로 뜨고, 체크 여부는 날짜별로 따로 기록됩니다.</p>
-                  {(sel.fixedChecks||[]).length===0&&<span className="hint">항목이 없습니다. 아래에서 추가하세요.</span>}
-                  {(sel.fixedChecks||[]).map((fc)=>{
-                    const dayKey=rDate;
-                    const done=!!((sel.fixedState||{})[dayKey]||{})[fc.id];
-                    return (
-                      <div key={fc.id} className="fcitem">
-                        <button className={"fccheck"+(done?" on":"")} disabled={!canEdit} onClick={()=>{
-                          commit((d)=>({...d,routines:(d.routines||[]).map((x)=>{
-                            if(x.id!==sel.id)return x;
-                            const fs={...(x.fixedState||{})};
-                            const day={...(fs[dayKey]||{})};
-                            if(day[fc.id])delete day[fc.id]; else day[fc.id]={by:me||"익명",ts:Date.now()};
-                            fs[dayKey]=day;
-                            return {...x,fixedState:fs,updatedAt:Date.now()};
-                          })}),[]);
-                        }}>{done?"✓":""}</button>
-                        {fcEditId===fc.id
-                          ? <input defaultValue={fc.text} autoFocus style={{flex:1,fontSize:13,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 7px"}}
-                              onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,fixedChecks:(x.fixedChecks||[]).map((y)=>y.id===fc.id?{...y,text:v}:y),updatedAt:Date.now()}:x)}),[]);setFcEditId(null);}if(e.key==="Escape")setFcEditId(null);}}
-                              onBlur={(e)=>{const v=e.target.value.trim();if(v)commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,fixedChecks:(x.fixedChecks||[]).map((y)=>y.id===fc.id?{...y,text:v}:y),updatedAt:Date.now()}:x)}),[]);setFcEditId(null);}} />
-                          : <span style={{flex:1,fontSize:13,textDecoration:done?"line-through":"none",color:done?"var(--ink3)":"inherit",cursor:canEdit?"pointer":"default"}} onClick={()=>canEdit&&setFcEditId(fc.id)}>{fc.text}</span>}
-                        {canEdit&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15}} onClick={()=>{
-                          commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,fixedChecks:(x.fixedChecks||[]).filter((y)=>y.id!==fc.id),updatedAt:Date.now()}:x)}),[]);
-                        }}>×</button>}
-                      </div>
-                    );
-                  })}
-                  {canEdit&&<div className="addrow">
-                    <input placeholder="체크 항목 입력 후 Enter" onKeyDown={(e)=>{
-                      if(e.nativeEvent.isComposing||e.key!=="Enter")return;
-                      const v=e.target.value.trim();if(!v)return;
-                      const item={id:uid(),text:v};
-                      commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,fixedChecks:[...(x.fixedChecks||[]),item],updatedAt:Date.now()}:x)}),[]);
-                      e.target.value="";
-                    }} />
-                  </div>}
-                </div>
-
-                <div className="sect">
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                    <h4 style={{margin:0}}>이슈{openIss.length>0&&` · 미해결 ${openIss.length}`}</h4>
-                    <button className="btn ghost" style={{padding:"4px 10px",fontSize:12}} onClick={()=>{setView("issue");setIssueFilter("all");}}>이슈 목록 전체보기 →</button>
-                  </div>
-                  {(sel.issues||[]).length===0&&<span className="hint">등록된 이슈가 없습니다</span>}
-                  {(sel.issues||[]).map((i)=>(
-                    <div key={i.id} className={"iss"+(i.resolved?" done":"")}>
-                      <button className="issck" onClick={()=>toggleIssue(sel.id,i.id)}>{i.resolved?"✓":""}</button>
-                      <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setIssueDetail({...i,routineId:sel.id,routineTitle:sel.title,owner:sel.owner,src:"반복"})}>
-                        <div className="isstext">{i.text}{(i.history||[]).length>0&&<span style={{fontSize:11,color:"var(--pri)",marginLeft:6,fontWeight:700}}>💬{(i.history||[]).length}</span>}</div>
-                        <div className="issmeta">{i.author} · {fmtTs(i.ts)}{i.date&&` · ${i.date.slice(5)}`} · 클릭해 히스토리</div>
-                      </div>
-                      {canEdit&&<button style={{background:"none",border:"none",color:"#8F959C",cursor:"pointer"}} onClick={()=>delIssue(sel.id,i.id)}>×</button>}
-                    </div>
-                  ))}
-                  <div className="addrow"><input placeholder="이슈 입력 후 Enter" value={issueText}
-                    onChange={(e)=>setIssueText(e.target.value)}
-                    onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addIssue(sel,issueText);}} /></div>
-                </div>
-
-                <div className="mfoot">
-                  {isAdmin&&<button className="del" onClick={()=>removeRoutine(sel)}>삭제</button>}
-                  <span className="spacer" />
-                  {canEdit&&<button className="btn ghost" onClick={()=>setRDraft({...sel})}>수정</button>}
-                </div>
-              </div>
-              );
-            })()}
-          </div>
+            );
+          })}
         </div>
-        );})()}
+        );
+      })()}
 
       {view==="monthly"&&(
         <div>
@@ -1545,10 +1390,9 @@ function Board() {
                   <div className="issmeta"><b style={{color:i.src==="업무"?"#0055CC":"#1F845A"}}>{i.src}</b> · {i.routineTitle} · {i.author} · {fmtTs(i.ts)}{i.owner&&` · 담당 ${i.owner}`}</div>
                 </div>
                 <button className={"issbtn"+(i.resolved?"":" active")} onClick={()=>toggleAny(i)}>{i.resolved?"해결됨 ✓":"미해결"}</button>
-                <button className="btn ghost" onClick={()=>{
-                  if(i.routineId){setView("routine");setSelR(i.routineId);}
-                  else{const t=data.tasks.find((x)=>x.id===i.taskId);if(t){setView("board");openTask(t);}}
-                }}>이동</button>
+                {!i.routineId&&<button className="btn ghost" onClick={()=>{
+                  const t=data.tasks.find((x)=>x.id===i.taskId);if(t){setView("board");openTask(t);}
+                }}>이동</button>}
               </div>
             ));
           })()}
@@ -1881,22 +1725,23 @@ function Board() {
         </div></div>
       )}
 
-      {rDraft&&(
-        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setRDraft(null)}><div className="modal sm">
-          <h2>{rDraft._new?"새 반복 업무":"반복 업무 수정"}</h2>
+      {riAdd&&(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setRiAdd(null)}><div className="modal sm">
+          <h2>{riAdd.id?"항목 수정":"새 항목 추가"}</h2>
           <div className="modal-body">
-            <div className="fld"><label>업무명</label><input autoFocus value={rDraft.title} onChange={(e)=>setRDraft({...rDraft,title:e.target.value})} placeholder="예) 쿠팡 전 상품 가격·아이템위너 확인" /></div>
-            <div className="r2">
-              <div className="fld"><label>분류</label><select value={rDraft.when} onChange={(e)=>setRDraft({...rDraft,when:e.target.value})}>{(data.routineCats&&data.routineCats.length?data.routineCats:["오전","오후"]).map((c)=><option key={c} value={c}>{c}</option>)}</select></div>
-              <div className="fld"><label>담당자</label><input list="wb-owners" value={rDraft.owner||""} onChange={(e)=>setRDraft({...rDraft,owner:e.target.value})} placeholder="이름" /></div>
+            <div className="fld"><label>대분류</label><input list="ri-cats" autoFocus value={riAdd.cat} onChange={(e)=>setRiAdd({...riAdd,cat:e.target.value})} placeholder="예) 외부채널" />
+              <datalist id="ri-cats">{riCatNames.map((c)=><option key={c} value={c} />)}</datalist>
             </div>
-            <div className="fld"><label>비고 · 메모</label><textarea value={rDraft.memo||""} onChange={(e)=>setRDraft({...rDraft,memo:e.target.value})} placeholder="확인 절차, 기준값, 참고 링크" /></div>
+            <div className="fld"><label>중분류</label><input list="ri-subs" value={riAdd.sub} onChange={(e)=>setRiAdd({...riAdd,sub:e.target.value})} placeholder="예) 지그재그" />
+              <datalist id="ri-subs">{riSubNames(riAdd.cat).map((s)=><option key={s} value={s} />)}</datalist>
+            </div>
+            <div className="fld"><label>소분류 (체크 항목)</label><input value={riAdd.title} onChange={(e)=>setRiAdd({...riAdd,title:e.target.value})} placeholder="예) CPC 확인" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;saveRi();}} /></div>
           </div>
-          <div className="modal-foot">
-            {!rDraft._new&&isAdmin&&<button className="del" onClick={()=>removeRoutine(rDraft)}>삭제</button>}
+          <div className="mfoot">
+            {riAdd.id&&<button className="del" onClick={()=>removeRi(riAdd)}>삭제</button>}
             <span className="spacer" />
-            <button className="btn ghost" onClick={()=>setRDraft(null)}>취소</button>
-            <button className="btn-save" onClick={saveRoutine}>저장</button>
+            <button className="btn ghost" onClick={()=>setRiAdd(null)}>취소</button>
+            <button className="btn-save" onClick={saveRi}>저장</button>
           </div>
         </div></div>
       )}
