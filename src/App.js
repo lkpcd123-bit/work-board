@@ -457,9 +457,9 @@ const CSS = `
 .ckclear:hover{text-decoration:underline;}
 .ckcolbody{display:flex;flex-direction:column;gap:8px;min-height:40px;}
 .ckempty{text-align:center;font-size:12.5px;color:var(--ink3);padding:20px 8px;}
-.ckrow{background:var(--card);border-radius:8px;box-shadow:var(--sh);padding:11px 13px;}
+.ckrow{background:var(--card);border-radius:8px;box-shadow:var(--sh);padding:11px 13px;border:2px solid transparent;}
 .ckrow:hover{box-shadow:var(--sh2);}
-.ckrow.over{box-shadow:0 0 0 1.5px #E2445C,var(--sh);}
+.ckrow.over{border-color:#E2445C;background:#FFF6F5;}
 .ckrow.done{opacity:.6;}
 .ckrow[draggable=true]{cursor:grab;}
 .ckrow.dragging{opacity:.4;cursor:grabbing;box-shadow:0 0 0 2px var(--pri),var(--sh);}
