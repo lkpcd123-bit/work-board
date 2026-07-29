@@ -232,6 +232,7 @@ const CSS = `
 .cfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink2);font-weight:500;}
 .avm{display:none;}
 .ownerchip{background:#E9F2FF;color:#0055CC;font-size:12px;font-weight:700;padding:3px 10px;border-radius:10px;white-space:nowrap;}
+.ownerchip.me{background:#F1E9FF;color:#6B3FA0;}
 .due{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:#EBECF0;font-size:11.5px;font-weight:600;}
 .due.late{background:#FFECEB;color:var(--danger);}
 .due.soon{background:#FFF7D6;color:var(--warn);}
@@ -936,11 +937,6 @@ function Board() {
         if(t.owner===me&&p.owner!==me)notify("새 업무가 배정됐어요",`${t.updatedBy||"팀원"}님이 "${t.title}" 업무를 배정했습니다.`);
         if(t.status==="doing"&&p.status!=="doing"&&t.createdBy===me)notify("업무가 시작됐어요",`${t.owner||"담당자"}님이 "${t.title}"를 진행중으로 옮겼습니다.`);
         if((t.memo||"").trim()&&(t.memo||"")!==(p.memo||"")&&(t.owner===me||t.createdBy===me))notify("메모가 등록됐어요",`"${t.title}": ${t.memo.slice(0,50)}`);
-        const newHist=(t.history||[]).length-((p.history||[]).length);
-        if(newHist>0&&(t.owner===me||t.createdBy===me)){
-          const last=(t.history||[])[t.history.length-1];
-          if(last&&last.author!==me)notify("히스토리가 등록됐어요",`${last.author}님 · "${t.title}": ${last.text.slice(0,50)}`);
-        }
       });
     }
     prevTasksRef.current=data.tasks;
@@ -949,14 +945,13 @@ function Board() {
   useEffect(()=>{
     if(!notifOn)return;
     const check=()=>{
-      const today=todayStr();
       data.tasks.forEach((t)=>{
         if((t.boardId||"공용")!=="공용"||t.deleted||t.archived||t.status==="done"||t.owner!==me||!t.due)return;
         const dd=dayDiff(t.due);if(dd===null)return;
         let key=null,ttl=null,body=null;
-        if(dd<0){key=`overdue:${t.id}:${today}`;ttl="마감이 지났어요";body=`"${t.title}" 마감 ${Math.abs(dd)}일 지남`;}
-        else if(dd===0){key=`due0:${t.id}:${today}`;ttl="오늘 마감이에요";body=`"${t.title}"`;}
-        else if(dd===1){key=`due1:${t.id}:${today}`;ttl="마감이 임박했어요";body=`"${t.title}" 내일 마감`;}
+        if(dd<0){key=`overdue:${t.id}`;ttl="마감이 지났어요";body=`"${t.title}" 마감 ${Math.abs(dd)}일 지남`;}
+        else if(dd===0){key=`due0:${t.id}`;ttl="오늘 마감이에요";body=`"${t.title}"`;}
+        else if(dd===1){key=`due1:${t.id}`;ttl="마감이 임박했어요";body=`"${t.title}" 내일 마감`;}
         if(key&&!notifiedRef.current.has(key)){notify(ttl,body);notifiedRef.current.add(key);}
       });
     };
@@ -981,7 +976,7 @@ function Board() {
         })()}
         <div className="cfoot">
           <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
-            {t.owner?<span className="ownerchip">{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
+            {t.owner?<span className={"ownerchip"+(t.owner===me?" me":"")}>{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
             {t.due&&<span className={"due"+(late?" late":soon?" soon":"")}>{t.start?t.start.slice(5)+"~":""}{t.due.slice(5)}{late?` +${Math.abs(d)}d`:""}</span>}
           </span>
           <span style={{display:"flex",gap:6,alignItems:"center"}}>
