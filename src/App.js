@@ -566,7 +566,8 @@ function Board() {
   const [riAdd, setRiAdd] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const prevTasksRef = useRef(null);
-  const notifiedRef = useRef(new Set());
+  const notifiedRef = useRef((()=>{try{return new Set(JSON.parse(localStorage.getItem("wb-notified")||"[]"));}catch(e){return new Set();}})());
+  const saveNotified=()=>{try{localStorage.setItem("wb-notified",JSON.stringify([...notifiedRef.current]));}catch(e){}};
   const [mlyDraft, setMlyDraft] = useState(null);
   const [mlyDate, setMlyDate] = useState(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;});
   const [confirmBox, setConfirmBox] = useState(null);
@@ -985,7 +986,7 @@ function Board() {
         if(dd<0){key=`overdue:${t.id}`;ttl="마감이 지났어요";body=`"${t.title}" 마감 ${Math.abs(dd)}일 지남`;}
         else if(dd===0){key=`due0:${t.id}`;ttl="오늘 마감이에요";body=`"${t.title}"`;}
         else if(dd===1){key=`due1:${t.id}`;ttl="마감이 임박했어요";body=`"${t.title}" 내일 마감`;}
-        if(key&&!notifiedRef.current.has(key)){notify(ttl,body);notifiedRef.current.add(key);}
+        if(key&&!notifiedRef.current.has(key)){notify(ttl,body);notifiedRef.current.add(key);saveNotified();}
       });
     };
     check();
