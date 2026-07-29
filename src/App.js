@@ -232,7 +232,6 @@ const CSS = `
 .cfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink2);font-weight:500;}
 .avm{display:none;}
 .ownerchip{background:#E9F2FF;color:#0055CC;font-size:12px;font-weight:700;padding:3px 10px;border-radius:10px;white-space:nowrap;}
-.ownerchip.me{background:#F1E9FF;color:#6B3FA0;}
 .due{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:#EBECF0;font-size:11.5px;font-weight:600;}
 .due.late{background:#FFECEB;color:var(--danger);}
 .due.soon{background:#FFF7D6;color:var(--warn);}
@@ -299,6 +298,7 @@ const CSS = `
 .item a:hover{text-decoration:underline;}
 .addrow{display:flex;gap:7px;margin-top:8px;}
 .addrow input{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;}
+.hinput{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;font-family:inherit;resize:vertical;min-height:38px;max-height:160px;line-height:1.5;}
 .addrow button{background:var(--pri);color:#fff;padding:8px 14px;font-size:13.5px;font-weight:600;border-radius:6px;}
 .cmt{border-left:3px solid var(--line2);padding:5px 0 5px 11px;margin-bottom:10px;}
 .cmt .ch2{font-size:12px;color:var(--ink3);margin-bottom:4px;font-weight:500;}
@@ -976,7 +976,7 @@ function Board() {
         })()}
         <div className="cfoot">
           <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
-            {t.owner?<span className={"ownerchip"+(t.owner===me?" me":"")}>{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
+            {t.owner?<span className="ownerchip">{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
             {t.due&&<span className={"due"+(late?" late":soon?" soon":"")}>{t.start?t.start.slice(5)+"~":""}{t.due.slice(5)}{late?` +${Math.abs(d)}d`:""}</span>}
           </span>
           <span style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -1924,9 +1924,11 @@ function Board() {
                 </div>
               ))}
               {canEdit&&<div className="addrow">
-                <input placeholder="진행 상황·조치 내용 입력 후 Enter" onKeyDown={(e)=>{
-                  if(e.nativeEvent.isComposing||e.key!=="Enter")return;
-                  addHistory(e.target.value);e.target.value="";
+                <textarea className="hinput" placeholder="진행 상황·조치 내용 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{
+                  if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;
+                  e.preventDefault();
+                  const v=e.target.value.trim();if(!v)return;
+                  addHistory(v);e.target.value="";
                 }} />
               </div>}
             </div>
@@ -1972,7 +1974,7 @@ function Board() {
                   <p>{h.text}</p>
                 </div>
               ))}
-              <div className="addrow"><input placeholder="진행 상황 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,history:[...(mlyDraft.history||[]),{id:uid(),text:v,author:me||"익명",ts:Date.now()}]});e.target.value="";}} /></div>
+              <div className="addrow"><textarea className="hinput" placeholder="진행 상황 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,history:[...(mlyDraft.history||[]),{id:uid(),text:v,author:me||"익명",ts:Date.now()}]});e.target.value="";}} /></div>
             </div>
           </div>
           <div className="modal-foot">
@@ -2032,8 +2034,9 @@ function Board() {
                 </div>
               ))}
               <div className="addrow">
-                <input placeholder="진행 상황·메모 입력 후 Enter" onKeyDown={(e)=>{
-                  if(e.nativeEvent.isComposing||e.key!=="Enter")return;
+                <textarea className="hinput" placeholder="진행 상황·메모 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{
+                  if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;
+                  e.preventDefault();
                   const v=e.target.value.trim();if(!v)return;
                   const entry={id:uid(),text:v,author:me||"익명",ts:Date.now()};
                   setCkDraft({...ckDraft,history:[...(ckDraft.history||[]),entry]});
@@ -2190,7 +2193,7 @@ function Board() {
                 </div>}
               </div>
             ))}
-            {canEdit&&<div className="addrow"><input placeholder="진행 상황·메모 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}}} /></div>}
+            {canEdit&&<div className="addrow"><textarea className="hinput" placeholder="진행 상황·메모 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}} /></div>}
           </div>
           <div className="sect"><h4>이슈</h4>
             {(draft.issues||[]).length===0&&<span className="hint">없음</span>}
