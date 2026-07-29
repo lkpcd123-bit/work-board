@@ -564,10 +564,13 @@ function Board() {
   const [riDate, setRiDate] = useState(todayStr());
   const [riCollapse, setRiCollapse] = useState({});
   const [riAdd, setRiAdd] = useState(null);
+  const [riIssueOpen, setRiIssueOpen] = useState(true);
+  const [riIssueFilter, setRiIssueFilter] = useState("open");
+  const [riIssueItem, setRiIssueItem] = useState("");
+  const [riIssueText, setRiIssueText] = useState("");
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const prevTasksRef = useRef(null);
-  const notifiedRef = useRef((()=>{try{return new Set(JSON.parse(localStorage.getItem("wb-notified")||"[]"));}catch(e){return new Set();}})());
-  const saveNotified=()=>{try{localStorage.setItem("wb-notified",JSON.stringify([...notifiedRef.current]));}catch(e){}};
+  const notifiedRef = useRef(new Set());
   const [mlyDraft, setMlyDraft] = useState(null);
   const [mlyDate, setMlyDate] = useState(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;});
   const [confirmBox, setConfirmBox] = useState(null);
@@ -940,6 +943,23 @@ function Board() {
   };
   const removeRi=(it)=>{commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===it.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("반복항목 삭제",null,it.title)]);setRiAdd(null);};
 
+  const riIssues=useMemo(()=>{
+    const out=[];
+    rItems.forEach((it)=>(it.issues||[]).forEach((i)=>out.push({...i,itemId:it.id,path:`${it.cat} > ${it.sub} > ${it.title}`})));
+    return out.sort((a,b)=>b.ts-a.ts);
+  },[rItems]);
+  const addRiIssue=(itemId,text)=>{
+    const t=text.trim();if(!t)return;
+    const iss={id:uid(),text:t,author:me||"익명",ts:Date.now(),resolved:false};
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===itemId?{...x,issues:[iss,...(x.issues||[])],updatedAt:Date.now()}:x)}),[mkLog("반복항목 이슈 등록",null,t.slice(0,30))]);
+  };
+  const toggleRiIssue=(itemId,issueId)=>{
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).map((i)=>i.id===issueId?{...i,resolved:!i.resolved,resolvedBy:me}:i),updatedAt:Date.now()})}),[]);
+  };
+  const removeRiIssue=(itemId,issueId)=>{
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).filter((i)=>i.id!==issueId),updatedAt:Date.now()})}),[]);
+  };
+
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
@@ -986,7 +1006,7 @@ function Board() {
         if(dd<0){key=`overdue:${t.id}`;ttl="마감이 지났어요";body=`"${t.title}" 마감 ${Math.abs(dd)}일 지남`;}
         else if(dd===0){key=`due0:${t.id}`;ttl="오늘 마감이에요";body=`"${t.title}"`;}
         else if(dd===1){key=`due1:${t.id}`;ttl="마감이 임박했어요";body=`"${t.title}" 내일 마감`;}
-        if(key&&!notifiedRef.current.has(key)){notify(ttl,body);notifiedRef.current.add(key);saveNotified();}
+        if(key&&!notifiedRef.current.has(key)){notify(ttl,body);notifiedRef.current.add(key);}
       });
     };
     check();
@@ -1183,6 +1203,46 @@ function Board() {
             </div>
           </div>
 
+          <div className="panel" style={{padding:14,marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}} onClick={()=>setRiIssueOpen(!riIssueOpen)}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span className="richev">{riIssueOpen?"▾":"▸"}</span>
+                <span style={{fontSize:14,fontWeight:800}}>이슈</span>
+                <span className="ricount">{riIssues.filter((i)=>!i.resolved).length}건 미해결</span>
+              </div>
+            </div>
+            {riIssueOpen&&(
+              <div style={{marginTop:12}} onClick={(e)=>e.stopPropagation()}>
+                <div style={{display:"flex",gap:7,marginBottom:10}}>
+                  {[{id:"open",label:`미해결 ${riIssues.filter((i)=>!i.resolved).length}`},{id:"done",label:`해결 ${riIssues.filter((i)=>i.resolved).length}`},{id:"all",label:`전체 ${riIssues.length}`}].map((f)=>(
+                    <button key={f.id} className={"chip"+(riIssueFilter===f.id?" sel":"")} onClick={()=>setRiIssueFilter(f.id)}>{f.label}</button>
+                  ))}
+                </div>
+                {riIssues.filter((i)=>riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved).length===0&&<div className="hint" style={{marginBottom:10}}>해당하는 이슈가 없습니다</div>}
+                {riIssues.filter((i)=>riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved).map((i)=>(
+                  <div key={i.id} className={"iss"+(i.resolved?" done":"")} style={{marginBottom:6}}>
+                    <button className="issck" onClick={()=>toggleRiIssue(i.itemId,i.id)}>{i.resolved?"✓":""}</button>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div className="isstext">{i.text}</div>
+                      <div className="issmeta">{i.path} · {i.author} · {fmtTs(i.ts)}</div>
+                    </div>
+                    {canEdit&&<button style={{background:"none",border:"none",color:"#8F959C",cursor:"pointer"}} onClick={()=>removeRiIssue(i.itemId,i.id)}>×</button>}
+                  </div>
+                ))}
+                {canEdit&&rItems.length>0&&(
+                  <div style={{display:"flex",gap:7,marginTop:10}}>
+                    <select className="sel" value={riIssueItem} onChange={(e)=>setRiIssueItem(e.target.value)} style={{maxWidth:220}}>
+                      <option value="">항목 선택</option>
+                      {rItems.map((it)=><option key={it.id} value={it.id}>{it.cat} &gt; {it.sub} &gt; {it.title}</option>)}
+                    </select>
+                    <input className="inp" style={{flex:1}} placeholder="이슈 입력 후 Enter" value={riIssueText} onChange={(e)=>setRiIssueText(e.target.value)}
+                      onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;if(!riIssueItem){alert("항목을 먼저 선택하세요.");return;}addRiIssue(riIssueItem,riIssueText);setRiIssueText("");}} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {riTree.length===0&&<div className="empty">등록된 항목이 없습니다. + 항목 추가로 시작하세요.</div>}
 
           {riTree.map((cat)=>{
@@ -1214,6 +1274,7 @@ function Board() {
                           <div key={it.id} className="rirow">
                             <button className={"ckbox"+(checked?" on":"")} disabled={!canEdit} onClick={()=>toggleRi(it,riDate)}>{checked?"✓":""}</button>
                             <span style={{flex:1,fontSize:13.5,textDecoration:checked?"line-through":"none",color:checked?"var(--ink3)":"inherit"}}>{it.title}</span>
+                            {(it.issues||[]).filter((i)=>!i.resolved).length>0&&<span style={{fontSize:11,color:"#C9372C",fontWeight:700}}>⚠ {(it.issues||[]).filter((i)=>!i.resolved).length}</span>}
                             {checked&&it.checkins[riDate].by&&<span style={{fontSize:11,color:"var(--ink3)"}}>{it.checkins[riDate].by}</span>}
                             {canEdit&&<button className="riedit" onClick={()=>setRiAdd({id:it.id,cat:it.cat,sub:it.sub,title:it.title})}>수정</button>}
                           </div>
