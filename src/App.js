@@ -72,6 +72,16 @@ const aiTools = [{
         optionalProperties: ["onlyUnresolved"],
       }),
     },
+    {
+      name: "getTaskDetail",
+      description: "특정 업무 하나를 제목 키워드로 찾아 메모, 히스토리(진행 기록 전체), 세부 단계(체크리스트), 이슈까지 상세 정보를 전부 조회합니다. 업무의 진행 상황·내용·연락 결과 등 구체적인 질문에는 이 함수를 사용하세요.",
+      parameters: Schema.object({
+        properties: {
+          titleKeyword: Schema.string({ description: "찾을 업무 제목에 포함된 키워드. 예: '웰니스식품' 또는 '큐레이션 샵'" }),
+        },
+        optionalProperties: [],
+      }),
+    },
   ],
 }];
 const BOARD_REF = () => doc(db, "board", "main");
@@ -846,6 +856,29 @@ function Board() {
       if (args.onlyUnresolved) list = list.filter((i) => !i.resolved);
       return list.slice(0, 40).map((i) => ({ text: i.text, source: i.src, related: i.routineTitle, owner: i.owner || "미지정", resolved: i.resolved }));
     }
+    if (name === "getTaskDetail") {
+      const kw = (args.titleKeyword || "").trim();
+      if (!kw) return { error: "titleKeyword가 필요합니다." };
+      const t = d.tasks.find((x) => !x.deleted && x.title.includes(kw));
+      if (!t) return { error: `"${kw}"를 포함한 업무를 찾지 못했습니다.` };
+      return {
+        title: t.title,
+        board: t.boardId || "공용",
+        channel: t.channel,
+        brand: t.brand || null,
+        type: t.type,
+        owner: t.owner || "미지정",
+        status: t.status,
+        due: t.due || null,
+        start: t.start || null,
+        priority: t.priority,
+        progress: t.progress || 0,
+        memo: t.memo || "(메모 없음)",
+        checklist: (t.checklist || []).map((c) => ({ text: c.text, done: c.done, subs: (c.subs || []).map((s) => ({ text: s.text, done: s.done })) })),
+        history: (t.history || []).map((h) => ({ author: h.author, text: h.text, when: fmtTs(h.ts) })),
+        issues: (t.issues || []).map((i) => ({ text: i.text, resolved: i.resolved })),
+      };
+    }
     return { error: "알 수 없는 함수" };
   }, [routines, checkitems, allIssues]);
 
@@ -861,7 +894,7 @@ function Board() {
         const model = getGenerativeModel(ai, {
           model: "gemini-3.5-flash",
           tools: aiTools,
-          systemInstruction: "당신은 ShakeBaby 팀의 업무보드 AI 비서입니다. 제공된 함수로 실제 업무·반복업무·체크리스트·이슈 데이터를 조회해서, 한국어로 간결하고 정확하게 답하세요. 데이터를 수정하거나 만들 수는 없고 오직 조회만 가능합니다. 숫자와 이름은 함수 결과에 있는 그대로 사용하고 추측하지 마세요.",
+          systemInstruction: "당신은 ShakeBaby 팀의 업무보드 AI 비서입니다. 제공된 함수로 실제 업무·반복업무·체크리스트·이슈 데이터를 조회해서, 한국어로 간결하고 정확하게 답하세요. 특정 업무 하나의 메모·진행 상황·히스토리·세부 단계처럼 구체적인 내용을 물어보면 getTaskDetail 함수를 사용해 그 업무의 전체 상세를 확인한 뒤 답하세요. 데이터를 수정하거나 만들 수는 없고 오직 조회만 가능합니다. 숫자와 이름은 함수 결과에 있는 그대로 사용하고 추측하지 마세요.",
         });
         aiChatRef.current = model.startChat();
       }
