@@ -76,7 +76,6 @@ const aiTools = [{
 }];
 const BOARD_REF = () => doc(db, "board", "main");
 const ME_KEY = "wb-me";
-const PASSWORD = "shakebaby2024";
 const LOG_CAP = 400;
 
 const COLUMNS = [
@@ -503,24 +502,7 @@ const CSS = `
 
 `;
 
-function LoginScreen() {
-  const [pw, setPw] = useState("");
-  const tryLogin = (val) => {
-    if (val === PASSWORD) { sessionStorage.setItem("wb-auth","1"); window.location.reload(); }
-    else { alert("비밀번호가 틀렸습니다."); setPw(""); }
-  };
-  return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#EDEFEC",gap:12}}>
-      <div style={{fontSize:22,fontWeight:800}}>업무 보드</div>
-      <div style={{fontSize:13,color:"#8F959C",marginBottom:8}}>비밀번호를 입력하세요</div>
-      <input type="password" autoFocus value={pw} onChange={(e)=>setPw(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&tryLogin(e.target.value)} placeholder="비밀번호" style={{padding:"10px 14px",fontSize:14,border:"1px solid #C4C9C1",width:240,outline:"none"}} />
-      <button onClick={()=>tryLogin(pw)} style={{background:"#1B4D3E",color:"#fff",border:"none",padding:"10px 24px",fontSize:13,fontWeight:600,cursor:"pointer",width:240}}>입장</button>
-    </div>
-  );
-}
-
 export default function App() {
-  if (sessionStorage.getItem("wb-auth") !== "1") return <LoginScreen />;
   return <Board />;
 }
 
