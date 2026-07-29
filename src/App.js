@@ -552,6 +552,7 @@ function Board() {
   const [newType, setNewType] = useState("");
   const [newRcat, setNewRcat] = useState("");
   const [rTitleEdit, setRTitleEdit] = useState(false);
+  const [fcEditId, setFcEditId] = useState(null);
   const [mlyDraft, setMlyDraft] = useState(null);
   const [mlyDate, setMlyDate] = useState(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;});
   const [confirmBox, setConfirmBox] = useState(null);
@@ -918,7 +919,7 @@ function Board() {
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
-  useEffect(()=>{setRTitleEdit(false);},[selR]);
+  useEffect(()=>{setRTitleEdit(false);setFcEditId(null);},[selR]);
   useEffect(()=>{const h=(e)=>{if(e.key==="Escape"){setDraft(null);setConfirmBox(null);}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 
   const renderCard=(t)=>{
@@ -1253,7 +1254,11 @@ function Board() {
                             return {...x,fixedState:fs,updatedAt:Date.now()};
                           })}),[]);
                         }}>{done?"✓":""}</button>
-                        <span style={{flex:1,fontSize:13,textDecoration:done?"line-through":"none",color:done?"var(--ink3)":"inherit"}}>{fc.text}</span>
+                        {fcEditId===fc.id
+                          ? <input defaultValue={fc.text} autoFocus style={{flex:1,fontSize:13,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 7px"}}
+                              onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,fixedChecks:(x.fixedChecks||[]).map((y)=>y.id===fc.id?{...y,text:v}:y),updatedAt:Date.now()}:x)}),[]);setFcEditId(null);}if(e.key==="Escape")setFcEditId(null);}}
+                              onBlur={(e)=>{const v=e.target.value.trim();if(v)commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,fixedChecks:(x.fixedChecks||[]).map((y)=>y.id===fc.id?{...y,text:v}:y),updatedAt:Date.now()}:x)}),[]);setFcEditId(null);}} />
+                          : <span style={{flex:1,fontSize:13,textDecoration:done?"line-through":"none",color:done?"var(--ink3)":"inherit",cursor:canEdit?"pointer":"default"}} onClick={()=>canEdit&&setFcEditId(fc.id)}>{fc.text}</span>}
                         {canEdit&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15}} onClick={()=>{
                           commit((d)=>({...d,routines:(d.routines||[]).map((x)=>x.id===sel.id?{...x,fixedChecks:(x.fixedChecks||[]).filter((y)=>y.id!==fc.id),updatedAt:Date.now()}:x)}),[]);
                         }}>×</button>}
