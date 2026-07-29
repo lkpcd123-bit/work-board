@@ -936,6 +936,11 @@ function Board() {
         if(t.owner===me&&p.owner!==me)notify("새 업무가 배정됐어요",`${t.updatedBy||"팀원"}님이 "${t.title}" 업무를 배정했습니다.`);
         if(t.status==="doing"&&p.status!=="doing"&&t.createdBy===me)notify("업무가 시작됐어요",`${t.owner||"담당자"}님이 "${t.title}"를 진행중으로 옮겼습니다.`);
         if((t.memo||"").trim()&&(t.memo||"")!==(p.memo||"")&&(t.owner===me||t.createdBy===me))notify("메모가 등록됐어요",`"${t.title}": ${t.memo.slice(0,50)}`);
+        const newHist=(t.history||[]).length-((p.history||[]).length);
+        if(newHist>0&&(t.owner===me||t.createdBy===me)){
+          const last=(t.history||[])[t.history.length-1];
+          if(last&&last.author!==me)notify("히스토리가 등록됐어요",`${last.author}님 · "${t.title}": ${last.text.slice(0,50)}`);
+        }
       });
     }
     prevTasksRef.current=data.tasks;
