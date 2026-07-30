@@ -579,6 +579,7 @@ function Board() {
   const [riIssueExpand, setRiIssueExpand] = useState({});
   const [riIssueEditId, setRiIssueEditId] = useState(null);
   const [riIssueSubText, setRiIssueSubText] = useState({});
+  const [riIssueSubEditId, setRiIssueSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const prevTasksRef = useRef(null);
   const notifiedRef = useRef(new Set());
@@ -1014,6 +1015,10 @@ function Board() {
   const removeRiIssueSub=(itemId,issueId,subId)=>{
     commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).map((i)=>i.id===issueId?{...i,subs:(i.subs||[]).filter((s)=>s.id!==subId)}:i),updatedAt:Date.now()})}),[]);
   };
+  const editRiIssueSub=(itemId,issueId,subId,text)=>{
+    const t=text.trim();if(!t)return;
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).map((i)=>i.id===issueId?{...i,subs:(i.subs||[]).map((s)=>s.id===subId?{...s,text:t,edited:true}:s)}:i),updatedAt:Date.now()})}),[]);
+  };
   const reorderRiIssue=(fromId,toId)=>{
     if(!canEdit||fromId===toId)return;
     const ordered=riIssues.filter((i)=>!i.resolved);
@@ -1325,9 +1330,18 @@ function Board() {
                         {(i.subs||[]).length===0&&<span className="hint">히스토리가 없습니다</span>}
                         {(i.subs||[]).map((s)=>(
                           <div key={s.id} className="cmt">
-                            <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}</div>
-                            <p>{s.text}</p>
-                            {canEdit&&<button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeRiIssueSub(i.itemId,i.id,s.id)}>삭제</button>}
+                            <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}{s.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                            {riIssueSubEditId===s.id
+                              ? <div style={{display:"flex",gap:6,marginTop:4}}>
+                                  <textarea className="hinput" defaultValue={s.text} autoFocus style={{flex:1}}
+                                    onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editRiIssueSub(i.itemId,i.id,s.id,e.target.value);setRiIssueSubEditId(null);}}
+                                    onBlur={(e)=>{editRiIssueSub(i.itemId,i.id,s.id,e.target.value);setRiIssueSubEditId(null);}} />
+                                </div>
+                              : <p>{s.text}</p>}
+                            {canEdit&&riIssueSubEditId!==s.id&&<div style={{display:"flex",gap:10}}>
+                              <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setRiIssueSubEditId(s.id)}>수정</button>
+                              <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeRiIssueSub(i.itemId,i.id,s.id)}>삭제</button>
+                            </div>}
                           </div>
                         ))}
                         {canEdit&&<div className="addrow">
