@@ -524,8 +524,8 @@ const CSS = `
 .risubname{font-size:13.5px;font-weight:700;flex:1;color:var(--ink2);}
 .rirow{display:flex;align-items:center;gap:10px;padding:8px 16px 8px 52px;border-top:1px solid #F0F1EF;}
 .rirow:hover{background:#FAFBFA;}
-.riedit{background:none;border:none;color:var(--ink3);font-size:11.5px;cursor:pointer;padding:2px 6px;opacity:0;transition:opacity .1s;}
-.rirow:hover .riedit{opacity:1;}
+.riedit{background:#EBECF0;border:none;color:var(--ink2);font-size:11.5px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:6px;}
+.riedit:hover{background:#DFE1E6;}
 
 `;
 
@@ -942,6 +942,11 @@ function Board() {
     })}),[]);
   };
   const removeRi=(it)=>{commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===it.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("반복항목 삭제",null,it.title)]);setRiAdd(null);};
+  const duplicateRi=(it)=>{
+    const now=Date.now();
+    const copy={id:uid(),cat:it.cat,sub:it.sub,title:it.title+" (복사)",checkins:{},issues:[],createdAt:now,updatedAt:now,createdBy:me};
+    commit((d)=>({...d,rItems:[...(d.rItems||[]),copy]}),[mkLog("반복항목 복사",null,copy.title)]);
+  };
 
   const riIssues=useMemo(()=>{
     const out=[];
@@ -1276,6 +1281,7 @@ function Board() {
                             <span style={{flex:1,fontSize:13.5,textDecoration:checked?"line-through":"none",color:checked?"var(--ink3)":"inherit"}}>{it.title}</span>
                             {(it.issues||[]).filter((i)=>!i.resolved).length>0&&<span style={{fontSize:11,color:"#C9372C",fontWeight:700}}>⚠ {(it.issues||[]).filter((i)=>!i.resolved).length}</span>}
                             {checked&&it.checkins[riDate].by&&<span style={{fontSize:11,color:"var(--ink3)"}}>{it.checkins[riDate].by}</span>}
+                            {canEdit&&<button className="riedit" onClick={()=>duplicateRi(it)}>복사</button>}
                             {canEdit&&<button className="riedit" onClick={()=>setRiAdd({id:it.id,cat:it.cat,sub:it.sub,title:it.title})}>수정</button>}
                           </div>
                         );
