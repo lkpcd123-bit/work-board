@@ -967,6 +967,10 @@ function Board() {
   const removeRiIssue=(itemId,issueId)=>{
     commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).filter((i)=>i.id!==issueId),updatedAt:Date.now()})}),[]);
   };
+  const duplicateRiIssue=(itemId,issue)=>{
+    const copy={id:uid(),text:issue.text+" (복사)",author:me||"익명",ts:Date.now(),resolved:false};
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===itemId?{...x,issues:[copy,...(x.issues||[])],updatedAt:Date.now()}:x)}),[mkLog("반복항목 이슈 복사",null,copy.text.slice(0,30))]);
+  };
 
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
@@ -1234,6 +1238,7 @@ function Board() {
                       <div className="isstext">{i.text}</div>
                       <div className="issmeta">{i.path} · {i.author} · {fmtTs(i.ts)}</div>
                     </div>
+                    {canEdit&&<button className="btn ghost" style={{padding:"4px 10px",fontSize:12}} onClick={()=>duplicateRiIssue(i.itemId,i)}>복사</button>}
                     {canEdit&&<button style={{background:"none",border:"none",color:"#8F959C",cursor:"pointer"}} onClick={()=>removeRiIssue(i.itemId,i.id)}>×</button>}
                   </div>
                 ))}
@@ -1243,8 +1248,9 @@ function Board() {
                       <option value="">항목 선택</option>
                       {rItems.map((it)=><option key={it.id} value={it.id}>{it.cat} &gt; {it.sub} &gt; {it.title}</option>)}
                     </select>
-                    <input className="inp" style={{flex:1}} placeholder="이슈 입력 후 Enter" value={riIssueText} onChange={(e)=>setRiIssueText(e.target.value)}
+                    <input className="inp" style={{flex:1}} placeholder="이슈 입력 후 Enter 또는 추가 버튼" value={riIssueText} onChange={(e)=>setRiIssueText(e.target.value)}
                       onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;if(!riIssueItem){alert("항목을 먼저 선택하세요.");return;}addRiIssue(riIssueItem,riIssueText);setRiIssueText("");}} />
+                    <button className="btn-save" onClick={()=>{if(!riIssueItem){alert("항목을 먼저 선택하세요.");return;}if(!riIssueText.trim()){alert("이슈 내용을 입력하세요.");return;}addRiIssue(riIssueItem,riIssueText);setRiIssueText("");}}>추가</button>
                   </div>
                 )}
               </div>
