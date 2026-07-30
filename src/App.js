@@ -525,6 +525,10 @@ const CSS = `
 .risubhead:hover{background:#FAFBFA;}
 .risubname{font-size:13.5px;font-weight:700;flex:1;color:var(--ink2);}
 .rirow{display:flex;align-items:center;gap:10px;padding:8px 16px 8px 52px;border-top:1px solid #F0F1EF;}
+.rirow[draggable=true]{cursor:grab;}
+.rirow.dragging{opacity:.4;cursor:grabbing;}
+.iss[draggable=true]{cursor:grab;}
+.iss.dragging{opacity:.4;cursor:grabbing;}
 .rirow:hover{background:#FAFBFA;}
 .riedit{background:#EBECF0;border:none;color:var(--ink2);font-size:11.5px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:6px;}
 .riedit:hover{background:#DFE1E6;}
@@ -570,6 +574,11 @@ function Board() {
   const [riIssueFilter, setRiIssueFilter] = useState("open");
   const [riIssueItem, setRiIssueItem] = useState("");
   const [riIssueText, setRiIssueText] = useState("");
+  const [riItemDrag, setRiItemDrag] = useState(null);
+  const [riIssueDrag, setRiIssueDrag] = useState(null);
+  const [riIssueExpand, setRiIssueExpand] = useState({});
+  const [riIssueEditId, setRiIssueEditId] = useState(null);
+  const [riIssueSubText, setRiIssueSubText] = useState({});
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const prevTasksRef = useRef(null);
   const notifiedRef = useRef(new Set());
@@ -950,15 +959,37 @@ function Board() {
     const copy={id:uid(),cat:it.cat,sub:it.sub,title:it.title+" (복사)",checkins:{},issues:[],createdAt:now,updatedAt:now,createdBy:me};
     commit((d)=>({...d,rItems:[...(d.rItems||[]),copy]}),[mkLog("반복항목 복사",null,copy.title)]);
   };
+  const reorderRi=(cat,sub,fromId,toId)=>{
+    if(!canEdit||fromId===toId)return;
+    const group=riTree.find((c)=>c.name===cat)?.subs.find((s)=>s.name===sub)?.items||[];
+    const fi=group.findIndex((x)=>x.id===fromId);
+    const ti=group.findIndex((x)=>x.id===toId);
+    if(fi<0||ti<0)return;
+    const arr=[...group];
+    const [moved]=arr.splice(fi,1);
+    arr.splice(ti,0,moved);
+    const now=Date.now();
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>{
+      const pos=arr.findIndex((a)=>a.id===x.id);
+      return pos>=0?{...x,order:pos,updatedAt:now}:x;
+    })}),[]);
+  };
 
   const riIssues=useMemo(()=>{
     const out=[];
     rItems.forEach((it)=>(it.issues||[]).forEach((i)=>out.push({...i,itemId:it.id,path:`${it.cat} > ${it.sub} > ${it.title}`})));
-    return out.sort((a,b)=>b.ts-a.ts);
+    return out.sort((a,b)=>{
+      if(!!a.resolved!==!!b.resolved)return a.resolved?1:-1;
+      const ao=a.order,bo=b.order;
+      if(ao!=null&&bo!=null)return ao-bo;
+      if(ao!=null)return -1;
+      if(bo!=null)return 1;
+      return b.ts-a.ts;
+    });
   },[rItems]);
   const addRiIssue=(itemId,text)=>{
     const t=text.trim();if(!t)return;
-    const iss={id:uid(),text:t,author:me||"익명",ts:Date.now(),resolved:false};
+    const iss={id:uid(),text:t,author:me||"익명",ts:Date.now(),resolved:false,subs:[]};
     commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===itemId?{...x,issues:[iss,...(x.issues||[])],updatedAt:Date.now()}:x)}),[mkLog("반복항목 이슈 등록",null,t.slice(0,30))]);
   };
   const toggleRiIssue=(itemId,issueId)=>{
@@ -968,8 +999,41 @@ function Board() {
     commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).filter((i)=>i.id!==issueId),updatedAt:Date.now()})}),[]);
   };
   const duplicateRiIssue=(itemId,issue)=>{
-    const copy={id:uid(),text:issue.text+" (복사)",author:me||"익명",ts:Date.now(),resolved:false};
+    const copy={id:uid(),text:issue.text+" (복사)",author:me||"익명",ts:Date.now(),resolved:false,subs:[]};
     commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===itemId?{...x,issues:[copy,...(x.issues||[])],updatedAt:Date.now()}:x)}),[mkLog("반복항목 이슈 복사",null,copy.text.slice(0,30))]);
+  };
+  const editRiIssueText=(itemId,issueId,text)=>{
+    const t=text.trim();if(!t)return;
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).map((i)=>i.id===issueId?{...i,text:t,edited:true}:i),updatedAt:Date.now()})}),[]);
+  };
+  const addRiIssueSub=(itemId,issueId,text)=>{
+    const t=text.trim();if(!t)return;
+    const sub={id:uid(),text:t,author:me||"익명",ts:Date.now()};
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).map((i)=>i.id===issueId?{...i,subs:[...(i.subs||[]),sub]}:i),updatedAt:Date.now()})}),[]);
+  };
+  const removeRiIssueSub=(itemId,issueId,subId)=>{
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).map((i)=>i.id===issueId?{...i,subs:(i.subs||[]).filter((s)=>s.id!==subId)}:i),updatedAt:Date.now()})}),[]);
+  };
+  const reorderRiIssue=(fromId,toId)=>{
+    if(!canEdit||fromId===toId)return;
+    const ordered=riIssues.filter((i)=>!i.resolved);
+    const fi=ordered.findIndex((i)=>i.id===fromId);
+    const ti=ordered.findIndex((i)=>i.id===toId);
+    if(fi<0||ti<0)return;
+    const arr=[...ordered];
+    const [moved]=arr.splice(fi,1);
+    arr.splice(ti,0,moved);
+    const now=Date.now();
+    const orderMap=new Map(arr.map((i,idx)=>[i.id,idx]));
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>{
+      if(!(x.issues||[]).length)return x;
+      let changed=false;
+      const issues=x.issues.map((i)=>{
+        if(orderMap.has(i.id)){changed=true;return {...i,order:orderMap.get(i.id)};}
+        return i;
+      });
+      return changed?{...x,issues,updatedAt:now}:x;
+    })}),[]);
   };
 
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
@@ -1231,25 +1295,59 @@ function Board() {
                   ))}
                 </div>
                 {riIssues.filter((i)=>riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved).length===0&&<div className="hint" style={{marginBottom:10}}>해당하는 이슈가 없습니다</div>}
-                {riIssues.filter((i)=>riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved).map((i)=>(
-                  <div key={i.id} className={"iss"+(i.resolved?" done":"")} style={{marginBottom:6}}>
-                    <button className="issck" onClick={()=>toggleRiIssue(i.itemId,i.id)}>{i.resolved?"✓":""}</button>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div className="isstext">{i.text}</div>
-                      <div className="issmeta">{i.path} · {i.author} · {fmtTs(i.ts)}</div>
+                {riIssues.filter((i)=>riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved).map((i)=>{
+                  const expanded=!!riIssueExpand[i.id];
+                  const editing=riIssueEditId===i.id;
+                  return (
+                  <div key={i.id} draggable={canEdit&&!i.resolved}
+                    onDragStart={(e)=>{setRiIssueDrag(i.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",i.id);}catch(err){}}}
+                    onDragOver={(e)=>{e.preventDefault();e.dataTransfer.dropEffect="move";}}
+                    onDrop={()=>{if(riIssueDrag)reorderRiIssue(riIssueDrag,i.id);setRiIssueDrag(null);}}
+                    onDragEnd={()=>setRiIssueDrag(null)}
+                    className={"iss"+(i.resolved?" done":"")+(riIssueDrag===i.id?" dragging":"")} style={{marginBottom:6,flexDirection:"column",alignItems:"stretch"}}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:9}}>
+                      <button className="issck" onClick={()=>toggleRiIssue(i.itemId,i.id)}>{i.resolved?"✓":""}</button>
+                      <div style={{flex:1,minWidth:0}}>
+                        {editing
+                          ? <textarea className="hinput" defaultValue={i.text} autoFocus style={{width:"100%"}}
+                              onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editRiIssueText(i.itemId,i.id,e.target.value);setRiIssueEditId(null);}}
+                              onBlur={(e)=>{editRiIssueText(i.itemId,i.id,e.target.value);setRiIssueEditId(null);}} />
+                          : <div className="isstext" style={{whiteSpace:"pre-wrap"}}>{i.text}{i.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (수정됨)</span>}</div>}
+                        <div className="issmeta">{i.path} · {i.author} · {fmtTs(i.ts)}</div>
+                      </div>
+                      <button className="riedit" onClick={()=>setRiIssueExpand({...riIssueExpand,[i.id]:!expanded})}>{(i.subs||[]).length>0?`하위 ${(i.subs||[]).length}`:"+하위"}</button>
+                      {canEdit&&!editing&&<button className="riedit" onClick={()=>setRiIssueEditId(i.id)}>수정</button>}
+                      {canEdit&&<button className="riedit" onClick={()=>duplicateRiIssue(i.itemId,i)}>복사</button>}
+                      {canEdit&&<button style={{background:"none",border:"none",color:"#8F959C",cursor:"pointer"}} onClick={()=>removeRiIssue(i.itemId,i.id)}>×</button>}
                     </div>
-                    {canEdit&&<button className="btn ghost" style={{padding:"4px 10px",fontSize:12}} onClick={()=>duplicateRiIssue(i.itemId,i)}>복사</button>}
-                    {canEdit&&<button style={{background:"none",border:"none",color:"#8F959C",cursor:"pointer"}} onClick={()=>removeRiIssue(i.itemId,i.id)}>×</button>}
+                    {expanded&&(
+                      <div style={{marginTop:8,paddingLeft:33,borderTop:"1px solid var(--line)",paddingTop:8}}>
+                        {(i.subs||[]).length===0&&<span className="hint">히스토리가 없습니다</span>}
+                        {(i.subs||[]).map((s)=>(
+                          <div key={s.id} className="cmt">
+                            <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}</div>
+                            <p>{s.text}</p>
+                            {canEdit&&<button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeRiIssueSub(i.itemId,i.id,s.id)}>삭제</button>}
+                          </div>
+                        ))}
+                        {canEdit&&<div className="addrow">
+                          <textarea className="hinput" placeholder="히스토리 입력 (Enter 전송, Shift+Enter 줄바꿈)"
+                            value={riIssueSubText[i.id]||""} onChange={(e)=>setRiIssueSubText({...riIssueSubText,[i.id]:e.target.value})}
+                            onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addRiIssueSub(i.itemId,i.id,riIssueSubText[i.id]||"");setRiIssueSubText({...riIssueSubText,[i.id]:""});}} />
+                        </div>}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
                 {canEdit&&rItems.length>0&&(
                   <div style={{display:"flex",gap:7,marginTop:10}}>
                     <select className="sel" value={riIssueItem} onChange={(e)=>setRiIssueItem(e.target.value)} style={{maxWidth:220}}>
                       <option value="">항목 선택</option>
                       {rItems.map((it)=><option key={it.id} value={it.id}>{it.cat} &gt; {it.sub} &gt; {it.title}</option>)}
                     </select>
-                    <input className="inp" style={{flex:1}} placeholder="이슈 입력 후 Enter 또는 추가 버튼" value={riIssueText} onChange={(e)=>setRiIssueText(e.target.value)}
-                      onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;if(!riIssueItem){alert("항목을 먼저 선택하세요.");return;}addRiIssue(riIssueItem,riIssueText);setRiIssueText("");}} />
+                    <textarea className="hinput" style={{flex:1}} placeholder="이슈 입력 (Enter 추가, Shift+Enter 줄바꿈)" value={riIssueText} onChange={(e)=>setRiIssueText(e.target.value)}
+                      onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();if(!riIssueItem){alert("항목을 먼저 선택하세요.");return;}addRiIssue(riIssueItem,riIssueText);setRiIssueText("");}} />
                     <button className="btn-save" onClick={()=>{if(!riIssueItem){alert("항목을 먼저 선택하세요.");return;}if(!riIssueText.trim()){alert("이슈 내용을 입력하세요.");return;}addRiIssue(riIssueItem,riIssueText);setRiIssueText("");}}>추가</button>
                   </div>
                 )}
@@ -1285,7 +1383,12 @@ function Board() {
                       {subOpen&&sub.items.map((it)=>{
                         const checked=!!(it.checkins||{})[riDate];
                         return (
-                          <div key={it.id} className="rirow">
+                          <div key={it.id} draggable={canEdit&&!checked}
+                            onDragStart={(e)=>{setRiItemDrag(it.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",it.id);}catch(err){}}}
+                            onDragOver={(e)=>{e.preventDefault();e.dataTransfer.dropEffect="move";}}
+                            onDrop={()=>{if(riItemDrag)reorderRi(cat.name,sub.name,riItemDrag,it.id);setRiItemDrag(null);}}
+                            onDragEnd={()=>setRiItemDrag(null)}
+                            className={"rirow"+(riItemDrag===it.id?" dragging":"")}>
                             <button className={"ckbox"+(checked?" on":"")} disabled={!canEdit} onClick={()=>toggleRi(it,riDate)}>{checked?"✓":""}</button>
                             <span style={{flex:1,fontSize:13.5,textDecoration:checked?"line-through":"none",color:checked?"var(--ink3)":"inherit"}}>{it.title}</span>
                             {(it.issues||[]).filter((i)=>!i.resolved).length>0&&<span style={{fontSize:11,color:"#C9372C",fontWeight:700}}>⚠ {(it.issues||[]).filter((i)=>!i.resolved).length}</span>}
