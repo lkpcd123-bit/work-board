@@ -2079,6 +2079,30 @@ function Board() {
             <div className="pticks"><span>0</span><span>50</span><span>100</span></div>
           </div>
           <div className="fld"><label>메모</label><textarea disabled={!canEdit} value={draft.memo} onChange={(e)=>setDraft({...draft,memo:e.target.value})} placeholder="진행 상황, 공급사 회신, 참고 수치" /></div>
+          <div className="sect"><h4>히스토리</h4>
+            {(draft.history||[]).length===0&&<span className="hint">진행 기록이 없습니다</span>}
+            {(draft.history||[]).map((h)=>(
+              <div key={h.id} className="cmt">
+                <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                {h.editing
+                  ? <div style={{display:"flex",gap:6,marginTop:4}}>
+                      <input defaultValue={h.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14}}
+                        onKeyDown={(e)=>{
+                          if(e.nativeEvent.isComposing)return;
+                          if(e.key==="Enter"){const v=e.target.value.trim();if(v)setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,text:v,edited:true,editing:false}:x)});}
+                          if(e.key==="Escape")setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:false}:x)});
+                        }} />
+                      <button className="btn ghost" onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:false}:x)})}>취소</button>
+                    </div>
+                  : <p>{h.text}</p>}
+                {canEdit&&!h.editing&&<div style={{display:"flex",gap:10,marginTop:3}}>
+                  <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>수정</button>
+                  <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.filter((x)=>x.id!==h.id)})}>삭제</button>
+                </div>}
+              </div>
+            ))}
+            {canEdit&&<div className="addrow"><textarea className="hinput" placeholder="진행 상황·메모 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}} /></div>}
+          </div>
           <div className="sect"><h4>태그</h4>
             <div className="ctags">{(draft.tags||[]).map((g)=><span key={g} className="tag">{g}{canEdit&&<button className="x" style={{fontSize:11,marginLeft:3,border:"none",cursor:"pointer",background:"none"}} onClick={()=>setDraft({...draft,tags:draft.tags.filter((x)=>x!==g)})}>x</button>}</span>)}{!(draft.tags||[]).length&&<span className="hint">없음</span>}</div>
             {canEdit&&<div className="addrow"><input placeholder="태그 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v&&!(draft.tags||[]).includes(v)){setDraft({...draft,tags:[...(draft.tags||[]),v]});e.target.value="";}}} /></div>}
@@ -2116,30 +2140,6 @@ function Board() {
             ))}
             {!(draft.checklist||[]).length&&<span className="hint">없음</span>}
             {canEdit&&<div className="addrow"><input placeholder="단계 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:[...(draft.checklist||[]),{id:uid(),text:v,done:false,subs:[]}]});e.target.value="";}}} /></div>}
-          </div>
-          <div className="sect"><h4>히스토리</h4>
-            {(draft.history||[]).length===0&&<span className="hint">진행 기록이 없습니다</span>}
-            {(draft.history||[]).map((h)=>(
-              <div key={h.id} className="cmt">
-                <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (수정됨)</span>}</div>
-                {h.editing
-                  ? <div style={{display:"flex",gap:6,marginTop:4}}>
-                      <input defaultValue={h.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14}}
-                        onKeyDown={(e)=>{
-                          if(e.nativeEvent.isComposing)return;
-                          if(e.key==="Enter"){const v=e.target.value.trim();if(v)setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,text:v,edited:true,editing:false}:x)});}
-                          if(e.key==="Escape")setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:false}:x)});
-                        }} />
-                      <button className="btn ghost" onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:false}:x)})}>취소</button>
-                    </div>
-                  : <p>{h.text}</p>}
-                {canEdit&&!h.editing&&<div style={{display:"flex",gap:10,marginTop:3}}>
-                  <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>수정</button>
-                  <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.filter((x)=>x.id!==h.id)})}>삭제</button>
-                </div>}
-              </div>
-            ))}
-            {canEdit&&<div className="addrow"><textarea className="hinput" placeholder="진행 상황·메모 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}} /></div>}
           </div>
           <div className="sect"><h4>이슈</h4>
             {(draft.issues||[]).length===0&&<span className="hint">없음</span>}
