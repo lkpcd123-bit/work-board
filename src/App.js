@@ -118,7 +118,7 @@ const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); r
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
 const addDays=(ds,n)=>{const d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
 const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -126,10 +126,11 @@ function mergeData(r,l) {
   const cm=new Map(); [...(r.checkitems||[]),...(l.checkitems||[])].forEach(t=>{const p=cm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))cm.set(t.id,t);});
   const mm2=new Map(); [...(r.monthlies||[]),...(l.monthlies||[])].forEach(t=>{const p=mm2.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mm2.set(t.id,t);});
   const ri=new Map(); [...(r.rItems||[]),...(l.rItems||[])].forEach(t=>{const p=ri.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))ri.set(t.id,t);});
+  const mi=new Map(); [...(r.memoItems||[]),...(l.memoItems||[])].forEach(t=>{const p=mi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mi.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
+  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
     routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
     colLabels:((l.colLabelsUpdatedAt||0)>=(r.colLabelsUpdatedAt||0)?l.colLabels:r.colLabels)||{},colLabelsUpdatedAt:Math.max(l.colLabelsUpdatedAt||0,r.colLabelsUpdatedAt||0),
     log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
@@ -533,6 +534,16 @@ const CSS = `
 .riedit{background:#EBECF0;border:none;color:var(--ink2);font-size:11.5px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:6px;}
 .riedit:hover{background:#DFE1E6;}
 
+/* ══ 메모 ══ */
+.memocard{background:var(--card);border-radius:10px;box-shadow:var(--sh);padding:13px 16px;}
+.memocard[draggable=true]{cursor:grab;}
+.memocard.dragging{opacity:.4;cursor:grabbing;}
+.memohead{display:flex;align-items:flex-start;gap:10px;}
+.memopath{font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:3px;}
+.memotitle{font-size:14.5px;font-weight:800;margin-bottom:4px;}
+.memotext{font-size:13.5px;color:var(--ink2);line-height:1.55;white-space:pre-wrap;word-break:break-word;}
+.memosubs{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px;}
+
 `;
 
 export default function App() {
@@ -580,6 +591,13 @@ function Board() {
   const [riIssueEditId, setRiIssueEditId] = useState(null);
   const [riIssueSubText, setRiIssueSubText] = useState({});
   const [riIssueSubEditId, setRiIssueSubEditId] = useState(null);
+  const [memoQuery, setMemoQuery] = useState("");
+  const [memoCatFilter, setMemoCatFilter] = useState("전체");
+  const [memoDraft, setMemoDraft] = useState(null);
+  const [memoExpand, setMemoExpand] = useState({});
+  const [memoDrag, setMemoDrag] = useState(null);
+  const [memoSubText, setMemoSubText] = useState({});
+  const [memoSubEditId, setMemoSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const prevTasksRef = useRef(null);
   const notifiedRef = useRef(new Set());
@@ -635,7 +653,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{}}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -1041,6 +1059,63 @@ function Board() {
     })}),[]);
   };
 
+  /* ── 메모 ── */
+  const memoItems=useMemo(()=>(data.memoItems||[]).filter((x)=>!x.deleted),[data.memoItems]);
+  const memoCatNames=useMemo(()=>[...new Set(memoItems.map((x)=>x.cat).filter(Boolean))].sort(),[memoItems]);
+  const memoSubNames=useMemo(()=>(cat)=>[...new Set(memoItems.filter((x)=>x.cat===cat).map((x)=>x.sub).filter(Boolean))].sort(),[memoItems]);
+  const memoFiltered=useMemo(()=>{
+    let list=memoItems;
+    if(memoCatFilter!=="전체")list=list.filter((x)=>(x.cat||"미분류")===memoCatFilter);
+    const q=memoQuery.trim().toLowerCase();
+    if(q)list=list.filter((x)=>`${x.cat||""} ${x.sub||""} ${x.title||""} ${x.text||""} ${(x.subs||[]).map((s)=>s.text).join(" ")}`.toLowerCase().includes(q));
+    return list.slice().sort((a,b)=>(a.order??999)-(b.order??999));
+  },[memoItems,memoCatFilter,memoQuery]);
+  const memoCatOptions=useMemo(()=>["전체",...new Set(memoItems.map((x)=>x.cat||"미분류"))],[memoItems]);
+  const saveMemo=()=>{
+    const text=(memoDraft.text||"").trim();
+    if(!text){alert("메모 내용을 입력하세요.");return;}
+    const now=Date.now();
+    if(memoDraft.id){
+      commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoDraft.id?{...x,cat:(memoDraft.cat||"").trim(),sub:(memoDraft.sub||"").trim(),title:(memoDraft.title||"").trim(),text,updatedAt:now}:x)}),[mkLog("메모 수정",null,text.slice(0,30))]);
+    }else{
+      const rec={id:uid(),cat:(memoDraft.cat||"").trim(),sub:(memoDraft.sub||"").trim(),title:(memoDraft.title||"").trim(),text,subs:[],createdAt:now,updatedAt:now,createdBy:me};
+      commit((d)=>({...d,memoItems:[...(d.memoItems||[]),rec]}),[mkLog("메모 생성",null,text.slice(0,30))]);
+    }
+    setMemoDraft(null);
+  };
+  const removeMemo=(m)=>{commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("메모 삭제",null,(m.text||"").slice(0,30))]);setMemoDraft(null);};
+  const duplicateMemo=(m)=>{
+    const now=Date.now();
+    const copy={id:uid(),cat:m.cat,sub:m.sub,title:m.title?m.title+" (복사)":"",text:m.text,subs:[],order:null,createdAt:now,updatedAt:now,createdBy:me};
+    commit((d)=>({...d,memoItems:[...(d.memoItems||[]),copy]}),[mkLog("메모 복사",null,(copy.text||"").slice(0,30))]);
+  };
+  const reorderMemo=(fromId,toId)=>{
+    if(!canEdit||fromId===toId)return;
+    const arr=[...memoFiltered];
+    const fi=arr.findIndex((x)=>x.id===fromId);
+    const ti=arr.findIndex((x)=>x.id===toId);
+    if(fi<0||ti<0)return;
+    const [moved]=arr.splice(fi,1);
+    arr.splice(ti,0,moved);
+    const now=Date.now();
+    commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>{
+      const pos=arr.findIndex((a)=>a.id===x.id);
+      return pos>=0?{...x,order:pos,updatedAt:now}:x;
+    })}),[]);
+  };
+  const addMemoSub=(memoId,text)=>{
+    const t=text.trim();if(!t)return;
+    const sub={id:uid(),text:t,author:me||"익명",ts:Date.now()};
+    commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoId?{...x,subs:[...(x.subs||[]),sub],updatedAt:Date.now()}:x)}),[]);
+  };
+  const editMemoSub=(memoId,subId,text)=>{
+    const t=text.trim();if(!t)return;
+    commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoId?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,text:t,edited:true}:s),updatedAt:Date.now()}:x)}),[]);
+  };
+  const removeMemoSub=(memoId,subId)=>{
+    commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
+  };
+
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
@@ -1182,7 +1257,7 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 체크리스트",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 체크리스트",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -1556,6 +1631,76 @@ function Board() {
             <input placeholder="질문을 입력하세요" value={aiInput} onChange={(e)=>setAiInput(e.target.value)}
               onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;sendAiMessage();}} disabled={aiLoading} />
             <button className="btn-save" onClick={sendAiMessage} disabled={aiLoading||!aiInput.trim()}>전송</button>
+          </div>
+        </div>
+      )}
+
+      {view==="memo"&&(
+        <div>
+          <div className="panel" style={{padding:14,marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <div style={{fontSize:14,fontWeight:800}}>메모</div>
+              {canEdit&&<button className="btn-save" onClick={()=>setMemoDraft({cat:"",sub:"",title:"",text:""})}>+ 메모 추가</button>}
+            </div>
+            <div style={{display:"flex",gap:7,marginTop:12,flexWrap:"wrap"}}>
+              <input className="inp" style={{flex:1,minWidth:160}} placeholder="검색 (분류·제목·내용·하위항목)" value={memoQuery} onChange={(e)=>setMemoQuery(e.target.value)} />
+              <select className="sel" value={memoCatFilter} onChange={(e)=>setMemoCatFilter(e.target.value)}>
+                {memoCatOptions.map((c)=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {memoFiltered.length===0&&<div className="empty">{memoQuery||memoCatFilter!=="전체"?"조건에 맞는 메모가 없습니다":"메모가 없습니다. + 메모 추가로 시작하세요."}</div>}
+
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {memoFiltered.map((m)=>{
+              const expanded=!!memoExpand[m.id];
+              return (
+                <div key={m.id} draggable={canEdit}
+                  onDragStart={(e)=>{setMemoDrag(m.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",m.id);}catch(err){}}}
+                  onDragOver={(e)=>{e.preventDefault();e.dataTransfer.dropEffect="move";}}
+                  onDrop={()=>{if(memoDrag)reorderMemo(memoDrag,m.id);setMemoDrag(null);}}
+                  onDragEnd={()=>setMemoDrag(null)}
+                  className={"memocard"+(memoDrag===m.id?" dragging":"")}>
+                  <div className="memohead">
+                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setMemoDraft({...m,subs:[...(m.subs||[])]})}>
+                      {(m.cat||m.sub)&&<div className="memopath">{[m.cat,m.sub].filter(Boolean).join(" > ")}</div>}
+                      {m.title&&<div className="memotitle">{m.title}</div>}
+                      <div className="memotext">{m.text}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <button className="riedit" onClick={()=>setMemoExpand({...memoExpand,[m.id]:!expanded})}>{(m.subs||[]).length>0?`하위 ${(m.subs||[]).length}`:"+하위"}</button>
+                      {canEdit&&<button className="riedit" onClick={()=>duplicateMemo(m)}>복사</button>}
+                      {canEdit&&<button className="riedit" onClick={()=>setMemoDraft({...m,subs:[...(m.subs||[])]})}>수정</button>}
+                    </div>
+                  </div>
+                  {expanded&&(
+                    <div className="memosubs">
+                      {(m.subs||[]).length===0&&<span className="hint">하위 항목이 없습니다</span>}
+                      {(m.subs||[]).map((s)=>(
+                        <div key={s.id} className="cmt">
+                          <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}{s.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                          {memoSubEditId===s.id
+                            ? <textarea className="hinput" defaultValue={s.text} autoFocus style={{width:"100%",marginTop:4}}
+                                onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editMemoSub(m.id,s.id,e.target.value);setMemoSubEditId(null);}}
+                                onBlur={(e)=>{editMemoSub(m.id,s.id,e.target.value);setMemoSubEditId(null);}} />
+                            : <p>{s.text}</p>}
+                          {canEdit&&memoSubEditId!==s.id&&<div style={{display:"flex",gap:10}}>
+                            <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setMemoSubEditId(s.id)}>수정</button>
+                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeMemoSub(m.id,s.id)}>삭제</button>
+                          </div>}
+                        </div>
+                      ))}
+                      {canEdit&&<div className="addrow">
+                        <textarea className="hinput" placeholder="하위 항목 입력 (Enter 추가, Shift+Enter 줄바꿈)"
+                          value={memoSubText[m.id]||""} onChange={(e)=>setMemoSubText({...memoSubText,[m.id]:e.target.value})}
+                          onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addMemoSub(m.id,memoSubText[m.id]||"");setMemoSubText({...memoSubText,[m.id]:""});}} />
+                      </div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -2029,6 +2174,31 @@ function Board() {
         </div></div>
         );
       })()}
+
+      {memoDraft&&(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMemoDraft(null)}><div className="modal">
+          <h2>{memoDraft.id?"메모 수정":"새 메모"}</h2>
+          <div className="modal-body">
+            <div className="r3">
+              <div className="fld"><label>대분류 (선택)</label><input list="memo-cats" value={memoDraft.cat||""} onChange={(e)=>setMemoDraft({...memoDraft,cat:e.target.value})} placeholder="예) 마케팅" />
+                <datalist id="memo-cats">{memoCatNames.map((c)=><option key={c} value={c} />)}</datalist>
+              </div>
+              <div className="fld"><label>중분류 (선택)</label><input list="memo-subs" value={memoDraft.sub||""} onChange={(e)=>setMemoDraft({...memoDraft,sub:e.target.value})} placeholder="예) 브랜드검색" />
+                <datalist id="memo-subs">{memoSubNames(memoDraft.cat||"").map((s)=><option key={s} value={s} />)}</datalist>
+              </div>
+              <div className="fld"><label>소분류 (선택)</label><input value={memoDraft.title||""} onChange={(e)=>setMemoDraft({...memoDraft,title:e.target.value})} placeholder="예) 키워드 아이디어" /></div>
+            </div>
+            <div className="fld"><label>내용</label><textarea autoFocus value={memoDraft.text||""} onChange={(e)=>setMemoDraft({...memoDraft,text:e.target.value})} placeholder="메모 내용을 입력하세요" style={{minHeight:100}} /></div>
+          </div>
+          <div className="modal-foot">
+            {memoDraft.id&&<button className="del" onClick={()=>removeMemo(memoDraft)}>삭제</button>}
+            {memoDraft.id&&<button className="btn ghost" onClick={()=>duplicateMemo(memoDraft)}>복사</button>}
+            <span className="spacer" />
+            <button className="btn ghost" onClick={()=>setMemoDraft(null)}>닫기</button>
+            <button className="btn-save" onClick={saveMemo}>저장</button>
+          </div>
+        </div></div>
+      )}
 
       {mlyDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMlyDraft(null)}><div className="modal">
