@@ -452,6 +452,7 @@ const CSS = `
 .btn-save:hover{background:#0055CC!important;}
 .issbtn:hover{border-color:var(--ink3);}
 .fcitem{display:flex;align-items:center;gap:9px;padding:5px 0;}
+.fcitem.dragging{opacity:.4;}
 .fccheck{width:21px;height:21px;border:2px solid #A9B0A6;border-radius:5px;background:#fff;font-size:11px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;}
 .fccheck:hover{border-color:var(--ok);background:#F5FBF7;}
 .fccheck.on{background:var(--ok);border-color:var(--ok);color:#fff;}
@@ -814,6 +815,7 @@ function Board() {
     setCkDraft(null);
   };
   const [ckDrag, setCkDrag] = useState(null);
+  const [ckSubDrag, setCkSubDrag] = useState(null);
   const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);if(willDone)setConfirmBox({kind:"archiveCk",ckId:c.id,ckTitle:c.title});};
   const reorderCk=(tab,fromId,toId)=>{if(!canEdit||fromId===toId)return;const ordered=ckByTab(tab).filter((x)=>!x.done);const fi=ordered.findIndex((x)=>x.id===fromId);const ti=ordered.findIndex((x)=>x.id===toId);if(fi<0||ti<0)return;const arr=[...ordered];const[moved]=arr.splice(fi,1);arr.splice(ti,0,moved);const now=Date.now();commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>{const pos=arr.findIndex((a)=>a.id===x.id);return pos>=0?{...x,order:pos,updatedAt:now}:x;})}),[])};
   const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크항목 삭제",detail:""}]);setCkDraft(null);};
@@ -2285,7 +2287,22 @@ function Board() {
                 </div>
                 {(ckDraft.subs||[]).length===0&&<span className="hint">하위 체크 항목이 없습니다</span>}
                 {(ckDraft.subs||[]).map((s)=>(
-                  <div key={s.id} className="fcitem">
+                  <div key={s.id} draggable
+                    onDragStart={()=>setCkSubDrag(s.id)}
+                    onDragOver={(e)=>e.preventDefault()}
+                    onDrop={()=>{
+                      if(!ckSubDrag||ckSubDrag===s.id)return;
+                      const arr=[...ckDraft.subs];
+                      const fi=arr.findIndex((x)=>x.id===ckSubDrag);
+                      const ti=arr.findIndex((x)=>x.id===s.id);
+                      if(fi<0||ti<0)return;
+                      const [moved]=arr.splice(fi,1);
+                      arr.splice(ti,0,moved);
+                      setCkDraft({...ckDraft,subs:arr});
+                      setCkSubDrag(null);
+                    }}
+                    onDragEnd={()=>setCkSubDrag(null)}
+                    className={"fcitem"+(ckSubDrag===s.id?" dragging":"")} style={{cursor:"grab"}}>
                     <button className={"fccheck"+(s.done?" on":"")} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"✓":""}</button>
                     {s.editing
                       ? <input defaultValue={s.text} autoFocus style={{flex:1,fontSize:13,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 7px"}}
