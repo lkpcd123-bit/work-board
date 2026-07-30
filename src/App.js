@@ -828,7 +828,7 @@ function Board() {
     commit((d)=>({...d,checkitems:[...(d.checkitems||[]),copy]}),[{id:uid(),ts:now,who:me||"익명",taskId:copy.id,taskTitle:copy.title,action:"체크항목 복사",detail:`원본: ${c.title}`}]);
     setCkDraft(null);
   };
-  const clearCkTab=(tab)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.tab===tab&&!x.deleted?{...x,done:false,doneAt:null,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:null,taskTitle:"",action:"체크 전체 해제",detail:CKTABS.find((t)=>t.id===tab)?.label||""}]);};
+  const clearCkItem=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크 해제",detail:""}]);};
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
 
   /* ── AI 비서 ── */
@@ -1573,7 +1573,6 @@ function Board() {
                 <div className="ckcolhead">
                   <div className="ckcoltitle">{tab.label}<em>{items.filter((c)=>!c.done).length}</em></div>
                   <div style={{display:"flex",gap:5}}>
-                    {isCL&&canEdit&&items.length>0&&<button className="ckclear" onClick={()=>setConfirmBox({kind:"clearCk",tab:tab.id})}>전체 체크 해제</button>}
                     {canEdit&&<button className="ckplus" style={{background:"#0C66E4",color:"#fff"}} onClick={()=>setCkDraft({_new:true,id:uid(),tab:tab.id,title:"",start:"",due:"",desc:"",done:false,subs:isCL?[]:undefined})}>+</button>}                  </div>
                 </div>
                 <div className="ckcolbody">
@@ -1602,6 +1601,7 @@ function Board() {
                             <div className="ckunderline" />
                           </div>
                           {isCL&&subs.length>0&&<button className="ckexp" onClick={(e)=>{e.stopPropagation();setCkExpand({...ckExpand,[c.id]:!exp});}}>{exp?"▲":"▼"}</button>}
+                          {isCL&&(c.subs||[]).some((s)=>s.done)&&<button className="riedit" onClick={(e)=>{e.stopPropagation();clearCkItem(c);}}>체크 해제</button>}
                           {canEdit&&<button className="riedit" onClick={(e)=>{e.stopPropagation();duplicateCk(c);}}>복사</button>}
                         </div>
                         {isCL&&exp&&subs.length>0&&(
@@ -2354,17 +2354,16 @@ function Board() {
 
       {confirmBox&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setConfirmBox(null)}><div className="modal sm">
-          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":confirmBox.kind==="clearCk"?"전체 지울까요?":confirmBox.kind==="archiveCk"?"목록에서 정리할까요?":"완료 업무를 보관할까요?"}</h2>
-          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요?`:confirmBox.kind==="clearCk"?`${CKTABS.find((t)=>t.id===confirmBox.tab)?.label} 탭의 모든 항목이 삭제됩니다.`:confirmBox.kind==="archiveCk"?`"${confirmBox.ckTitle}" 항목을 완료했습니다. 목록에서 삭제할까요? 남겨두면 완료 상태로 표시됩니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
+          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":confirmBox.kind==="archiveCk"?"목록에서 정리할까요?":"완료 업무를 보관할까요?"}</h2>
+          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요?`:confirmBox.kind==="archiveCk"?`"${confirmBox.ckTitle}" 항목을 완료했습니다. 목록에서 삭제할까요? 남겨두면 완료 상태로 표시됩니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
           <div className="mfoot"><span className="spacer" />
             <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":confirmBox.kind==="archiveCk"?"남겨두기":"취소"}</button>
-            <button className={confirmBox.kind==="purge"||confirmBox.kind==="clearCk"?"btn warn":"btn-save"} onClick={()=>{
+            <button className={confirmBox.kind==="purge"?"btn warn":"btn-save"} onClick={()=>{
               if(confirmBox.kind==="purge")purgeArchive();
-              else if(confirmBox.kind==="clearCk"){clearCkTab(confirmBox.tab);setConfirmBox(null);}
               else if(confirmBox.kind==="archiveCk"){const cid=confirmBox.ckId;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===cid?{...x,deleted:true,updatedAt:Date.now()}:x)}),[]);setConfirmBox(null);}
               else if(confirmBox.kind==="archiveOne"){const tid=confirmBox.taskId;commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===tid?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("아카이브",{id:tid,title:confirmBox.taskTitle})]);setConfirmBox(null);}
               else archiveDone();
-            }}>{confirmBox.kind==="purge"?"영구 삭제":confirmBox.kind==="clearCk"?"전체 삭제":confirmBox.kind==="archiveCk"?"삭제":"보관하기"}</button>
+            }}>{confirmBox.kind==="purge"?"영구 삭제":confirmBox.kind==="archiveCk"?"삭제":"보관하기"}</button>
           </div>
         </div></div>
       )}
