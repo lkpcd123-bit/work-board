@@ -118,7 +118,7 @@ const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); r
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
 const addDays=(ds,n)=>{const d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
 const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -130,7 +130,9 @@ function mergeData(r,l) {
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
   return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
-    routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
+    routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
+    colLabels:((l.colLabelsUpdatedAt||0)>=(r.colLabelsUpdatedAt||0)?l.colLabels:r.colLabels)||{},colLabelsUpdatedAt:Math.max(l.colLabelsUpdatedAt||0,r.colLabelsUpdatedAt||0),
+    log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
 }
 
 const CSS = `
@@ -623,7 +625,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{}}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -717,14 +719,14 @@ function Board() {
     const now=Date.now(),isNew=draft._new,clean={...draft};delete clean._new;
     const before=data.tasks.find((t)=>t.id===draft.id),logs=[];
     if(isNew)logs.push(mkLog("업무 생성",clean,`${clean.channel} · ${clean.type}`));
-    else{const diffs=[];if(before){if(before.title!==clean.title)diffs.push("업무명");if(before.status!==clean.status)diffs.push(`상태 -> ${COLUMNS.find((c)=>c.id===clean.status)?.label}`);if(before.owner!==clean.owner)diffs.push(`담당자 -> ${clean.owner||"미지정"}`);if(before.due!==clean.due)diffs.push(`마감 -> ${clean.due||"없음"}`);if(before.priority!==clean.priority)diffs.push("우선순위");if(before.channel!==clean.channel)diffs.push(`채널 -> ${clean.channel}`);if((before.comments||[]).length!==(clean.comments||[]).length)diffs.push("댓글");}logs.push(mkLog("업무 수정",clean,diffs.join(", ")||"내용 변경"));}
+    else{const diffs=[];if(before){if(before.title!==clean.title)diffs.push("업무명");if(before.status!==clean.status)diffs.push(`상태 -> ${cols.find((c)=>c.id===clean.status)?.label}`);if(before.owner!==clean.owner)diffs.push(`담당자 -> ${clean.owner||"미지정"}`);if(before.due!==clean.due)diffs.push(`마감 -> ${clean.due||"없음"}`);if(before.priority!==clean.priority)diffs.push("우선순위");if(before.channel!==clean.channel)diffs.push(`채널 -> ${clean.channel}`);if((before.comments||[]).length!==(clean.comments||[]).length)diffs.push("댓글");}logs.push(mkLog("업무 수정",clean,diffs.join(", ")||"내용 변경"));}
     let spawn=null;
     if(clean.status==="done"&&before?.status!=="done"&&clean.repeat!=="none"){spawn={...clean,id:uid(),status:"todo",due:nextDue(clean.due,clean.repeat),checklist:(clean.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}
     commit((d)=>{const ex=d.tasks.some((t)=>t.id===clean.id);const rec={...clean,createdAt:before?.createdAt||now,createdBy:before?.createdBy||me,updatedAt:now,updatedBy:me,doneAt:clean.status==="done"?(before?.doneAt||now):null};let tasks=ex?d.tasks.map((t)=>t.id===rec.id?rec:t):[rec,...d.tasks];if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);
     setDraft(null);
   };
 
-  const moveTask=(task,statusId)=>{if(!canEdit||task.status===statusId)return;const now=Date.now();const logs=[mkLog("상태 변경",task,`${COLUMNS.find((c)=>c.id===task.status)?.label} -> ${COLUMNS.find((c)=>c.id===statusId)?.label}`)];let spawn=null;if(statusId==="done"&&task.repeat&&task.repeat!=="none"){spawn={...task,id:uid(),status:"todo",due:nextDue(task.due,task.repeat),checklist:(task.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}commit((d)=>{let tasks=d.tasks.map((t)=>t.id===task.id?{...t,status:statusId,updatedAt:now,updatedBy:me,doneAt:statusId==="done"?(t.doneAt||now):null}:t);if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);if(statusId==="done"&&task.status!=="done"){setConfirmBox({kind:"archiveOne",taskId:task.id,taskTitle:task.title});}};
+  const moveTask=(task,statusId)=>{if(!canEdit||task.status===statusId)return;const now=Date.now();const logs=[mkLog("상태 변경",task,`${cols.find((c)=>c.id===task.status)?.label} -> ${cols.find((c)=>c.id===statusId)?.label}`)];let spawn=null;if(statusId==="done"&&task.repeat&&task.repeat!=="none"){spawn={...task,id:uid(),status:"todo",due:nextDue(task.due,task.repeat),checklist:(task.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}commit((d)=>{let tasks=d.tasks.map((t)=>t.id===task.id?{...t,status:statusId,updatedAt:now,updatedBy:me,doneAt:statusId==="done"?(t.doneAt||now):null}:t);if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);if(statusId==="done"&&task.status!=="done"){setConfirmBox({kind:"archiveOne",taskId:task.id,taskTitle:task.title});}};
   const removeTask=(task)=>{commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,deleted:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("업무 삭제",task)]);setDraft(null);};
   const setArchivedFlag=(task,flag)=>commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,archived:flag,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog(flag?"아카이브":"아카이브 해제",task)]);
   const archiveDone=()=>{const targets=live.filter((t)=>t.status==="done");if(!targets.length){setConfirmBox(null);return;}const ids=new Set(targets.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.map((t)=>ids.has(t.id)?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("완료 일괄 보관",null,`${targets.length}건`)]);setConfirmBox(null);};
@@ -744,6 +746,7 @@ function Board() {
     setTimeout(()=>{addingRef.current=false;},600);
   };
   /* ── 반복 업무 (구버전 데이터, AI비서 조회용으로만 유지) ── */
+  const cols = useMemo(()=>COLUMNS.map((c)=>({...c,label:(data.colLabels||{})[c.id]||c.label})),[data.colLabels]);
   const routines = useMemo(()=>(data.routines||[]).filter((r)=>!r.deleted),[data.routines]);
 
   const toggleIssue=(rid,iid)=>{
@@ -1176,7 +1179,7 @@ function Board() {
       </>)}
 
       {view==="board"&&(
-        <div className="board">{COLUMNS.map((col)=>{const items=visible.filter((t)=>t.status===col.id);return(
+        <div className="board">{cols.map((col)=>{const items=visible.filter((t)=>t.status===col.id);return(
           <div key={col.id} className="colwrap">
             <div className="colhead"><span>{col.label}</span><em>{items.length}</em></div>
             <div className={"colbody"+(overCol===col.id?" over":"")} onDragOver={(e)=>{if(dragId){e.preventDefault();setOverCol(col.id);}}} onDragLeave={()=>setOverCol((c)=>c===col.id?null:c)} onDrop={(e)=>{e.preventDefault();const t=data.tasks.find((x)=>x.id===dragId);if(t)moveTask(t,col.id);setDragId(null);setOverCol(null);}}>
@@ -1484,7 +1487,7 @@ function Board() {
             [mkLog("셀 수정",t,`${k} → ${v}`)]);
         };
         const groups=grpBy==="status"
-          ? COLUMNS.map((c)=>({key:c.id,label:c.label,color:STCOL[c.id],items:mdVisible.filter((t)=>t.status===c.id)}))
+          ? cols.map((c)=>({key:c.id,label:c.label,color:STCOL[c.id],items:mdVisible.filter((t)=>t.status===c.id)}))
           : data.channels.map((c)=>({key:c.id,label:c.id,color:c.color,items:mdVisible.filter((t)=>t.channel===c.id)})).filter((g)=>g.items.length>0);
         return (
         <div>
@@ -1516,7 +1519,7 @@ function Board() {
           {groups.map((g)=>{
             const open=!collapsed[g.key];
             const items=g.items;
-            const stCount=COLUMNS.map((c)=>({...c,n:items.filter((t)=>t.status===c.id).length,color:STCOL[c.id]})).filter((c)=>c.n>0);
+            const stCount=cols.map((c)=>({...c,n:items.filter((t)=>t.status===c.id).length,color:STCOL[c.id]})).filter((c)=>c.n>0);
             const prCount=PRIORITIES.map((p)=>({...p,n:items.filter((t)=>t.priority===p.id).length,color:PRCOL[p.id]})).filter((p)=>p.n>0);
             const dues=items.map((t)=>t.due).filter(Boolean).sort();
             const avgPg=items.length?Math.round(items.reduce((s,t)=>s+(t.progress||0),0)/items.length):0;
@@ -1565,7 +1568,7 @@ function Board() {
                           <td className="mdcell" style={{background:STCOL[t.status]}}>
                             <select className="mdcolorsel" value={t.status} disabled={!canEdit}
                               onChange={(e)=>patch(t,"status",e.target.value)}>
-                              {COLUMNS.map((c)=><option key={c.id} value={c.id}>{c.label}</option>)}
+                              {cols.map((c)=><option key={c.id} value={c.id}>{c.label}</option>)}
                             </select>
                           </td>
                           <td>
@@ -1725,6 +1728,23 @@ function Board() {
             </div>
           )}
         </div>
+        <div className="panel"><h3>보드 컬럼 이름</h3><p className="sub">보드의 5개 컬럼(대기·진행중·검토컨펌·이슈·완료) 이름을 원하는 대로 바꿉니다.</p>
+          {cols.map((c)=>(
+            <div key={c.id} className="mrow" style={{borderTop:"1px solid var(--line)"}}>
+              <span style={{fontSize:11,fontFamily:"monospace",color:"var(--ink3)",minWidth:70}}>{c.id}</span>
+              <input disabled={!isAdmin} defaultValue={c.label} placeholder={c.label}
+                onBlur={(e)=>{
+                  const v=e.target.value.trim();
+                  if(!v||v===c.label)return;
+                  commit((d)=>({...d,colLabels:{...(d.colLabels||{}),[c.id]:v},colLabelsUpdatedAt:Date.now()}),[mkLog("컬럼명 변경",null,`${c.id} -> ${v}`)]);
+                }}
+                onKeyDown={(e)=>{if(e.key==="Enter")e.target.blur();}}
+                style={{flex:1,maxWidth:220,background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"6px 9px",fontSize:13}} />
+              {(data.colLabels||{})[c.id]&&isAdmin&&<button className="del" onClick={()=>commit((d)=>{const cl={...(d.colLabels||{})};delete cl[c.id];return{...d,colLabels:cl,colLabelsUpdatedAt:Date.now()};},[mkLog("컬럼명 초기화",null,c.id)])}>초기화</button>}
+            </div>
+          ))}
+        </div>
+
         <div className="panel"><h3>업무 유형</h3><p className="sub">업무 상세에서 선택할 수 있는 유형을 추가·삭제합니다.</p>
           <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
             {(data.types||TYPES).map((t)=>(
@@ -2063,7 +2083,7 @@ function Board() {
           </div>
           <div className="r3">
             <div className="fld"><label>우선순위</label><select disabled={!canEdit} value={draft.priority} onChange={(e)=>setDraft({...draft,priority:e.target.value})}>{PRIORITIES.map((p)=><option key={p.id} value={p.id}>{p.label}</option>)}</select></div>
-            <div className="fld"><label>상태</label><select disabled={!canEdit} value={draft.status} onChange={(e)=>setDraft({...draft,status:e.target.value})}>{COLUMNS.map((c)=><option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
+            <div className="fld"><label>상태</label><select disabled={!canEdit} value={draft.status} onChange={(e)=>setDraft({...draft,status:e.target.value})}>{cols.map((c)=><option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
             <div className="fld"><label>반복</label><select disabled={!canEdit} value={draft.repeat} onChange={(e)=>setDraft({...draft,repeat:e.target.value})}>{REPEATS.map((r)=><option key={r.id} value={r.id}>{r.label}</option>)}</select></div>
           </div>
           <div className="fld">
@@ -2074,7 +2094,7 @@ function Board() {
                 value={draft.progress||0}
                 onChange={(e)=>{const v=Number(e.target.value);setDraft({...draft,progress:v,status:v===100?"done":draft.status==="done"&&v<100?"doing":draft.status});}}
                 className="prange" />
-              <span className="pbadge">{COLUMNS.find((c)=>c.id===draft.status)?.label}</span>
+              <span className="pbadge">{cols.find((c)=>c.id===draft.status)?.label}</span>
             </div>
             <div className="pticks"><span>0</span><span>50</span><span>100</span></div>
           </div>
