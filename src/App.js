@@ -476,8 +476,8 @@ const CSS = `
 .ckrow[draggable=true]{cursor:grab;}
 .ckrow.dragging{opacity:.4;cursor:grabbing;box-shadow:0 0 0 2px var(--pri),var(--sh);}
 .ckrowmain{display:flex;align-items:flex-start;gap:11px;}
-.ckbox{width:22px;height:22px;border:2px solid var(--line2);border-radius:6px;background:var(--card);font-size:12px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;}
-.ckbox:hover{border-color:var(--ok);}
+.ckbox{width:22px;height:22px;border:2px solid #8F959C;border-radius:6px;background:#fff;font-size:12px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.ckbox:hover{border-color:var(--ok);background:#F5FBF7;}
 .ckbox.on{background:var(--ok);border-color:var(--ok);color:#fff;}
 .ckbox.sm{width:18px;height:18px;font-size:10px;}
 .ckbox:disabled{opacity:.5;}
