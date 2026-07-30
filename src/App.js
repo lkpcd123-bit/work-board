@@ -794,8 +794,12 @@ function Board() {
   /* ── 체크리스트 ── */
   const checkitems=useMemo(()=>(data.checkitems||[]).filter((c)=>!c.deleted),[data.checkitems]);
   const ckByTab=useCallback((tab)=>checkitems.filter((c)=>c.tab===tab).slice().sort((a,b)=>{
-    const da=a.due||"9999",db=b.due||"9999";
     if(a.done!==b.done)return a.done?1:-1;
+    const ao=a.order,bo=b.order;
+    if(ao!=null&&bo!=null)return ao-bo;
+    if(ao!=null)return -1;
+    if(bo!=null)return 1;
+    const da=a.due||"9999",db=b.due||"9999";
     return da<db?-1:da>db?1:0;
   }),[checkitems]);
 
@@ -1260,7 +1264,7 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 체크리스트",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -1517,7 +1521,7 @@ function Board() {
           <div className="panel" style={{marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
               <div>
-                <h3 style={{margin:0}}>월간 체크리스트</h3>
+                <h3 style={{margin:0}}>월간 업무</h3>
                 <p className="sub" style={{margin:"4px 0 0"}}>월별로 해야 할 항목을 관리합니다. 하위 항목을 넣을 수 있습니다.</p>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -1597,7 +1601,6 @@ function Board() {
                           </div>
                           {isCL&&subs.length>0&&<button className="ckexp" onClick={(e)=>{e.stopPropagation();setCkExpand({...ckExpand,[c.id]:!exp});}}>{exp?"▲":"▼"}</button>}
                           {canEdit&&<button className="riedit" onClick={(e)=>{e.stopPropagation();duplicateCk(c);}}>복사</button>}
-                          {canEdit&&<button className="riedit" onClick={(e)=>{e.stopPropagation();setCkDraft({...c,subs:c.subs?[...c.subs]:(isCL?[]:undefined)});}}>수정</button>}
                         </div>
                         {isCL&&exp&&subs.length>0&&(
                           <div className="cksubs">
