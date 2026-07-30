@@ -1586,7 +1586,8 @@ function Board() {
                       {subs.map((s)=>(
                         <div key={s.id} style={{display:"flex",alignItems:"center",gap:8}}>
                           <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySub(m,s.id)}>{s.done?"✓":""}</button>
-                          <span style={{fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
+                          <span style={{fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",cursor:"pointer",flex:1}} onClick={()=>{setMlyDraft({...m,subs:[...m.subs||[]],history:[...m.history||[]]});setMlySubHistOpen({[s.id]:true});}}>{s.text}</span>
+                          {(s.history||[]).length>0&&<span style={{fontSize:11,color:"var(--pri)",fontWeight:700,cursor:"pointer"}} onClick={()=>{setMlyDraft({...m,subs:[...m.subs||[]],history:[...m.history||[]]});setMlySubHistOpen({[s.id]:true});}}>💬{s.history.length}</span>}
                         </div>
                       ))}
                     </div>
