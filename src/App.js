@@ -583,6 +583,7 @@ function Board() {
   const [riAdd, setRiAdd] = useState(null);
   const [riIssueOpen, setRiIssueOpen] = useState(true);
   const [riIssueFilter, setRiIssueFilter] = useState("open");
+  const [riIssueQuery, setRiIssueQuery] = useState("");
   const [riIssueItem, setRiIssueItem] = useState("");
   const [riIssueText, setRiIssueText] = useState("");
   const [riItemDrag, setRiItemDrag] = useState(null);
@@ -591,8 +592,6 @@ function Board() {
   const [riIssueEditId, setRiIssueEditId] = useState(null);
   const [riIssueSubText, setRiIssueSubText] = useState({});
   const [riIssueSubEditId, setRiIssueSubEditId] = useState(null);
-  const [riQuickIssueId, setRiQuickIssueId] = useState(null);
-  const [riQuickIssueText, setRiQuickIssueText] = useState("");
   const [memoQuery, setMemoQuery] = useState("");
   const [memoCatFilter, setMemoCatFilter] = useState("전체");
   const [memoDraft, setMemoDraft] = useState(null);
@@ -1371,13 +1370,14 @@ function Board() {
             </div>
             {riIssueOpen&&(
               <div style={{marginTop:12}} onClick={(e)=>e.stopPropagation()}>
-                <div style={{display:"flex",gap:7,marginBottom:10}}>
+                <div style={{display:"flex",gap:7,marginBottom:10,flexWrap:"wrap"}}>
                   {[{id:"open",label:`미해결 ${riIssues.filter((i)=>!i.resolved).length}`},{id:"done",label:`해결 ${riIssues.filter((i)=>i.resolved).length}`},{id:"all",label:`전체 ${riIssues.length}`}].map((f)=>(
                     <button key={f.id} className={"chip"+(riIssueFilter===f.id?" sel":"")} onClick={()=>setRiIssueFilter(f.id)}>{f.label}</button>
                   ))}
+                  <input className="inp" style={{flex:1,minWidth:140}} placeholder="이슈 검색 (내용·항목명)" value={riIssueQuery} onChange={(e)=>setRiIssueQuery(e.target.value)} />
                 </div>
-                {riIssues.filter((i)=>riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved).length===0&&<div className="hint" style={{marginBottom:10}}>해당하는 이슈가 없습니다</div>}
-                {riIssues.filter((i)=>riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved).map((i)=>{
+                {riIssues.filter((i)=>(riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved)&&(!riIssueQuery.trim()||`${i.text} ${i.path}`.toLowerCase().includes(riIssueQuery.trim().toLowerCase()))).length===0&&<div className="hint" style={{marginBottom:10}}>해당하는 이슈가 없습니다</div>}
+                {riIssues.filter((i)=>(riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved)&&(!riIssueQuery.trim()||`${i.text} ${i.path}`.toLowerCase().includes(riIssueQuery.trim().toLowerCase()))).map((i)=>{
                   const expanded=!!riIssueExpand[i.id];
                   const editing=riIssueEditId===i.id;
                   return (
@@ -1474,8 +1474,7 @@ function Board() {
                       {subOpen&&sub.items.map((it)=>{
                         const checked=!!(it.checkins||{})[riDate];
                         return (
-                          <div key={it.id}>
-                          <div draggable={canEdit&&!checked}
+                          <div key={it.id} draggable={canEdit&&!checked}
                             onDragStart={(e)=>{setRiItemDrag(it.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",it.id);}catch(err){}}}
                             onDragOver={(e)=>{e.preventDefault();e.dataTransfer.dropEffect="move";}}
                             onDrop={()=>{if(riItemDrag)reorderRi(cat.name,sub.name,riItemDrag,it.id);setRiItemDrag(null);}}
@@ -1485,18 +1484,8 @@ function Board() {
                             <span style={{flex:1,fontSize:13.5,textDecoration:checked?"line-through":"none",color:checked?"var(--ink3)":"inherit"}}>{it.title}</span>
                             {(it.issues||[]).filter((i)=>!i.resolved).length>0&&<span style={{fontSize:11,color:"#C9372C",fontWeight:700}}>⚠ {(it.issues||[]).filter((i)=>!i.resolved).length}</span>}
                             {checked&&it.checkins[riDate].by&&<span style={{fontSize:11,color:"var(--ink3)"}}>{it.checkins[riDate].by}</span>}
-                            {canEdit&&<button className="riedit" onClick={()=>{setRiQuickIssueId(riQuickIssueId===it.id?null:it.id);setRiQuickIssueText("");}}>이슈</button>}
                             {canEdit&&<button className="riedit" onClick={()=>duplicateRi(it)}>복사</button>}
                             {canEdit&&<button className="riedit" onClick={()=>setRiAdd({id:it.id,cat:it.cat,sub:it.sub,title:it.title})}>수정</button>}
-                          </div>
-                          {riQuickIssueId===it.id&&(
-                            <div style={{display:"flex",gap:7,padding:"6px 16px 10px 52px"}}>
-                              <textarea className="hinput" autoFocus placeholder="이슈 입력 (Enter 추가, Shift+Enter 줄바꿈)" value={riQuickIssueText} onChange={(e)=>setRiQuickIssueText(e.target.value)}
-                                onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();if(!riQuickIssueText.trim())return;addRiIssue(it.id,riQuickIssueText);setRiQuickIssueId(null);setRiQuickIssueText("");}} />
-                              <button className="btn-save" onClick={()=>{if(!riQuickIssueText.trim())return;addRiIssue(it.id,riQuickIssueText);setRiQuickIssueId(null);setRiQuickIssueText("");}}>추가</button>
-                              <button className="btn ghost" onClick={()=>setRiQuickIssueId(null)}>취소</button>
-                            </div>
-                          )}
                           </div>
                         );
                       })}
