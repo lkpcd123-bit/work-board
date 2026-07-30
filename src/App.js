@@ -1596,6 +1596,8 @@ function Board() {
                             <div className="ckunderline" />
                           </div>
                           {isCL&&subs.length>0&&<button className="ckexp" onClick={(e)=>{e.stopPropagation();setCkExpand({...ckExpand,[c.id]:!exp});}}>{exp?"▲":"▼"}</button>}
+                          {canEdit&&<button className="riedit" onClick={(e)=>{e.stopPropagation();duplicateCk(c);}}>복사</button>}
+                          {canEdit&&<button className="riedit" onClick={(e)=>{e.stopPropagation();setCkDraft({...c,subs:c.subs?[...c.subs]:(isCL?[]:undefined)});}}>수정</button>}
                         </div>
                         {isCL&&exp&&subs.length>0&&(
                           <div className="cksubs">
