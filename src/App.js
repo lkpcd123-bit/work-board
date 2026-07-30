@@ -610,6 +610,7 @@ function Board() {
   const [mlySubHistOpen, setMlySubHistOpen] = useState({});
   const [mlySubHistText, setMlySubHistText] = useState({});
   const [mlySubHistEditId, setMlySubHistEditId] = useState(null);
+  const [mlySubsubOpen, setMlySubsubOpen] = useState({});
   const [mlyDate, setMlyDate] = useState(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;});
   const [confirmBox, setConfirmBox] = useState(null);
   const [newChannel, setNewChannel] = useState("");
@@ -988,12 +989,23 @@ function Board() {
     commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,history:(s.history||[]).map((h)=>h.id===hid?{...h,text:t,edited:true}:h)}:s),updatedAt:Date.now()}:m)}),[]);
   };
   const removeMlySubHistoryDirect=(monthlyId,subId,hid)=>{
-    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,history:(s.history||[]).filter((h)=>h.id!==hid)}:s)}:m)}),[]);
+    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,history:(s.history||[]).filter((h)=>h.id!==hid)}:s),updatedAt:Date.now()}:m)}),[]);
   };
   const addMlySubDirect=(monthlyId,text)=>{
     const t=text.trim();if(!t)return;
-    const sub={id:uid(),text:t,done:false,history:[]};
+    const sub={id:uid(),text:t,done:false,history:[],subsubs:[]};
     commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:[...(m.subs||[]),sub],updatedAt:Date.now()}:m)}),[]);
+  };
+  const addMlySubsubDirect=(monthlyId,subId,text)=>{
+    const t=text.trim();if(!t)return;
+    const item={id:uid(),text:t,done:false};
+    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,subsubs:[...(s.subsubs||[]),item]}:s),updatedAt:Date.now()}:m)}),[]);
+  };
+  const toggleMlySubsubDirect=(monthlyId,subId,subsubId)=>{
+    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,subsubs:(s.subsubs||[]).map((x)=>x.id===subsubId?{...x,done:!x.done}:x)}:s),updatedAt:Date.now()}:m)}),[]);
+  };
+  const removeMlySubsubDirect=(monthlyId,subId,subsubId)=>{
+    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,subsubs:(s.subsubs||[]).filter((x)=>x.id!==subsubId)}:s),updatedAt:Date.now()}:m)}),[]);
   };
 
   /* ── 반복업무 3단(대분류>중분류>소분류) ── */
@@ -1602,13 +1614,31 @@ function Board() {
                     <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--line)",display:"flex",flexDirection:"column",gap:6,paddingLeft:35}}>
                       {subs.map((s)=>{
                         const subOpen=!!mlySubHistOpen[s.id];
+                        const subsubOpen=!!mlySubsubOpen[s.id];
+                        const subsubs=s.subsubs||[];
                         return (
                         <div key={s.id}>
                           <div style={{display:"flex",alignItems:"center",gap:8}}>
                             <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySub(m,s.id)}>{s.done?"✓":""}</button>
                             <span style={{fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",flex:1}}>{s.text}</span>
+                            <button className="riedit" onClick={()=>setMlySubsubOpen({...mlySubsubOpen,[s.id]:!subsubOpen})}>{subsubs.length>0?`하위목록 ${subsubs.filter((x)=>x.done).length}/${subsubs.length}`:"+하위목록"}</button>
                             <button className="riedit" onClick={()=>setMlySubHistOpen({...mlySubHistOpen,[s.id]:!subOpen})}>{(s.history||[]).length>0?`히스토리 ${s.history.length}`:"+히스토리"}</button>
                           </div>
+                          {subsubOpen&&(
+                            <div style={{paddingLeft:31,marginTop:6,marginBottom:8}}>
+                              {subsubs.length===0&&<span className="hint">하위 목록이 없습니다</span>}
+                              {subsubs.map((x)=>(
+                                <div key={x.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                                  <button className={"ckbox sm"+(x.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySubsubDirect(m.id,s.id,x.id)}>{x.done?"✓":""}</button>
+                                  <span style={{fontSize:12.5,textDecoration:x.done?"line-through":"none",color:x.done?"var(--ink3)":"inherit",flex:1}}>{x.text}</span>
+                                  {canEdit&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:14}} onClick={()=>removeMlySubsubDirect(m.id,s.id,x.id)}>×</button>}
+                                </div>
+                              ))}
+                              {canEdit&&<div className="addrow">
+                                <input className="inp" placeholder="하위목록 항목 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addMlySubsubDirect(m.id,s.id,e.target.value);e.target.value="";}} />
+                              </div>}
+                            </div>
+                          )}
                           {subOpen&&(
                             <div style={{paddingLeft:31,marginTop:6,marginBottom:8}}>
                               {(s.history||[]).length===0&&<span className="hint">기록이 없습니다</span>}
@@ -2321,6 +2351,8 @@ function Board() {
               {(mlyDraft.subs||[]).length===0&&<span className="hint">하위 항목이 없습니다</span>}
               {(mlyDraft.subs||[]).map((s)=>{
                 const subOpen=!!mlySubHistOpen[s.id];
+                const subsubOpen=!!mlySubsubOpen[s.id];
+                const subsubs=s.subsubs||[];
                 return (
                 <div key={s.id}>
                   <div className="fcitem">
@@ -2330,12 +2362,27 @@ function Board() {
                           onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,editing:false}:x)});}}
                           onBlur={(e)=>{const v=e.target.value.trim();if(v)setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}} />
                       : <span style={{flex:1,fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",cursor:"pointer"}} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,editing:true}:x)})}>{s.text}</span>}
+                    <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:11}} onClick={()=>setMlySubsubOpen({...mlySubsubOpen,[s.id]:!subsubOpen})}>{subsubs.length>0?`하위목록 ${subsubs.filter((x)=>x.done).length}/${subsubs.length}`:"+하위목록"}</button>
                     <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:11}} onClick={()=>setMlySubHistOpen({...mlySubHistOpen,[s.id]:!subOpen})}>{(s.history||[]).length>0?`히스토리 ${s.history.length}`:"+히스토리"}</button>
                     <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15}} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.filter((x)=>x.id!==s.id)})}>×</button>
                   </div>
+                  {subsubOpen&&(
+                    <div style={{paddingLeft:31,marginBottom:8}}>
+                      {subsubs.length===0&&<span className="hint">하위 목록이 없습니다</span>}
+                      {subsubs.map((x)=>(
+                        <div key={x.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                          <button className={"fccheck"+(x.done?" on":"")} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((y)=>y.id===s.id?{...y,subsubs:y.subsubs.map((z)=>z.id===x.id?{...z,done:!z.done}:z)}:y)})}>{x.done?"✓":""}</button>
+                          <span style={{flex:1,fontSize:12.5,textDecoration:x.done?"line-through":"none",color:x.done?"var(--ink3)":"inherit"}}>{x.text}</span>
+                          <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:14}} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((y)=>y.id===s.id?{...y,subsubs:y.subsubs.filter((z)=>z.id!==x.id)}:y)})}>×</button>
+                        </div>
+                      ))}
+                      <div className="addrow"><input placeholder="하위목록 항목 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((y)=>y.id===s.id?{...y,subsubs:[...(y.subsubs||[]),{id:uid(),text:v,done:false}]}:y)});e.target.value="";}} /></div>
+                    </div>
+                  )}
                   {subOpen&&(
                     <div style={{paddingLeft:31,marginBottom:8}}>
                       {(s.history||[]).length===0&&<span className="hint">기록이 없습니다</span>}
+
                       {(s.history||[]).map((h)=>(
                         <div key={h.id} className="cmt">
                           <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
