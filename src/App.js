@@ -978,6 +978,23 @@ function Board() {
   const removeMlySubHistory=(subId,hid)=>{
     setMlyDraft((d)=>({...d,subs:d.subs.map((s)=>s.id===subId?{...s,history:(s.history||[]).filter((h)=>h.id!==hid)}:s)}));
   };
+  const addMlySubHistoryDirect=(monthlyId,subId,text)=>{
+    const t=text.trim();if(!t)return;
+    const entry={id:uid(),text:t,author:me||"익명",ts:Date.now()};
+    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,history:[...(s.history||[]),entry]}:s),updatedAt:Date.now()}:m)}),[]);
+  };
+  const editMlySubHistoryDirect=(monthlyId,subId,hid,text)=>{
+    const t=text.trim();if(!t)return;
+    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,history:(s.history||[]).map((h)=>h.id===hid?{...h,text:t,edited:true}:h)}:s),updatedAt:Date.now()}:m)}),[]);
+  };
+  const removeMlySubHistoryDirect=(monthlyId,subId,hid)=>{
+    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,history:(s.history||[]).filter((h)=>h.id!==hid)}:s)}:m)}),[]);
+  };
+  const addMlySubDirect=(monthlyId,text)=>{
+    const t=text.trim();if(!t)return;
+    const sub={id:uid(),text:t,done:false,history:[]};
+    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:[...(m.subs||[]),sub],updatedAt:Date.now()}:m)}),[]);
+  };
 
   /* ── 반복업무 3단(대분류>중분류>소분류) ── */
   const rItems=useMemo(()=>(data.rItems||[]).filter((x)=>!x.deleted),[data.rItems]);
@@ -1581,15 +1598,47 @@ function Board() {
                       {subs.length>0&&<div style={{fontSize:12,color:"var(--ink3)",marginTop:4,fontWeight:600}}>하위 {subDone}/{subs.length}</div>}
                     </div>
                   </div>
-                  {subs.length>0&&(
+                  {(subs.length>0||canEdit)&&(
                     <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--line)",display:"flex",flexDirection:"column",gap:6,paddingLeft:35}}>
-                      {subs.map((s)=>(
-                        <div key={s.id} style={{display:"flex",alignItems:"center",gap:8}}>
-                          <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySub(m,s.id)}>{s.done?"✓":""}</button>
-                          <span style={{fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",cursor:"pointer",flex:1}} onClick={()=>{setMlyDraft({...m,subs:[...m.subs||[]],history:[...m.history||[]]});setMlySubHistOpen({[s.id]:true});}}>{s.text}</span>
-                          {(s.history||[]).length>0&&<span style={{fontSize:11,color:"var(--pri)",fontWeight:700,cursor:"pointer"}} onClick={()=>{setMlyDraft({...m,subs:[...m.subs||[]],history:[...m.history||[]]});setMlySubHistOpen({[s.id]:true});}}>💬{s.history.length}</span>}
+                      {subs.map((s)=>{
+                        const subOpen=!!mlySubHistOpen[s.id];
+                        return (
+                        <div key={s.id}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySub(m,s.id)}>{s.done?"✓":""}</button>
+                            <span style={{fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",flex:1}}>{s.text}</span>
+                            <button className="riedit" onClick={()=>setMlySubHistOpen({...mlySubHistOpen,[s.id]:!subOpen})}>{(s.history||[]).length>0?`히스토리 ${s.history.length}`:"+히스토리"}</button>
+                          </div>
+                          {subOpen&&(
+                            <div style={{paddingLeft:31,marginTop:6,marginBottom:8}}>
+                              {(s.history||[]).length===0&&<span className="hint">기록이 없습니다</span>}
+                              {(s.history||[]).map((h)=>(
+                                <div key={h.id} className="cmt">
+                                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                                  {mlySubHistEditId===h.id
+                                    ? <textarea className="hinput" defaultValue={h.text} autoFocus style={{width:"100%",marginTop:4}}
+                                        onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editMlySubHistoryDirect(m.id,s.id,h.id,e.target.value);setMlySubHistEditId(null);}}
+                                        onBlur={(e)=>{editMlySubHistoryDirect(m.id,s.id,h.id,e.target.value);setMlySubHistEditId(null);}} />
+                                    : <p>{h.text}</p>}
+                                  {canEdit&&mlySubHistEditId!==h.id&&<div style={{display:"flex",gap:10}}>
+                                    <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setMlySubHistEditId(h.id)}>수정</button>
+                                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeMlySubHistoryDirect(m.id,s.id,h.id)}>삭제</button>
+                                  </div>}
+                                </div>
+                              ))}
+                              {canEdit&&<div className="addrow">
+                                <textarea className="hinput" placeholder="히스토리 입력 (Enter 추가, Shift+Enter 줄바꿈)"
+                                  value={mlySubHistText[s.id]||""} onChange={(e)=>setMlySubHistText({...mlySubHistText,[s.id]:e.target.value})}
+                                  onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addMlySubHistoryDirect(m.id,s.id,mlySubHistText[s.id]||"");setMlySubHistText({...mlySubHistText,[s.id]:""});}} />
+                              </div>}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
+                      {canEdit&&<div className="addrow" style={{marginTop:4}}>
+                        <input className="inp" placeholder="하위 항목 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addMlySubDirect(m.id,e.target.value);e.target.value="";}} />
+                      </div>}
                     </div>
                   )}
                 </div>
