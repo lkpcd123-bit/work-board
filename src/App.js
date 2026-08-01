@@ -915,13 +915,13 @@ function Board() {
       let calls = result.response.functionCalls();
       let guard = 0;
       while (calls && calls.length > 0 && guard < 5) {
-        const responses = calls.map((c) => ({
+        const parts = calls.map((c) => ({
           functionResponse: {
             name: c.name,
             response: { output: JSON.stringify(runAiFunction(c.name, c.args || {})) },
           },
         }));
-        result = await chat.sendMessage(responses);
+        result = await chat.sendMessage([{ role: "user", parts }]);
         calls = result.response.functionCalls();
         guard++;
       }
