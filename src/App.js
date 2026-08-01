@@ -904,7 +904,7 @@ function Board() {
       if (!aiChatRef.current) {
         const ai = getAI(fbApp, { backend: new GoogleAIBackend() });
         const model = getGenerativeModel(ai, {
-          model: "gemini-3.6-flash",
+          model: "gemini-3.5-flash-lite",
           tools: aiTools,
           systemInstruction: "당신은 ShakeBaby 팀의 업무보드 AI 비서입니다. 제공된 함수로 실제 업무·반복업무·체크리스트·이슈 데이터를 조회해서, 한국어로 간결하고 정확하게 답하세요. 특정 업무 하나의 메모·진행 상황·히스토리·세부 단계처럼 구체적인 내용을 물어보면 getTaskDetail 함수를 사용해 그 업무의 전체 상세를 확인한 뒤 답하세요. 데이터를 수정하거나 만들 수는 없고 오직 조회만 가능합니다. 숫자와 이름은 함수 결과에 있는 그대로 사용하고 추측하지 마세요.",
         });
