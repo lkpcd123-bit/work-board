@@ -21,63 +21,63 @@ initializeAppCheck(fbApp, {
   isTokenAutoRefreshEnabled: true,
 });
 
-/* ?�?� AI 비서: Gemini ?�수 ?�언 (조회 ?�용) ?�?� */
+/* ── AI 비서: Gemini 함수 선언 (조회 전용) ── */
 const aiTools = [{
   functionDeclarations: [
     {
       name: "searchTasks",
-      description: "?�무 보드???�무 목록??조건?�로 검?�합?�다. 마감?? ?�당?? 채널, ?�태�?찾을 ???�용?�니??",
+      description: "업무 보드의 업무 목록을 조건으로 검색합니다. 마감일, 담당자, 채널, 상태로 찾을 때 사용합니다.",
       parameters: Schema.object({
         properties: {
-          status: Schema.string({ description: "?�태 ?�터: todo, doing, review, issuecol, done �??�나. ?�략?�면 ?�체." }),
-          owner: Schema.string({ description: "?�당???�름. ?�략?�면 ?�체 ?�당??" }),
-          channel: Schema.string({ description: "채널�? ?�략?�면 ?�체 채널." }),
-          board: Schema.string({ description: "보드 ?�름: 공용, 김?��? �??�나. ?�략?�면 ?�체 보드." }),
-          onlyOverdue: Schema.boolean({ description: "true�?마감??지???�무�?" }),
-          onlyToday: Schema.boolean({ description: "true�??�늘 마감???�무�?" }),
+          status: Schema.string({ description: "상태 필터: todo, doing, review, issuecol, done 중 하나. 생략하면 전체." }),
+          owner: Schema.string({ description: "담당자 이름. 생략하면 전체 담당자." }),
+          channel: Schema.string({ description: "채널명. 생략하면 전체 채널." }),
+          board: Schema.string({ description: "보드 이름: 공용, 김현민 중 하나. 생략하면 전체 보드." }),
+          onlyOverdue: Schema.boolean({ description: "true면 마감이 지난 업무만." }),
+          onlyToday: Schema.boolean({ description: "true면 오늘 마감인 업무만." }),
         },
         optionalProperties: ["status", "owner", "channel", "board", "onlyOverdue", "onlyToday"],
       }),
     },
     {
       name: "searchRoutines",
-      description: "반복 ?�무 목록�??�늘 체크 ?��?, ?�속 기록??조회?�니??",
+      description: "반복 업무 목록과 오늘 체크 여부, 연속 기록을 조회합니다.",
       parameters: Schema.object({
         properties: {
-          owner: Schema.string({ description: "?�당???�름. ?�략?�면 ?�체." }),
-          onlyUnchecked: Schema.boolean({ description: "true�??�늘 ?�직 체크 ????반복?�무�?" }),
+          owner: Schema.string({ description: "담당자 이름. 생략하면 전체." }),
+          onlyUnchecked: Schema.boolean({ description: "true면 오늘 아직 체크 안 한 반복업무만." }),
         },
         optionalProperties: ["owner", "onlyUnchecked"],
       }),
     },
     {
       name: "searchCheckitems",
-      description: "체크리스??체크리스???�사 ?�복/?�품 ?�복) ??��??조회?�니??",
+      description: "체크리스트(체크리스트/행사 원복/상품 원복) 항목을 조회합니다.",
       parameters: Schema.object({
         properties: {
-          tab: Schema.string({ description: "checklist, event, product �??�나. ?�략?�면 ?�체 ??" }),
-          onlyPending: Schema.boolean({ description: "true�??�직 ?�료 ??????���?" }),
-          onlyOverdue: Schema.boolean({ description: "true�?마감(종료????지??미완�???���?" }),
+          tab: Schema.string({ description: "checklist, event, product 중 하나. 생략하면 전체 탭." }),
+          onlyPending: Schema.boolean({ description: "true면 아직 완료 안 한 항목만." }),
+          onlyOverdue: Schema.boolean({ description: "true면 마감(종료일)이 지난 미완료 항목만." }),
         },
         optionalProperties: ["tab", "onlyPending", "onlyOverdue"],
       }),
     },
     {
       name: "searchIssues",
-      description: "?�무·반복?�무???�록???�슈�?조회?�니??",
+      description: "업무·반복업무에 등록된 이슈를 조회합니다.",
       parameters: Schema.object({
         properties: {
-          onlyUnresolved: Schema.boolean({ description: "true�?미해�??�슈�?" }),
+          onlyUnresolved: Schema.boolean({ description: "true면 미해결 이슈만." }),
         },
         optionalProperties: ["onlyUnresolved"],
       }),
     },
     {
       name: "getTaskDetail",
-      description: "?�정 ?�무 ?�나�??�목 ?�워?�로 찾아 메모, ?�스?�리(진행 기록 ?�체), ?��? ?�계(체크리스??, ?�슈까�? ?�세 ?�보�??��? 조회?�니?? ?�무??진행 ?�황·?�용·?�락 결과 ??구체?�인 질문?�는 ???�수�??�용?�세??",
+      description: "특정 업무 하나를 제목 키워드로 찾아 메모, 히스토리(진행 기록 전체), 세부 단계(체크리스트), 이슈까지 상세 정보를 전부 조회합니다. 업무의 진행 상황·내용·연락 결과 등 구체적인 질문에는 이 함수를 사용하세요.",
       parameters: Schema.object({
         properties: {
-          titleKeyword: Schema.string({ description: "찾을 ?�무 ?�목???�함???�워?? ?? '?�니?�식?? ?�는 '?�레?�션 ??" }),
+          titleKeyword: Schema.string({ description: "찾을 업무 제목에 포함된 키워드. 예: '웰니스식품' 또는 '큐레이션 샵'" }),
         },
         optionalProperties: [],
       }),
@@ -89,26 +89,26 @@ const ME_KEY = "wb-me";
 const LOG_CAP = 400;
 
 const COLUMNS = [
-  { id: "todo", label: "?��? },
-  { id: "doing", label: "진행�? },
-  { id: "review", label: "검?�·컨?? },
-  { id: "issuecol", label: "?�슈" },
-  { id: "done", label: "?�료" },
+  { id: "todo", label: "대기" },
+  { id: "doing", label: "진행중" },
+  { id: "review", label: "검토·컨펌" },
+  { id: "issuecol", label: "이슈" },
+  { id: "done", label: "완료" },
 ];
-const BOARDS = ["공용","김?��?"];
-const CKTABS = [{id:"checklist",label:"체크리스??},{id:"event",label:"?�사 ?�복"},{id:"product",label:"?�품 ?�복"}];
+const BOARDS = ["공용","김현민"];
+const CKTABS = [{id:"checklist",label:"체크리스트"},{id:"event",label:"행사 원복"},{id:"product",label:"상품 원복"}];
 const DEFAULT_CHANNELS = [
   { id: "공통", color: "#7A8189" },
-  { id: "?�사�?, color: "#3355C9" },
+  { id: "자사몰", color: "#3355C9" },
   { id: "쿠팡", color: "#D14A4A" },
-  { id: "?�이버쇼??, color: "#2E9E5B" },
-  { id: "?�리브영", color: "#87A82B" },
+  { id: "네이버쇼핑", color: "#2E9E5B" },
+  { id: "올리브영", color: "#87A82B" },
   { id: "마켓컬리", color: "#6B3FA0" },
-  { id: "11번�?", color: "#DE7A1C" },
+  { id: "11번가", color: "#DE7A1C" },
 ];
-const TYPES = ["?�품기획","채널?�영","마�???,"?�세?�이지","공급??,"?�플루언??,"?�이?�분??,"기�?"];
-const PRIORITIES = [{ id:"high",label:"?�음",rank:0 },{ id:"mid",label:"보통",rank:1 },{ id:"low",label:"??��",rank:2 }];
-const REPEATS = [{ id:"none",label:"반복 ?�음" },{ id:"daily",label:"매일" },{ id:"weekly",label:"매주" },{ id:"biweekly",label:"격주" },{ id:"monthly",label:"매월" }];
+const TYPES = ["상품기획","채널운영","마케팅","상세페이지","공급사","인플루언서","데이터분석","기타"];
+const PRIORITIES = [{ id:"high",label:"높음",rank:0 },{ id:"mid",label:"보통",rank:1 },{ id:"low",label:"낮음",rank:2 }];
+const REPEATS = [{ id:"none",label:"반복 없음" },{ id:"daily",label:"매일" },{ id:"weekly",label:"매주" },{ id:"biweekly",label:"격주" },{ id:"monthly",label:"매월" }];
 const ROLES = [{ id:"admin",label:"관리자" },{ id:"member",label:"멤버" },{ id:"viewer",label:"뷰어" }];
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -118,7 +118,7 @@ const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); r
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
 const addDays=(ds,n)=>{const d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
 const streakOf=(ck,from)=>{let n=0,cur=from;while(ck&&ck[cur]){n++;cur=addDays(cur,-1);}return n;};
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["?�전","?�후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -131,7 +131,7 @@ function mergeData(r,l) {
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
   return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
-    routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["?�전","?�후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
+    routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
     colLabels:((l.colLabelsUpdatedAt||0)>=(r.colLabelsUpdatedAt||0)?l.colLabels:r.colLabels)||{},colLabelsUpdatedAt:Math.max(l.colLabelsUpdatedAt||0,r.colLabelsUpdatedAt||0),
     log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
 }
@@ -161,7 +161,7 @@ const CSS = `
 .spacer{flex:1;}
 .wb ::selection{background:#B3D4FF;}
 
-/* ?�?� ?�단 �??�?� */
+/* ── 상단 바 ── */
 .topbar{background:#fff;border-bottom:1px solid #DFE1E6;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
 .brand{font-size:19px;font-weight:800;color:var(--ink);letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
 .brand .logo{width:26px;height:26px;border-radius:6px;background:#fff;color:#6E5AE6;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;}
@@ -175,7 +175,7 @@ const CSS = `
 .ghostw{background:#EBECF0;color:var(--ink2);padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;}
 .ghostw:hover{background:#DFE1E6;}
 
-/* ?�?� ???�?� */
+/* ── 탭 ── */
 .tabs{display:flex;gap:4px;padding:12px 20px 0;flex-wrap:wrap;}
 .tab{padding:8px 16px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;color:var(--ink3);}
 .tab:hover{background:#DFE1E6;color:var(--ink);}
@@ -185,7 +185,7 @@ const CSS = `
 
 .page{background:#F7F8F9;border-radius:0 12px 12px 12px;margin:0 16px;padding:18px;min-height:60vh;}
 
-/* ?�?� 지???�?� */
+/* ── 지표 ── */
 .metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;}
 .metric{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px;text-align:left;}
 .metric.cl:hover{box-shadow:var(--sh2);transform:translateY(-1px);}
@@ -199,7 +199,7 @@ const CSS = `
 .leg{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink2);font-weight:500;}
 .leg b{width:9px;height:9px;border-radius:3px;}
 
-/* ?�?� ?�바 ?�?� */
+/* ── 툴바 ── */
 .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-bottom:14px;margin-bottom:16px;border-bottom:2px solid var(--line);}
 .inp,.sel{background:var(--card);border:1px solid var(--line2);color:var(--ink);padding:7px 11px;font-size:14px;border-radius:6px;}
 .inp:focus,.sel:focus{outline:2px solid var(--pri);outline-offset:-1px;border-color:var(--pri);}
@@ -217,7 +217,7 @@ const CSS = `
 .btn.ghost:hover{background:#DFE1E6;}
 .btn.warn{background:var(--danger);}
 
-/* ?�?� 보드 ?�?� */
+/* ── 보드 ── */
 .board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;align-items:start;}
 .colwrap{background:var(--col);border-radius:12px;padding:10px;}
 .colhead{display:flex;align-items:center;justify-content:space-between;padding:2px 6px 10px;}
@@ -226,7 +226,7 @@ const CSS = `
 .colbody{display:flex;flex-direction:column;gap:8px;min-height:60px;}
 .colbody.over{background:#D0D4DB;border-radius:8px;outline:2px dashed var(--pri);}
 
-/* ?�?� 카드 ?�?� */
+/* ── 카드 ── */
 .card{position:relative;background:var(--card);border-radius:8px;box-shadow:var(--sh);padding:9px 11px 10px;cursor:pointer;}
 .card:hover{box-shadow:var(--sh2);}
 .card.late{box-shadow:0 0 0 2px #FF8F73,var(--sh);}
@@ -254,7 +254,7 @@ const CSS = `
 .addbtn{width:100%;background:transparent;color:var(--ink2);padding:8px;font-size:13.5px;font-weight:600;border-radius:6px;text-align:left;}
 .addbtn:hover{background:#DFE1E6;}
 
-/* ?�?� ???�?� */
+/* ── 표 ── */
 .tbl{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border-radius:var(--r);box-shadow:var(--sh);font-size:14px;overflow:hidden;}
 .tbl th{font-size:12px;font-weight:700;color:var(--ink3);text-align:left;padding:11px 14px;background:#F1F2F4;border-bottom:1px solid var(--line);white-space:nowrap;}
 .tbl td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle;}
@@ -264,19 +264,19 @@ const CSS = `
 .chdot{display:inline-flex;align-items:center;gap:7px;}
 .chdot b{width:10px;height:10px;border-radius:3px;}
 
-/* ?�?� ?�력 ?�?� */
+/* ── 이력 ── */
 .logrow{display:grid;grid-template-columns:130px 90px 1fr;gap:12px;padding:11px 14px;background:var(--card);border-bottom:1px solid var(--line);font-size:14px;align-items:baseline;}
 .logrow:first-of-type{border-radius:var(--r) var(--r) 0 0;}
 .logrow .t{font-size:12px;color:var(--ink3);font-weight:500;}
 .logrow .w{font-size:12.5px;color:var(--ink2);font-weight:700;}
 
-/* ?�?� ?�널 ?�?� */
+/* ── 패널 ── */
 .panel{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:20px;margin-bottom:14px;}
 .panel h3{font-size:16px;font-weight:800;margin-bottom:5px;letter-spacing:-.01em;}
 .sub{font-size:13px;color:var(--ink3);line-height:1.65;margin-bottom:16px;}
 .mrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}
 
-/* ?�?� 모달 ?�?� */
+/* ── 모달 ── */
 .mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:center;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:50;}
 .modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:0;display:flex;flex-direction:column;max-height:90vh;}
 .modal h2{font-size:19px;font-weight:800;margin:0;padding:24px 28px 18px;border-bottom:1px solid var(--line);letter-spacing:-.02em;}
@@ -318,7 +318,7 @@ const CSS = `
 .cmt p{font-size:14px;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
 .hint{font-size:13px;color:var(--ink3);}
 
-/* ?�?� 진행�??�?� */
+/* ── 진행률 ── */
 .prow{display:flex;align-items:center;gap:8px;}
 .ppct{font-size:18px;font-weight:800;color:var(--ok);min-width:44px;letter-spacing:-.02em;text-align:right;}
 .prange{flex:1;-webkit-appearance:none;appearance:none;width:100%;height:6px;background:transparent;outline:none;padding:0;margin:0;box-sizing:border-box;display:block;}
@@ -331,7 +331,7 @@ const CSS = `
 .pbadge{font-size:12.5px;font-weight:700;border-radius:20px;padding:5px 12px;background:#EBECF0;color:var(--ink2);white-space:nowrap;}
 .pticks{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink3);margin-top:5px;padding-left:58px;font-weight:600;}
 
-/* ?�?� 반복 ?�무 ?�?� */
+/* ── 반복 업무 ── */
 .rwrap{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start;}
 .wkstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;}
 .wkday{background:var(--card);border:2px solid var(--line);border-radius:10px;padding:9px 2px 11px;display:flex;flex-direction:column;align-items:center;gap:5px;}
@@ -381,7 +381,7 @@ const CSS = `
 .issmeta{font-size:12px;color:var(--ink3);margin-top:4px;font-weight:500;}
 .note{margin-top:28px;font-size:12.5px;color:var(--ink3);line-height:1.75;border-top:1px solid var(--line);padding-top:14px;}
 
-/* ?�?� 채널 ?�리 ?�?� */
+/* ── 채널 트리 ── */
 .chnode{border-top:1px solid var(--line);padding-top:6px;margin-top:6px;}
 .chsub{padding-left:26px;}
 .chsub .mrow{border-top:none;padding:6px 0;}
@@ -389,7 +389,7 @@ const CSS = `
 
 @media(max-width:1100px){.board{grid-template-columns:repeat(3,minmax(0,1fr));}.metrics{grid-template-columns:repeat(3,1fr);}.rwrap{grid-template-columns:1fr;}.rside{position:static;}}
 @media(max-width:680px){.board{grid-template-columns:1fr;}.metrics{grid-template-columns:repeat(2,1fr);}.r3{grid-template-columns:1fr;}.page{margin:0 8px;padding:12px;}}
-/* ?�═ Monday ?��????�이�??�═ */
+/* ══ Monday 스타일 테이블 ══ */
 .mdtoolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:14px;margin-bottom:8px;border-bottom:1px solid var(--line);}
 .mdsep{width:1px;height:22px;background:var(--line);margin:0 4px;}
 .mdlbl{font-size:13px;color:var(--ink3);font-weight:600;}
@@ -436,7 +436,7 @@ const CSS = `
 .mdstack i{display:block;height:100%;}
 .mdrange{font-size:12px;color:var(--ink2);font-weight:600;background:#E6E9EF;border-radius:12px;padding:3px 10px;display:inline-block;}
 
-/* ?�═ ?�규 기능 CSS ?�═ */
+/* ══ 신규 기능 CSS ══ */
 .boardtabs{display:flex;gap:6px;margin-bottom:14px;}
 .boardtab{background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;color:var(--ink2);display:inline-flex;align-items:center;gap:7px;}
 .boardtab:hover{border-color:var(--pri);}
@@ -459,7 +459,7 @@ const CSS = `
 .fccheck:disabled{opacity:.4;}
 
 
-/* ?�═ 체크리스?????�═ */
+/* ══ 체크리스트 탭 ══ */
 .ckcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start;}
 .ckcol{background:#EBECF0;border-radius:12px;padding:12px;}
 .ckcolhead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 4px 12px;min-height:44px;}
@@ -495,7 +495,7 @@ const CSS = `
 .cksub{display:flex;align-items:center;gap:8px;font-size:13px;}
 @media(max-width:1100px){.ckcols{grid-template-columns:1fr;}}
 
-/* ?�═ AI 비서 ?�═ */
+/* ══ AI 비서 ══ */
 .aiwrap{max-width:720px;margin:0 auto;}
 .aichat{background:var(--card);border-radius:12px;box-shadow:var(--sh);padding:20px;min-height:360px;max-height:520px;overflow-y:auto;margin-bottom:12px;}
 .aiempty{text-align:center;padding:30px 10px;color:var(--ink3);}
@@ -514,7 +514,7 @@ const CSS = `
 .aiinput input{flex:1;background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:11px 14px;font-size:14.5px;}
 .aiinput input:focus{outline:2px solid var(--pri);outline-offset:-1px;}
 
-/* ?�═ 반복?�무 3??구조 ?�═ */
+/* ══ 반복업무 3단 구조 ══ */
 .ritop{background:var(--card);border-radius:10px;box-shadow:var(--sh);margin-bottom:12px;overflow:hidden;}
 .rihead{display:flex;align-items:center;gap:9px;padding:13px 16px;cursor:pointer;background:#F5F6F5;}
 .rihead:hover{background:#EFF1EE;}
@@ -535,7 +535,7 @@ const CSS = `
 .riedit{background:#EBECF0;border:none;color:var(--ink2);font-size:11.5px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:6px;}
 .riedit:hover{background:#DFE1E6;}
 
-/* ?�═ 메모 ?�═ */
+/* ══ 메모 ══ */
 .memocard{background:var(--card);border-radius:10px;box-shadow:var(--sh);padding:13px 16px;}
 .memocard[draggable=true]{cursor:grab;}
 .memocard.dragging{opacity:.4;cursor:grabbing;}
@@ -558,9 +558,9 @@ function Board() {
   const [saveState, setSaveState] = useState("idle");
   const [view, setView] = useState("board");
   const [q, setQ] = useState("");
-  const [fCh, setFCh] = useState("?�체");
-  const [fOwner, setFOwner] = useState("?�체");
-  const [fTag, setFTag] = useState("?�체");
+  const [fCh, setFCh] = useState("전체");
+  const [fOwner, setFOwner] = useState("전체");
+  const [fTag, setFTag] = useState("전체");
   const [onlyMine, setOnlyMine] = useState(false);
   const [onlyLate, setOnlyLate] = useState(false);
   const [sortBy, setSortBy] = useState("due");
@@ -596,7 +596,7 @@ function Board() {
   const [riQuickIssueId, setRiQuickIssueId] = useState(null);
   const [riQuickIssueText, setRiQuickIssueText] = useState("");
   const [memoQuery, setMemoQuery] = useState("");
-  const [memoCatFilter, setMemoCatFilter] = useState("?�체");
+  const [memoCatFilter, setMemoCatFilter] = useState("전체");
   const [memoDraft, setMemoDraft] = useState(null);
   const [memoExpand, setMemoExpand] = useState({});
   const [memoDrag, setMemoDrag] = useState(null);
@@ -662,7 +662,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["?�전","?�후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -670,7 +670,7 @@ function Board() {
     } catch(e){setSaveState("error");} finally{busyRef.current=false;}
   }, []);
 
-  const mkLog=(action,task,detail)=>({id:uid(),ts:Date.now(),who:me||"?�명",taskId:task?.id||null,taskTitle:task?.title||"",action,detail:detail||""});
+  const mkLog=(action,task,detail)=>({id:uid(),ts:Date.now(),who:me||"익명",taskId:task?.id||null,taskTitle:task?.title||"",action,detail:detail||""});
 
   const live=useMemo(()=>data.tasks.filter((t)=>!t.deleted&&!t.archived&&(t.boardId||"공용")===curBoard),[data.tasks,curBoard]);
   const archived=useMemo(()=>data.tasks.filter((t)=>!t.deleted&&t.archived&&(t.boardId||"공용")===curBoard),[data.tasks,curBoard]);
@@ -685,9 +685,9 @@ function Board() {
   const applyFilters=useCallback((list)=>{
     const kw=q.trim().toLowerCase();
     return list.filter((t)=>{
-      if(fCh!=="?�체"&&!inChannel(t.channel,fCh))return false;
-      if(fOwner!=="?�체"&&t.owner!==fOwner)return false;
-      if(fTag!=="?�체"&&!(t.tags||[]).includes(fTag))return false;
+      if(fCh!=="전체"&&!inChannel(t.channel,fCh))return false;
+      if(fOwner!=="전체"&&t.owner!==fOwner)return false;
+      if(fTag!=="전체"&&!(t.tags||[]).includes(fTag))return false;
       if(onlyMine&&t.owner!==me)return false;
       if(onlyLate){const d=dayDiff(t.due);if(!(d!==null&&d<0&&t.status!=="done"))return false;}
       if(dateFrom&&(!t.due||t.due<dateFrom))return false;
@@ -701,27 +701,27 @@ function Board() {
   const visible=useMemo(()=>applyFilters(live).slice().sort(sortFn),[live,applyFilters,sortFn]);
   const stats=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return{total:live.length,doing:live.filter((t)=>t.status==="doing").length,tomorrow:o.filter((t)=>dayDiff(t.due)===1).length,late:o.filter((t)=>{const d=dayDiff(t.due);return d!==null&&d<0;}).length,open:o.length};},[live]);
 
-  const saveMe=async(name)=>{const n=name.trim();if(!n)return;setMe(n);setAskName(false);try{localStorage.setItem(ME_KEY,n);}catch(e){}if(!dataRef.current.members.find((m)=>m.name===n)){const role=dataRef.current.members.length===0?"admin":"member";commit((d)=>({...d,members:[...d.members,{name:n,role,updatedAt:Date.now()}]}),[{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:"?� ?�류",detail:ROLES.find((r)=>r.id===role).label}]);}};
+  const saveMe=async(name)=>{const n=name.trim();if(!n)return;setMe(n);setAskName(false);try{localStorage.setItem(ME_KEY,n);}catch(e){}if(!dataRef.current.members.find((m)=>m.name===n)){const role=dataRef.current.members.length===0?"admin":"member";commit((d)=>({...d,members:[...d.members,{name:n,role,updatedAt:Date.now()}]}),[{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:"팀 합류",detail:ROLES.find((r)=>r.id===role).label}]);}};
 
   const doLogin=()=>{
-    const n=nameInput.trim();if(!n){alert("?�름???�력?�세??");return;}
+    const n=nameInput.trim();if(!n){alert("이름을 입력하세요.");return;}
     const mem=dataRef.current.members.find((m)=>m.name===n);
-    if(!mem){alert("?�록?��? ?��? ?�름?�니?? ?�규 ?�록???�러 계정??만드?�요.");return;}
-    if(mem.pw&&mem.pw!==loginPw){alert("비�?번호가 ?�?�습?�다.");setLoginPw("");return;}
-    if(!mem.pw){alert("비�?번호가 ?�정?��? ?��? 계정?�니?? ?�규 ?�록?�서 비�?번호�?먼�? ?�정?�세??");return;}
+    if(!mem){alert("등록되지 않은 이름입니다. 신규 등록을 눌러 계정을 만드세요.");return;}
+    if(mem.pw&&mem.pw!==loginPw){alert("비밀번호가 틀렸습니다.");setLoginPw("");return;}
+    if(!mem.pw){alert("비밀번호가 설정되지 않은 계정입니다. 신규 등록에서 비밀번호를 먼저 설정하세요.");return;}
     setMe(n);try{localStorage.setItem(ME_KEY,n);}catch(e){}
     setLoginPw("");setNameInput("");
   };
   const doSignup=()=>{
-    const n=nameInput.trim();if(!n){alert("?�름???�력?�세??");return;}
-    if(loginPw.length<4){alert("비�?번호??4???�상?�로 ?�정?�세??");return;}
-    if(loginPw!==signupPw2){alert("비�?번호가 ?�치?��? ?�습?�다.");return;}
+    const n=nameInput.trim();if(!n){alert("이름을 입력하세요.");return;}
+    if(loginPw.length<4){alert("비밀번호는 4자 이상으로 설정하세요.");return;}
+    if(loginPw!==signupPw2){alert("비밀번호가 일치하지 않습니다.");return;}
     const exist=dataRef.current.members.find((m)=>m.name===n);
-    if(exist&&exist.pw){alert("?��? 비�?번호가 ?�정???�름?�니?? 로그?�을 ?�용?�세??");return;}
+    if(exist&&exist.pw){alert("이미 비밀번호가 설정된 이름입니다. 로그인을 사용하세요.");return;}
     const role=dataRef.current.members.length===0?"admin":(exist?exist.role:"member");
     commit((d)=>{const list=d.members||[];const ex=list.find((m)=>m.name===n);
       return{...d,members:ex?list.map((m)=>m.name===n?{...m,pw:loginPw,updatedAt:Date.now()}:m):[...list,{name:n,role,pw:loginPw,updatedAt:Date.now()}]};},
-      [{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:exist?"비�?번호 ?�정":"계정 ?�성",detail:ROLES.find((r)=>r.id===role).label}]);
+      [{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:exist?"비밀번호 설정":"계정 생성",detail:ROLES.find((r)=>r.id===role).label}]);
     setMe(n);try{localStorage.setItem(ME_KEY,n);}catch(e){}
     setLoginPw("");setSignupPw2("");setNameInput("");setSignupMode(false);
   };
@@ -731,13 +731,13 @@ function Board() {
     const {cur,next,next2}=pwChange;
     const mem=dataRef.current.members.find((m)=>m.name===me);
     if(!mem){setPwChange(null);return;}
-    if(mem.pw&&mem.pw!==cur){alert("?�재 비�?번호가 ?�?�습?�다.");return;}
-    if(next.length<4){alert("??비�?번호??4???�상?�로 ?�정?�세??");return;}
-    if(next!==next2){alert("??비�?번호가 ?�치?��? ?�습?�다.");return;}
-    commit((d)=>({...d,members:d.members.map((m)=>m.name===me?{...m,pw:next,updatedAt:Date.now()}:m)}),[{id:uid(),ts:Date.now(),who:me,taskId:null,taskTitle:"",action:"비�?번호 변�?,detail:""}]);
-    setPwChange(null);alert("비�?번호가 변경되?�습?�다.");
+    if(mem.pw&&mem.pw!==cur){alert("현재 비밀번호가 틀렸습니다.");return;}
+    if(next.length<4){alert("새 비밀번호는 4자 이상으로 설정하세요.");return;}
+    if(next!==next2){alert("새 비밀번호가 일치하지 않습니다.");return;}
+    commit((d)=>({...d,members:d.members.map((m)=>m.name===me?{...m,pw:next,updatedAt:Date.now()}:m)}),[{id:uid(),ts:Date.now(),who:me,taskId:null,taskTitle:"",action:"비밀번호 변경",detail:""}]);
+    setPwChange(null);alert("비밀번호가 변경되었습니다.");
   };
-  const openNew=(status)=>setDraft({_new:true,id:uid(),boardId:curBoard,title:"",channel:data.channels[0]?.id||"공통",brand:"",type:"채널?�영",owner:me,start:"",due:"",priority:"mid",memo:"",progress:0,status:status||"todo",tags:[],checklist:[],links:[],comments:[],issues:[],repeat:"none",archived:false,deleted:false});
+  const openNew=(status)=>setDraft({_new:true,id:uid(),boardId:curBoard,title:"",channel:data.channels[0]?.id||"공통",brand:"",type:"채널운영",owner:me,start:"",due:"",priority:"mid",memo:"",progress:0,status:status||"todo",tags:[],checklist:[],links:[],comments:[],issues:[],repeat:"none",archived:false,deleted:false});
   const openTask=(t)=>setDraft({...t,boardId:t.boardId||"공용",brand:t.brand||"",start:t.start||"",tags:[...(t.tags||[])],checklist:[...(t.checklist||[])],links:[...(t.links||[])],comments:[...(t.comments||[])],issues:[...(t.issues||[])]});
 
   const duplicateTask=(t)=>{
@@ -747,7 +747,7 @@ function Board() {
       links:(t.links||[]).map((l)=>({...l,id:uid()})),
       createdAt:now,createdBy:me,updatedAt:now,doneAt:null,archived:false,deleted:false};
     delete copy._new;
-    commit((d)=>({...d,tasks:[copy,...d.tasks]}),[mkLog("?�무 복사",copy,`?�본: ${t.title}`)]);
+    commit((d)=>({...d,tasks:[copy,...d.tasks]}),[mkLog("업무 복사",copy,`원본: ${t.title}`)]);
     setDraft(null);
   };
 
@@ -755,34 +755,34 @@ function Board() {
     if(!draft.title.trim())return;
     const now=Date.now(),isNew=draft._new,clean={...draft};delete clean._new;
     const before=data.tasks.find((t)=>t.id===draft.id),logs=[];
-    if(isNew)logs.push(mkLog("?�무 ?�성",clean,`${clean.channel} · ${clean.type}`));
-    else{const diffs=[];if(before){if(before.title!==clean.title)diffs.push("?�무�?);if(before.status!==clean.status)diffs.push(`?�태 -> ${cols.find((c)=>c.id===clean.status)?.label}`);if(before.owner!==clean.owner)diffs.push(`?�당??-> ${clean.owner||"미�???}`);if(before.due!==clean.due)diffs.push(`마감 -> ${clean.due||"?�음"}`);if(before.priority!==clean.priority)diffs.push("?�선?�위");if(before.channel!==clean.channel)diffs.push(`채널 -> ${clean.channel}`);if((before.comments||[]).length!==(clean.comments||[]).length)diffs.push("?��?");}logs.push(mkLog("?�무 ?�정",clean,diffs.join(", ")||"?�용 변�?));}
+    if(isNew)logs.push(mkLog("업무 생성",clean,`${clean.channel} · ${clean.type}`));
+    else{const diffs=[];if(before){if(before.title!==clean.title)diffs.push("업무명");if(before.status!==clean.status)diffs.push(`상태 -> ${cols.find((c)=>c.id===clean.status)?.label}`);if(before.owner!==clean.owner)diffs.push(`담당자 -> ${clean.owner||"미지정"}`);if(before.due!==clean.due)diffs.push(`마감 -> ${clean.due||"없음"}`);if(before.priority!==clean.priority)diffs.push("우선순위");if(before.channel!==clean.channel)diffs.push(`채널 -> ${clean.channel}`);if((before.comments||[]).length!==(clean.comments||[]).length)diffs.push("댓글");}logs.push(mkLog("업무 수정",clean,diffs.join(", ")||"내용 변경"));}
     let spawn=null;
-    if(clean.status==="done"&&before?.status!=="done"&&clean.repeat!=="none"){spawn={...clean,id:uid(),status:"todo",due:nextDue(clean.due,clean.repeat),checklist:(clean.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 ?�성",spawn,`?�음 마감 ${spawn.due}`));}
+    if(clean.status==="done"&&before?.status!=="done"&&clean.repeat!=="none"){spawn={...clean,id:uid(),status:"todo",due:nextDue(clean.due,clean.repeat),checklist:(clean.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}
     commit((d)=>{const ex=d.tasks.some((t)=>t.id===clean.id);const rec={...clean,createdAt:before?.createdAt||now,createdBy:before?.createdBy||me,updatedAt:now,updatedBy:me,doneAt:clean.status==="done"?(before?.doneAt||now):null};let tasks=ex?d.tasks.map((t)=>t.id===rec.id?rec:t):[rec,...d.tasks];if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);
     setDraft(null);
   };
 
-  const moveTask=(task,statusId)=>{if(!canEdit||task.status===statusId)return;const now=Date.now();const logs=[mkLog("?�태 변�?,task,`${cols.find((c)=>c.id===task.status)?.label} -> ${cols.find((c)=>c.id===statusId)?.label}`)];let spawn=null;if(statusId==="done"&&task.repeat&&task.repeat!=="none"){spawn={...task,id:uid(),status:"todo",due:nextDue(task.due,task.repeat),checklist:(task.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 ?�성",spawn,`?�음 마감 ${spawn.due}`));}commit((d)=>{let tasks=d.tasks.map((t)=>t.id===task.id?{...t,status:statusId,updatedAt:now,updatedBy:me,doneAt:statusId==="done"?(t.doneAt||now):null}:t);if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);if(statusId==="done"&&task.status!=="done"){setConfirmBox({kind:"archiveOne",taskId:task.id,taskTitle:task.title});}};
-  const removeTask=(task)=>{commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,deleted:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("?�무 ??��",task)]);setDraft(null);};
-  const setArchivedFlag=(task,flag)=>commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,archived:flag,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog(flag?"?�카?�브":"?�카?�브 ?�제",task)]);
-  const archiveDone=()=>{const targets=live.filter((t)=>t.status==="done");if(!targets.length){setConfirmBox(null);return;}const ids=new Set(targets.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.map((t)=>ids.has(t.id)?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("?�료 ?�괄 보�?",null,`${targets.length}�?)]);setConfirmBox(null);};
-  const purgeArchive=()=>{const ids=new Set(archived.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.filter((t)=>!ids.has(t.id))}),[mkLog("보�????�구 ??��",null,`${ids.size}�?)]);setConfirmBox(null);};
+  const moveTask=(task,statusId)=>{if(!canEdit||task.status===statusId)return;const now=Date.now();const logs=[mkLog("상태 변경",task,`${cols.find((c)=>c.id===task.status)?.label} -> ${cols.find((c)=>c.id===statusId)?.label}`)];let spawn=null;if(statusId==="done"&&task.repeat&&task.repeat!=="none"){spawn={...task,id:uid(),status:"todo",due:nextDue(task.due,task.repeat),checklist:(task.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}commit((d)=>{let tasks=d.tasks.map((t)=>t.id===task.id?{...t,status:statusId,updatedAt:now,updatedBy:me,doneAt:statusId==="done"?(t.doneAt||now):null}:t);if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);if(statusId==="done"&&task.status!=="done"){setConfirmBox({kind:"archiveOne",taskId:task.id,taskTitle:task.title});}};
+  const removeTask=(task)=>{commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,deleted:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("업무 삭제",task)]);setDraft(null);};
+  const setArchivedFlag=(task,flag)=>commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,archived:flag,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog(flag?"아카이브":"아카이브 해제",task)]);
+  const archiveDone=()=>{const targets=live.filter((t)=>t.status==="done");if(!targets.length){setConfirmBox(null);return;}const ids=new Set(targets.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.map((t)=>ids.has(t.id)?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("완료 일괄 보관",null,`${targets.length}건`)]);setConfirmBox(null);};
+  const purgeArchive=()=>{const ids=new Set(archived.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.filter((t)=>!ids.has(t.id))}),[mkLog("보관함 영구 삭제",null,`${ids.size}건`)]);setConfirmBox(null);};
   const addChannel=(parent)=>{
     if(addingRef.current)return;
     const id=(parent?newSub:newChannel).trim();
     if(!id)return;
-    if((dataRef.current.channels||[]).some((c)=>c.id===id)){alert("?��? ?�는 채널명입?�다.");return;}
+    if((dataRef.current.channels||[]).some((c)=>c.id===id)){alert("이미 있는 채널명입니다.");return;}
     addingRef.current=true;
     if(parent){setNewSub("");setSubTarget(null);}else{setNewChannel("");}
     const pc=parent?(dataRef.current.channels.find((c)=>c.id===parent)||{}).color:null;
     commit((d)=>{
       if((d.channels||[]).some((c)=>c.id===id))return d;
       return{...d,channels:[...d.channels,{id,color:pc||"#7A8189",parent:parent||null}],channelsUpdatedAt:Date.now()};
-    },[mkLog(parent?"?�위 채널 추�?":"채널 추�?",null,parent?`${parent} > ${id}`:id)]);
+    },[mkLog(parent?"하위 채널 추가":"채널 추가",null,parent?`${parent} > ${id}`:id)]);
     setTimeout(()=>{addingRef.current=false;},600);
   };
-  /* ?�?� 반복 ?�무 (구버???�이?? AI비서 조회?�으로만 ?��?) ?�?� */
+  /* ── 반복 업무 (구버전 데이터, AI비서 조회용으로만 유지) ── */
   const cols = useMemo(()=>COLUMNS.map((c)=>({...c,label:(data.colLabels||{})[c.id]||c.label})),[data.colLabels]);
   const routines = useMemo(()=>(data.routines||[]).filter((r)=>!r.deleted),[data.routines]);
 
@@ -793,11 +793,11 @@ function Board() {
   const allIssues=useMemo(()=>{
     const out=[];
     routines.forEach((r)=>(r.issues||[]).forEach((i)=>out.push({...i,routineId:r.id,routineTitle:r.title,owner:r.owner,src:"반복"})));
-    data.tasks.filter((t)=>!t.deleted&&!t.archived).forEach((t)=>(t.issues||[]).forEach((i)=>out.push({...i,taskId:t.id,routineTitle:t.title,owner:t.owner,src:"?�무"})));
+    data.tasks.filter((t)=>!t.deleted&&!t.archived).forEach((t)=>(t.issues||[]).forEach((i)=>out.push({...i,taskId:t.id,routineTitle:t.title,owner:t.owner,src:"업무"})));
     return out.sort((a,b)=>b.ts-a.ts);
   },[routines,data.tasks]);
 
-  /* ?�?� 체크리스???�?� */
+  /* ── 체크리스트 ── */
   const checkitems=useMemo(()=>(data.checkitems||[]).filter((c)=>!c.deleted),[data.checkitems]);
   const ckByTab=useCallback((tab)=>checkitems.filter((c)=>c.tab===tab).slice().sort((a,b)=>{
     if(a.done!==b.done)return a.done?1:-1;
@@ -816,27 +816,27 @@ function Board() {
     delete rec._new;
     commit((d)=>{const list=d.checkitems||[];const ex=list.some((c)=>c.id===rec.id);
       return{...d,checkitems:ex?list.map((c)=>c.id===rec.id?rec:c):[...list,rec]};},
-      [{id:uid(),ts:now,who:me||"?�명",taskId:rec.id,taskTitle:rec.title,action:isNew?"체크??�� ?�성":"체크??�� ?�정",detail:CKTABS.find((t)=>t.id===rec.tab)?.label||""}]);
+      [{id:uid(),ts:now,who:me||"익명",taskId:rec.id,taskTitle:rec.title,action:isNew?"체크항목 생성":"체크항목 수정",detail:CKTABS.find((t)=>t.id===rec.tab)?.label||""}]);
     setCkDraft(null);
   };
   const [ckDrag, setCkDrag] = useState(null);
   const [ckSubDrag, setCkSubDrag] = useState(null);
-  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"?�명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 ?�제":"체크 ?�료",detail:""}]);if(willDone)setConfirmBox({kind:"archiveCk",ckId:c.id,ckTitle:c.title});};
+  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);if(willDone)setConfirmBox({kind:"archiveCk",ckId:c.id,ckTitle:c.title});};
   const reorderCk=(tab,fromId,toId)=>{if(!canEdit||fromId===toId)return;const ordered=ckByTab(tab).filter((x)=>!x.done);const fi=ordered.findIndex((x)=>x.id===fromId);const ti=ordered.findIndex((x)=>x.id===toId);if(fi<0||ti<0)return;const arr=[...ordered];const[moved]=arr.splice(fi,1);arr.splice(ti,0,moved);const now=Date.now();commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>{const pos=arr.findIndex((a)=>a.id===x.id);return pos>=0?{...x,order:pos,updatedAt:now}:x;})}),[])};
-  const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"?�명",taskId:c.id,taskTitle:c.title,action:"체크??�� ??��",detail:""}]);setCkDraft(null);};
+  const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크항목 삭제",detail:""}]);setCkDraft(null);};
   const duplicateCk=(c)=>{
     const now=Date.now();
     const copy={...c,id:uid(),title:c.title+" (복사)",done:false,doneAt:null,order:null,
       subs:(c.subs||[]).map((s)=>({...s,id:uid(),done:false})),
       history:[],createdAt:now,updatedAt:now};
     delete copy._new;
-    commit((d)=>({...d,checkitems:[...(d.checkitems||[]),copy]}),[{id:uid(),ts:now,who:me||"?�명",taskId:copy.id,taskTitle:copy.title,action:"체크??�� 복사",detail:`?�본: ${c.title}`}]);
+    commit((d)=>({...d,checkitems:[...(d.checkitems||[]),copy]}),[{id:uid(),ts:now,who:me||"익명",taskId:copy.id,taskTitle:copy.title,action:"체크항목 복사",detail:`원본: ${c.title}`}]);
     setCkDraft(null);
   };
-  const clearCkItem=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"?�명",taskId:c.id,taskTitle:c.title,action:"체크 ?�제",detail:""}]);};
+  const clearCkItem=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크 해제",detail:""}]);};
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
 
-  /* ?�?� AI 비서 ?�?� */
+  /* ── AI 비서 ── */
   const runAiFunction = useCallback((name, args) => {
     const d = dataRef.current;
     if (name === "searchTasks") {
@@ -847,14 +847,14 @@ function Board() {
       if (args.channel) list = list.filter((t) => t.channel === args.channel);
       if (args.onlyOverdue) list = list.filter((t) => { const dd = dayDiff(t.due); return dd !== null && dd < 0 && t.status !== "done"; });
       if (args.onlyToday) list = list.filter((t) => t.due === todayStr());
-      return list.slice(0, 40).map((t) => ({ title: t.title, channel: t.channel, owner: t.owner || "미�???, status: t.status, due: t.due || null, priority: t.priority, progress: t.progress || 0, board: t.boardId || "공용" }));
+      return list.slice(0, 40).map((t) => ({ title: t.title, channel: t.channel, owner: t.owner || "미지정", status: t.status, due: t.due || null, priority: t.priority, progress: t.progress || 0, board: t.boardId || "공용" }));
     }
     if (name === "searchRoutines") {
       let list = routines;
       if (args.owner) list = list.filter((r) => r.owner === args.owner);
       const today = todayStr();
       if (args.onlyUnchecked) list = list.filter((r) => !(r.checkins || {})[today]);
-      return list.slice(0, 40).map((r) => ({ title: r.title, when: r.when, owner: r.owner || "미�???, checkedToday: !!(r.checkins || {})[today], streak: streakOf(r.checkins || {}, today) }));
+      return list.slice(0, 40).map((r) => ({ title: r.title, when: r.when, owner: r.owner || "미지정", checkedToday: !!(r.checkins || {})[today], streak: streakOf(r.checkins || {}, today) }));
     }
     if (name === "searchCheckitems") {
       let list = checkitems;
@@ -866,32 +866,32 @@ function Board() {
     if (name === "searchIssues") {
       let list = allIssues;
       if (args.onlyUnresolved) list = list.filter((i) => !i.resolved);
-      return list.slice(0, 40).map((i) => ({ text: i.text, source: i.src, related: i.routineTitle, owner: i.owner || "미�???, resolved: i.resolved }));
+      return list.slice(0, 40).map((i) => ({ text: i.text, source: i.src, related: i.routineTitle, owner: i.owner || "미지정", resolved: i.resolved }));
     }
     if (name === "getTaskDetail") {
       const kw = (args.titleKeyword || "").trim();
-      if (!kw) return { error: "titleKeyword가 ?�요?�니??" };
+      if (!kw) return { error: "titleKeyword가 필요합니다." };
       const t = d.tasks.find((x) => !x.deleted && x.title.includes(kw));
-      if (!t) return { error: `"${kw}"�??�함???�무�?찾�? 못했?�니??` };
+      if (!t) return { error: `"${kw}"를 포함한 업무를 찾지 못했습니다.` };
       return {
         title: t.title,
         board: t.boardId || "공용",
         channel: t.channel,
         brand: t.brand || null,
         type: t.type,
-        owner: t.owner || "미�???,
+        owner: t.owner || "미지정",
         status: t.status,
         due: t.due || null,
         start: t.start || null,
         priority: t.priority,
         progress: t.progress || 0,
-        memo: t.memo || "(메모 ?�음)",
+        memo: t.memo || "(메모 없음)",
         checklist: (t.checklist || []).map((c) => ({ text: c.text, done: c.done, subs: (c.subs || []).map((s) => ({ text: s.text, done: s.done })) })),
         history: (t.history || []).map((h) => ({ author: h.author, text: h.text, when: fmtTs(h.ts) })),
         issues: (t.issues || []).map((i) => ({ text: i.text, resolved: i.resolved })),
       };
     }
-    return { error: "?????�는 ?�수" };
+    return { error: "알 수 없는 함수" };
   }, [routines, checkitems, allIssues]);
 
   const sendAiMessage = async () => {
@@ -906,7 +906,7 @@ function Board() {
         const model = getGenerativeModel(ai, {
           model: "gemini-3.5-flash-lite",
           tools: aiTools,
-          systemInstruction: "?�신?� ShakeBaby ?�???�무보드 AI 비서?�니?? ?�공???�수�??�제 ?�무·반복?�무·체크리스?�·이???�이?��? 조회?�서, ?�국?�로 간결?�고 ?�확?�게 ?�하?�요. ?�정 ?�무 ?�나??메모·진행 ?�황·?�스?�리·?��? ?�계처럼 구체?�인 ?�용??물어보면 getTaskDetail ?�수�??�용??�??�무???�체 ?�세�??�인?????�하?�요. ?�이?��? ?�정?�거??만들 ?�는 ?�고 ?�직 조회�?가?�합?�다. ?�자?� ?�름?� ?�수 결과???�는 그�?�??�용?�고 추측?��? 마세??",
+          systemInstruction: "당신은 ShakeBaby 팀의 업무보드 AI 비서입니다. 제공된 함수로 실제 업무·반복업무·체크리스트·이슈 데이터를 조회해서, 한국어로 간결하고 정확하게 답하세요. 특정 업무 하나의 메모·진행 상황·히스토리·세부 단계처럼 구체적인 내용을 물어보면 getTaskDetail 함수를 사용해 그 업무의 전체 상세를 확인한 뒤 답하세요. 데이터를 수정하거나 만들 수는 없고 오직 조회만 가능합니다. 숫자와 이름은 함수 결과에 있는 그대로 사용하고 추측하지 마세요.",
         });
         aiChatRef.current = model.startChat();
       }
@@ -921,18 +921,18 @@ function Board() {
             response: { output: JSON.stringify(runAiFunction(c.name, c.args || {})) },
           },
         }));
-        result = await chat.sendMessage(parts);
+        result = await chat.sendMessage([{ role: "user", parts }]);
         calls = result.response.functionCalls();
         guard++;
       }
-      setAiMessages((m) => [...m, { role: "ai", text: result.response.text() || "?��???만들지 못했?�니??" }]);
+      setAiMessages((m) => [...m, { role: "ai", text: result.response.text() || "답변을 만들지 못했습니다." }]);
     } catch (e) {
-      setAiMessages((m) => [...m, { role: "ai", text: "?�류가 발생?�습?�다: " + (e.message || "?????�는 ?�류") }]);
+      setAiMessages((m) => [...m, { role: "ai", text: "오류가 발생했습니다: " + (e.message || "알 수 없는 오류") }]);
     }
     setAiLoading(false);
   };
 
-  /* ?�?� ?�간 체크리스???�?� */
+  /* ── 월간 체크리스트 ── */
   const monthlies=useMemo(()=>(data.monthlies||[]).filter((m)=>!m.deleted),[data.monthlies]);
   const mlyByMonth=(ym)=>monthlies.filter((m)=>m.month===ym).slice().sort((a,b)=>{if(a.done!==b.done)return a.done?1:-1;return(a.order??999)-(b.order??999);});
   const saveMly=()=>{
@@ -942,7 +942,7 @@ function Board() {
     delete rec._new;
     commit((d)=>{const list=d.monthlies||[];const ex=list.some((x)=>x.id===rec.id);
       return{...d,monthlies:ex?list.map((x)=>x.id===rec.id?rec:x):[...list,rec]};},
-      [{id:uid(),ts:now,who:me||"?�명",taskId:rec.id,taskTitle:rec.title,action:isNew?"?�간??�� ?�성":"?�간??�� ?�정",detail:rec.month}]);
+      [{id:uid(),ts:now,who:me||"익명",taskId:rec.id,taskTitle:rec.title,action:isNew?"월간항목 생성":"월간항목 수정",detail:rec.month}]);
     setMlyDraft(null);
   };
   const toggleMly=(m)=>{if(!canEdit)return;const willDone=!m.done;commit((d)=>({...d,monthlies:(d.monthlies||[]).map((x)=>x.id===m.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[]);};
@@ -956,7 +956,7 @@ function Board() {
     const copy={id:uid(),month:nextMonth,title:m.title,desc:m.desc||"",done:false,doneAt:null,
       subs:(m.subs||[]).map((s)=>({id:uid(),text:s.text,done:false,history:[]})),
       history:[],createdAt:now,updatedAt:now,createdBy:me};
-    commit((d)=>({...d,monthlies:[...(d.monthlies||[]),copy]}),[mkLog("?�간??�� 복사",null,`${copy.title} -> ${nextMonth}`)]);
+    commit((d)=>({...d,monthlies:[...(d.monthlies||[]),copy]}),[mkLog("월간항목 복사",null,`${copy.title} -> ${nextMonth}`)]);
     setMlyDraft(null);
     setMlyDate(nextMonth);
   };
@@ -969,7 +969,7 @@ function Board() {
   };
   const addMlySubHistory=(subId,text)=>{
     const t=text.trim();if(!t)return;
-    const entry={id:uid(),text:t,author:me||"?�명",ts:Date.now()};
+    const entry={id:uid(),text:t,author:me||"익명",ts:Date.now()};
     setMlyDraft((d)=>({...d,subs:d.subs.map((s)=>s.id===subId?{...s,history:[...(s.history||[]),entry]}:s)}));
   };
   const editMlySubHistory=(subId,hid,text)=>{
@@ -981,7 +981,7 @@ function Board() {
   };
   const addMlySubHistoryDirect=(monthlyId,subId,text)=>{
     const t=text.trim();if(!t)return;
-    const entry={id:uid(),text:t,author:me||"?�명",ts:Date.now()};
+    const entry={id:uid(),text:t,author:me||"익명",ts:Date.now()};
     commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,history:[...(s.history||[]),entry]}:s),updatedAt:Date.now()}:m)}),[]);
   };
   const editMlySubHistoryDirect=(monthlyId,subId,hid,text)=>{
@@ -1008,7 +1008,7 @@ function Board() {
     commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,subsubs:(s.subsubs||[]).filter((x)=>x.id!==subsubId)}:s),updatedAt:Date.now()}:m)}),[]);
   };
 
-  /* ?�?� 반복?�무 3???�분류>중분�??�분�? ?�?� */
+  /* ── 반복업무 3단(대분류>중분류>소분류) ── */
   const rItems=useMemo(()=>(data.rItems||[]).filter((x)=>!x.deleted),[data.rItems]);
   const riTree=useMemo(()=>{
     const cats=[];
@@ -1026,13 +1026,13 @@ function Board() {
   const riSubNames=useMemo(()=>(cat)=>[...new Set(rItems.filter((x)=>x.cat===cat).map((x)=>x.sub))].filter(Boolean).sort(),[rItems]);
   const saveRi=()=>{
     const {cat,sub,title}=riAdd;
-    if(!cat?.trim()||!sub?.trim()||!title?.trim()){alert("?�분류·중분류·소분류�?모두 ?�력?�세??");return;}
+    if(!cat?.trim()||!sub?.trim()||!title?.trim()){alert("대분류·중분류·소분류를 모두 입력하세요.");return;}
     const now=Date.now();
     if(riAdd.id){
-      commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===riAdd.id?{...x,cat:cat.trim(),sub:sub.trim(),title:title.trim(),updatedAt:now}:x)}),[mkLog("반복??�� ?�정",null,title)]);
+      commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===riAdd.id?{...x,cat:cat.trim(),sub:sub.trim(),title:title.trim(),updatedAt:now}:x)}),[mkLog("반복항목 수정",null,title)]);
     }else{
       const rec={id:uid(),cat:cat.trim(),sub:sub.trim(),title:title.trim(),checkins:{},createdAt:now,updatedAt:now,createdBy:me};
-      commit((d)=>({...d,rItems:[...(d.rItems||[]),rec]}),[mkLog("반복??�� 추�?",null,title)]);
+      commit((d)=>({...d,rItems:[...(d.rItems||[]),rec]}),[mkLog("반복항목 추가",null,title)]);
     }
     setRiAdd(null);
   };
@@ -1041,15 +1041,15 @@ function Board() {
     commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>{
       if(x.id!==it.id)return x;
       const ck={...(x.checkins||{})};
-      if(ck[date])delete ck[date]; else ck[date]={by:me||"?�명",ts:Date.now()};
+      if(ck[date])delete ck[date]; else ck[date]={by:me||"익명",ts:Date.now()};
       return {...x,checkins:ck,updatedAt:Date.now()};
     })}),[]);
   };
-  const removeRi=(it)=>{commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===it.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("반복??�� ??��",null,it.title)]);setRiAdd(null);};
+  const removeRi=(it)=>{commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===it.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("반복항목 삭제",null,it.title)]);setRiAdd(null);};
   const duplicateRi=(it)=>{
     const now=Date.now();
     const copy={id:uid(),cat:it.cat,sub:it.sub,title:it.title+" (복사)",checkins:{},issues:[],createdAt:now,updatedAt:now,createdBy:me};
-    commit((d)=>({...d,rItems:[...(d.rItems||[]),copy]}),[mkLog("반복??�� 복사",null,copy.title)]);
+    commit((d)=>({...d,rItems:[...(d.rItems||[]),copy]}),[mkLog("반복항목 복사",null,copy.title)]);
   };
   const reorderRi=(cat,sub,fromId,toId)=>{
     if(!canEdit||fromId===toId)return;
@@ -1081,8 +1081,8 @@ function Board() {
   },[rItems]);
   const addRiIssue=(itemId,text)=>{
     const t=text.trim();if(!t)return;
-    const iss={id:uid(),text:t,author:me||"?�명",ts:Date.now(),resolved:false,subs:[]};
-    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===itemId?{...x,issues:[iss,...(x.issues||[])],updatedAt:Date.now()}:x)}),[mkLog("반복??�� ?�슈 ?�록",null,t.slice(0,30))]);
+    const iss={id:uid(),text:t,author:me||"익명",ts:Date.now(),resolved:false,subs:[]};
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===itemId?{...x,issues:[iss,...(x.issues||[])],updatedAt:Date.now()}:x)}),[mkLog("반복항목 이슈 등록",null,t.slice(0,30))]);
   };
   const toggleRiIssue=(itemId,issueId)=>{
     commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).map((i)=>i.id===issueId?{...i,resolved:!i.resolved,resolvedBy:me}:i),updatedAt:Date.now()})}),[]);
@@ -1091,8 +1091,8 @@ function Board() {
     commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).filter((i)=>i.id!==issueId),updatedAt:Date.now()})}),[]);
   };
   const duplicateRiIssue=(itemId,issue)=>{
-    const copy={id:uid(),text:issue.text+" (복사)",author:me||"?�명",ts:Date.now(),resolved:false,subs:[]};
-    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===itemId?{...x,issues:[copy,...(x.issues||[])],updatedAt:Date.now()}:x)}),[mkLog("반복??�� ?�슈 복사",null,copy.text.slice(0,30))]);
+    const copy={id:uid(),text:issue.text+" (복사)",author:me||"익명",ts:Date.now(),resolved:false,subs:[]};
+    commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id===itemId?{...x,issues:[copy,...(x.issues||[])],updatedAt:Date.now()}:x)}),[mkLog("반복항목 이슈 복사",null,copy.text.slice(0,30))]);
   };
   const editRiIssueText=(itemId,issueId,text)=>{
     const t=text.trim();if(!t)return;
@@ -1100,7 +1100,7 @@ function Board() {
   };
   const addRiIssueSub=(itemId,issueId,text)=>{
     const t=text.trim();if(!t)return;
-    const sub={id:uid(),text:t,author:me||"?�명",ts:Date.now()};
+    const sub={id:uid(),text:t,author:me||"익명",ts:Date.now()};
     commit((d)=>({...d,rItems:(d.rItems||[]).map((x)=>x.id!==itemId?x:{...x,issues:(x.issues||[]).map((i)=>i.id===issueId?{...i,subs:[...(i.subs||[]),sub]}:i),updatedAt:Date.now()})}),[]);
   };
   const removeRiIssueSub=(itemId,issueId,subId)=>{
@@ -1132,31 +1132,31 @@ function Board() {
     })}),[]);
   };
 
-  /* ?�?� 메모 ?�?� */
+  /* ── 메모 ── */
   const memoItems=useMemo(()=>(data.memoItems||[]).filter((x)=>!x.deleted),[data.memoItems]);
   const memoCatNames=useMemo(()=>[...new Set(memoItems.map((x)=>x.cat).filter(Boolean))].sort(),[memoItems]);
   const memoSubNames=useMemo(()=>(cat)=>[...new Set(memoItems.filter((x)=>x.cat===cat).map((x)=>x.sub).filter(Boolean))].sort(),[memoItems]);
   const memoFiltered=useMemo(()=>{
     let list=memoItems;
-    if(memoCatFilter!=="?�체")list=list.filter((x)=>(x.cat||"미분�?)===memoCatFilter);
+    if(memoCatFilter!=="전체")list=list.filter((x)=>(x.cat||"미분류")===memoCatFilter);
     const q=memoQuery.trim().toLowerCase();
     if(q)list=list.filter((x)=>`${x.cat||""} ${x.sub||""} ${x.title||""} ${x.text||""} ${(x.subs||[]).map((s)=>s.text).join(" ")}`.toLowerCase().includes(q));
     return list.slice().sort((a,b)=>(a.order??999)-(b.order??999));
   },[memoItems,memoCatFilter,memoQuery]);
-  const memoCatOptions=useMemo(()=>["?�체",...new Set(memoItems.map((x)=>x.cat||"미분�?))],[memoItems]);
+  const memoCatOptions=useMemo(()=>["전체",...new Set(memoItems.map((x)=>x.cat||"미분류"))],[memoItems]);
   const saveMemo=()=>{
     const text=(memoDraft.text||"").trim();
-    if(!text){alert("메모 ?�용???�력?�세??");return;}
+    if(!text){alert("메모 내용을 입력하세요.");return;}
     const now=Date.now();
     if(memoDraft.id){
-      commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoDraft.id?{...x,cat:(memoDraft.cat||"").trim(),sub:(memoDraft.sub||"").trim(),title:(memoDraft.title||"").trim(),text,updatedAt:now}:x)}),[mkLog("메모 ?�정",null,text.slice(0,30))]);
+      commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoDraft.id?{...x,cat:(memoDraft.cat||"").trim(),sub:(memoDraft.sub||"").trim(),title:(memoDraft.title||"").trim(),text,updatedAt:now}:x)}),[mkLog("메모 수정",null,text.slice(0,30))]);
     }else{
       const rec={id:uid(),cat:(memoDraft.cat||"").trim(),sub:(memoDraft.sub||"").trim(),title:(memoDraft.title||"").trim(),text,subs:[],createdAt:now,updatedAt:now,createdBy:me};
-      commit((d)=>({...d,memoItems:[...(d.memoItems||[]),rec]}),[mkLog("메모 ?�성",null,text.slice(0,30))]);
+      commit((d)=>({...d,memoItems:[...(d.memoItems||[]),rec]}),[mkLog("메모 생성",null,text.slice(0,30))]);
     }
     setMemoDraft(null);
   };
-  const removeMemo=(m)=>{commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("메모 ??��",null,(m.text||"").slice(0,30))]);setMemoDraft(null);};
+  const removeMemo=(m)=>{commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("메모 삭제",null,(m.text||"").slice(0,30))]);setMemoDraft(null);};
   const duplicateMemo=(m)=>{
     const now=Date.now();
     const copy={id:uid(),cat:m.cat,sub:m.sub,title:m.title?m.title+" (복사)":"",text:m.text,subs:[],order:null,createdAt:now,updatedAt:now,createdBy:me};
@@ -1178,7 +1178,7 @@ function Board() {
   };
   const addMemoSub=(memoId,text)=>{
     const t=text.trim();if(!t)return;
-    const sub={id:uid(),text:t,author:me||"?�명",ts:Date.now()};
+    const sub={id:uid(),text:t,author:me||"익명",ts:Date.now()};
     commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoId?{...x,subs:[...(x.subs||[]),sub],updatedAt:Date.now()}:x)}),[]);
   };
   const editMemoSub=(memoId,subId,text)=>{
@@ -1190,18 +1190,18 @@ function Board() {
   };
 
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
-  const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가?�오�?,null,`${p.tasks.length}�?)]);} catch(e){alert("?�을 ???�는 ?�일?�니??");}};
+  const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
-  /* ?�?� ?�림 (공용 보드 ?�용, ???�려?�을 ?�만) ?�?� */
+  /* ── 알림 (공용 보드 전용, 탭 열려있을 때만) ── */
   const notify=useCallback((title,body)=>{
     if(!notifOn||typeof Notification==="undefined")return;
     try{const n=new Notification(title,{body,icon:"/favicon.ico"});n.onclick=()=>{window.focus();n.close();};}catch(e){}
   },[notifOn]);
 
   const enableNotif=()=>{
-    if(typeof Notification==="undefined"){alert("??브라?��????�림??지?�하지 ?�습?�다.");return;}
+    if(typeof Notification==="undefined"){alert("이 브라우저는 알림을 지원하지 않습니다.");return;}
     if(Notification.permission==="granted"){setNotifOn(true);return;}
-    Notification.requestPermission().then((p)=>{setNotifOn(p==="granted");if(p!=="granted")alert("?�림??차단?�습?�다. 브라?��? 주소�??�쪽 ?�물???�이콘에???�림???�용?�주?�요.");});
+    Notification.requestPermission().then((p)=>{setNotifOn(p==="granted");if(p!=="granted")alert("알림이 차단됐습니다. 브라우저 주소창 왼쪽 자물쇠 아이콘에서 알림을 허용해주세요.");});
   };
 
   useEffect(()=>{
@@ -1213,13 +1213,13 @@ function Board() {
         if((t.boardId||"공용")!=="공용"||t.deleted)return;
         const p=prevMap.get(t.id);
         if(!p){
-          if(t.owner===me&&t.createdBy&&t.createdBy!==me)notify("???�무가 배정?�어??,`${t.createdBy}?�이 "${t.title}" ?�무�?배정?�습?�다.`);
+          if(t.owner===me&&t.createdBy&&t.createdBy!==me)notify("새 업무가 배정됐어요",`${t.createdBy}님이 "${t.title}" 업무를 배정했습니다.`);
           return;
         }
         if(t.updatedBy===me)return;
-        if(t.owner===me&&p.owner!==me)notify("???�무가 배정?�어??,`${t.updatedBy||"?�??}?�이 "${t.title}" ?�무�?배정?�습?�다.`);
-        if(t.status==="doing"&&p.status!=="doing"&&t.createdBy===me)notify("?�무가 ?�작?�어??,`${t.owner||"?�당??}?�이 "${t.title}"�?진행중으�???��?�니??`);
-        if((t.memo||"").trim()&&(t.memo||"")!==(p.memo||"")&&(t.owner===me||t.createdBy===me))notify("메모가 ?�록?�어??,`"${t.title}": ${t.memo.slice(0,50)}`);
+        if(t.owner===me&&p.owner!==me)notify("새 업무가 배정됐어요",`${t.updatedBy||"팀원"}님이 "${t.title}" 업무를 배정했습니다.`);
+        if(t.status==="doing"&&p.status!=="doing"&&t.createdBy===me)notify("업무가 시작됐어요",`${t.owner||"담당자"}님이 "${t.title}"를 진행중으로 옮겼습니다.`);
+        if((t.memo||"").trim()&&(t.memo||"")!==(p.memo||"")&&(t.owner===me||t.createdBy===me))notify("메모가 등록됐어요",`"${t.title}": ${t.memo.slice(0,50)}`);
       });
     }
     prevTasksRef.current=data.tasks;
@@ -1232,9 +1232,9 @@ function Board() {
         if((t.boardId||"공용")!=="공용"||t.deleted||t.archived||t.status==="done"||t.owner!==me||!t.due)return;
         const dd=dayDiff(t.due);if(dd===null)return;
         let key=null,ttl=null,body=null;
-        if(dd<0){key=`overdue:${t.id}`;ttl="마감??지?�어??;body=`"${t.title}" 마감 ${Math.abs(dd)}??지??;}
-        else if(dd===0){key=`due0:${t.id}`;ttl="?�늘 마감?�에??;body=`"${t.title}"`;}
-        else if(dd===1){key=`due1:${t.id}`;ttl="마감???�박?�어??;body=`"${t.title}" ?�일 마감`;}
+        if(dd<0){key=`overdue:${t.id}`;ttl="마감이 지났어요";body=`"${t.title}" 마감 ${Math.abs(dd)}일 지남`;}
+        else if(dd===0){key=`due0:${t.id}`;ttl="오늘 마감이에요";body=`"${t.title}"`;}
+        else if(dd===1){key=`due1:${t.id}`;ttl="마감이 임박했어요";body=`"${t.title}" 내일 마감`;}
         if(key&&!notifiedRef.current.has(key)){notify(ttl,body);notifiedRef.current.add(key);}
       });
     };
@@ -1250,20 +1250,20 @@ function Board() {
     return(
       <div key={t.id} className={"card"+(late?" late":"")+(t.status==="done"?" done":"")+(dragId===t.id?" drag":"")} style={{"--ch":chColor(t.channel)}}
         draggable={canEdit} onDragStart={(e)=>{setDragId(t.id);e.dataTransfer.effectAllowed="move";}} onDragEnd={()=>{setDragId(null);setOverCol(null);}} onClick={()=>openTask(t)}>
-        <div className="cmeta"><span className="ch">{t.channel}</span><span>·</span><span>{t.type}</span>{t.repeat&&t.repeat!=="none"&&<><span>·</span><span>??REPEATS.find((r)=>r.id===t.repeat)?.label}</span></>}</div>
+        <div className="cmeta"><span className="ch">{t.channel}</span><span>·</span><span>{t.type}</span>{t.repeat&&t.repeat!=="none"&&<><span>·</span><span>↻{REPEATS.find((r)=>r.id===t.repeat)?.label}</span></>}</div>
         <p className="ctitle">{t.title}</p>
         {!!(t.tags||[]).length&&<div className="ctags">{t.tags.map((g)=><span key={g} className="tag">{g}</span>)}</div>}
         {(t.progress>0||ck.length>0)&&(()=>{
           const pct=t.progress!=null&&t.progress>0?t.progress:(ck.length?Math.round(ckDone/ck.length*100):0);
-          return <div className="cbar" title={`진행�?${pct}%`}><i style={{width:pct+"%"}} /></div>;
+          return <div className="cbar" title={`진행률 ${pct}%`}><i style={{width:pct+"%"}} /></div>;
         })()}
         <div className="cfoot">
           <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
-            {t.owner?<span className={"ownerchip"+(t.owner===me?" me":"")}>{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미�???/span>}
+            {t.owner?<span className={"ownerchip"+(t.owner===me?" me":"")}>{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
             {t.due&&<span className={"due"+(late?" late":soon?" soon":"")}>{t.start?t.start.slice(5)+"~":""}{t.due.slice(5)}{late?` +${Math.abs(d)}d`:""}</span>}
           </span>
           <span style={{display:"flex",gap:6,alignItems:"center"}}>
-            <span className="icons">{ck.length>0&&<span>??ckDone}/{ck.length}</span>}{!!(t.comments||[]).length&&<span>?��{t.comments.length}</span>}{!!(t.links||[]).length&&<span>?��{t.links.length}</span>}</span>
+            <span className="icons">{ck.length>0&&<span>☑{ckDone}/{ck.length}</span>}{!!(t.comments||[]).length&&<span>💬{t.comments.length}</span>}{!!(t.links||[]).length&&<span>🔗{t.links.length}</span>}</span>
             <span className={"pri"+(t.priority==="high"?" high":"")}>{PRIORITIES.find((p)=>p.id===t.priority)?.label}</span>
           </span>
         </div>
@@ -1271,41 +1271,41 @@ function Board() {
     );
   };
 
-  if(!ready)return<div className="wb"><style>{CSS}</style><div className="eyebrow">Team Work Board</div><p style={{fontFamily:"monospace",fontSize:12,color:"#8F959C"}}>보드�?불러?�는 �?/p></div>;
+  if(!ready)return<div className="wb"><style>{CSS}</style><div className="eyebrow">Team Work Board</div><p style={{fontFamily:"monospace",fontSize:12,color:"#8F959C"}}>보드를 불러오는 중</p></div>;
 
   if(!me){
     return (
       <div className="wb"><style>{CSS}</style>
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:20}}>
           <div className="modal" style={{maxWidth:400,margin:0}}>
-            <h2>{signupMode?"?�규 계정 ?�록":"로그??}</h2>
+            <h2>{signupMode?"신규 계정 등록":"로그인"}</h2>
             <div className="modal-body">
-              <div className="fld"><label>?�름</label>
+              <div className="fld"><label>이름</label>
                 <input list="wb-memlist" autoFocus value={nameInput} onChange={(e)=>setNameInput(e.target.value)}
                   onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"&&!signupMode)doLogin();}}
-                  placeholder="?? 김?��?" />
+                  placeholder="예) 김현민" />
                 <datalist id="wb-memlist">{data.members.map((m)=><option key={m.name} value={m.name} />)}</datalist>
               </div>
-              <div className="fld"><label>비�?번호</label>
+              <div className="fld"><label>비밀번호</label>
                 <input type="password" value={loginPw} onChange={(e)=>setLoginPw(e.target.value)}
                   onKeyDown={(e)=>{if(e.key==="Enter"&&!signupMode)doLogin();}}
-                  placeholder="비�?번호" />
+                  placeholder="비밀번호" />
               </div>
               {signupMode&&(
-                <div className="fld"><label>비�?번호 ?�인</label>
+                <div className="fld"><label>비밀번호 확인</label>
                   <input type="password" value={signupPw2} onChange={(e)=>setSignupPw2(e.target.value)}
                     onKeyDown={(e)=>{if(e.key==="Enter")doSignup();}}
-                    placeholder="비�?번호 ?�시 ?�력" />
+                    placeholder="비밀번호 다시 입력" />
                 </div>
               )}
-              {data.members.length===0&&!signupMode&&<p className="hint" style={{color:"var(--pri)"}}>�??�용?�입?�다. ?�규 ?�록?�로 관리자 계정??만드?�요.</p>}
+              {data.members.length===0&&!signupMode&&<p className="hint" style={{color:"var(--pri)"}}>첫 사용자입니다. 신규 등록으로 관리자 계정을 만드세요.</p>}
             </div>
             <div className="modal-foot">
-              <button className="btn ghost" onClick={()=>{setSignupMode(!signupMode);setLoginPw("");setSignupPw2("");}}>{signupMode?"??로그?�으�?:"?�규 ?�록"}</button>
+              <button className="btn ghost" onClick={()=>{setSignupMode(!signupMode);setLoginPw("");setSignupPw2("");}}>{signupMode?"← 로그인으로":"신규 등록"}</button>
               <span className="spacer" />
               {signupMode
-                ? <button className="btn-save" onClick={doSignup}>계정 만들�?/button>
-                : <button className="btn-save" onClick={doLogin}>로그??/button>}
+                ? <button className="btn-save" onClick={doSignup}>계정 만들기</button>
+                : <button className="btn-save" onClick={doLogin}>로그인</button>}
             </div>
           </div>
         </div>
@@ -1317,20 +1317,20 @@ function Board() {
     <div className="wb">
       <style>{CSS}</style>
       <div className="topbar">
-        <div className="brand"><span className="logo">W</span>?�무 보드</div>
+        <div className="brand"><span className="logo">W</span>업무 보드</div>
         <span className="spacer" />
-        <button className="who" onClick={()=>setPwChange({cur:"",next:"",next2:""})} title="비�?번호 변�?>
+        <button className="who" onClick={()=>setPwChange({cur:"",next:"",next2:""})} title="비밀번호 변경">
           <span className="av">{(me||"?").slice(0,1)}</span>
-          {me||"?�름 ?�정"}<span className="role">{ROLES.find((r)=>r.id===myRole)?.label}</span>
+          {me||"이름 설정"}<span className="role">{ROLES.find((r)=>r.id===myRole)?.label}</span>
         </button>
-        <span className="save"><i className={"dot "+(saveState==="error"?"err":saveState==="idle"?"":"on")} />{saveState==="saving"?"?�??�?:saveState==="saved"?"?�?�됨":saveState==="error"?"?�???�패":saveState==="loading"?"불러?�는 �?:"?�기?�됨"}</span>
-        <button className="ghostw" onClick={()=>load()}>?�로고침</button>
-        {!notifOn&&<button className="ghostw" onClick={enableNotif}>?�� ?�림 켜기</button>}
-        {notifOn&&<span style={{fontSize:12,color:"var(--ok)",fontWeight:700,display:"inline-flex",alignItems:"center",gap:4}}>?�� ?�림 켜짐</span>}
-        <button className="ghostw" onClick={logout}>로그?�웃</button>
+        <span className="save"><i className={"dot "+(saveState==="error"?"err":saveState==="idle"?"":"on")} />{saveState==="saving"?"저장 중":saveState==="saved"?"저장됨":saveState==="error"?"저장 실패":saveState==="loading"?"불러오는 중":"동기화됨"}</span>
+        <button className="ghostw" onClick={()=>load()}>새로고침</button>
+        {!notifOn&&<button className="ghostw" onClick={enableNotif}>🔔 알림 켜기</button>}
+        {notifOn&&<span style={{fontSize:12,color:"var(--ok)",fontWeight:700,display:"inline-flex",alignItems:"center",gap:4}}>🔔 알림 켜짐</span>}
+        <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복?�무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"?�간 ?�무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스??,n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"issue",label:"?�슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보�???,n:archived.length},{id:"log",label:"변�??�력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"?�·?�정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -1346,56 +1346,56 @@ function Board() {
           ))}
         </div>
         <div className="metrics">
-          <button className="metric cl" onClick={()=>{setOnlyLate(false);}}><span className="k">?�체</span><span className="v">{stats.total}</span></button>
-          <div className="metric"><span className="k">진행�?/span><span className="v">{stats.doing}</span></div>
-          <div className="metric"><span className="k">마감 ?�루 ??/span><span className={"v"+(stats.tomorrow?" wa":"")}>{stats.tomorrow}</span></div>
-          <button className="metric cl" onClick={()=>{setOnlyLate(true);}}><span className="k">지??/span><span className={"v"+(stats.late?" al":"")}>{stats.late}</span></button>
-          <div className="metric"><span className="k">미완�?/span><span className="v">{stats.open}</span></div>
+          <button className="metric cl" onClick={()=>{setOnlyLate(false);}}><span className="k">전체</span><span className="v">{stats.total}</span></button>
+          <div className="metric"><span className="k">진행중</span><span className="v">{stats.doing}</span></div>
+          <div className="metric"><span className="k">마감 하루 전</span><span className={"v"+(stats.tomorrow?" wa":"")}>{stats.tomorrow}</span></div>
+          <button className="metric cl" onClick={()=>{setOnlyLate(true);}}><span className="k">지연</span><span className={"v"+(stats.late?" al":"")}>{stats.late}</span></button>
+          <div className="metric"><span className="k">미완료</span><span className="v">{stats.open}</span></div>
         </div>
         <div className="tools">
-          <input className="inp" placeholder="검?? value={q} onChange={(e)=>setQ(e.target.value)} style={{width:120}} />
-          <select className="sel" value={fOwner} onChange={(e)=>setFOwner(e.target.value)}><option value="?�체">?�당???�체</option>{owners.map((o)=><option key={o} value={o}>{o}</option>)}</select>
-          <select className="sel" value={sortBy} onChange={(e)=>setSortBy(e.target.value)}><option value="due">마감?�순</option><option value="pri">?�선?�위??/option><option value="upd">최근?�정??/option></select>
+          <input className="inp" placeholder="검색" value={q} onChange={(e)=>setQ(e.target.value)} style={{width:120}} />
+          <select className="sel" value={fOwner} onChange={(e)=>setFOwner(e.target.value)}><option value="전체">담당자 전체</option>{owners.map((o)=><option key={o} value={o}>{o}</option>)}</select>
+          <select className="sel" value={sortBy} onChange={(e)=>setSortBy(e.target.value)}><option value="due">마감일순</option><option value="pri">우선순위순</option><option value="upd">최근수정순</option></select>
           <span className="datefilt">
-            <input type="date" className="sel" value={dateFrom} onChange={(e)=>setDateFrom(e.target.value)} title="?�작 ?�짜" />
+            <input type="date" className="sel" value={dateFrom} onChange={(e)=>setDateFrom(e.target.value)} title="시작 날짜" />
             <span style={{color:"var(--ink3)"}}>~</span>
-            <input type="date" className="sel" value={dateTo} onChange={(e)=>setDateTo(e.target.value)} title="종료 ?�짜" />
-            {(dateFrom||dateTo)&&<button className="chip" onClick={()=>{setDateFrom("");setDateTo("");}}>?�짜 ?�제</button>}
+            <input type="date" className="sel" value={dateTo} onChange={(e)=>setDateTo(e.target.value)} title="종료 날짜" />
+            {(dateFrom||dateTo)&&<button className="chip" onClick={()=>{setDateFrom("");setDateTo("");}}>날짜 해제</button>}
           </span>
-          <button className={"chip tog"+(onlyMine?" sel":"")} onClick={()=>setOnlyMine((v)=>!v)}>???�무</button>
-          <button className={"chip tog"+(onlyLate?" sel":"")} onClick={()=>setOnlyLate((v)=>!v)}>지?�만</button>
-          {allTags.length>0&&<select className="sel" value={fTag} onChange={(e)=>setFTag(e.target.value)}><option value="?�체">?�그 ?�체</option>{allTags.map((g)=><option key={g} value={g}>{g}</option>)}</select>}
+          <button className={"chip tog"+(onlyMine?" sel":"")} onClick={()=>setOnlyMine((v)=>!v)}>내 업무</button>
+          <button className={"chip tog"+(onlyLate?" sel":"")} onClick={()=>setOnlyLate((v)=>!v)}>지연만</button>
+          {allTags.length>0&&<select className="sel" value={fTag} onChange={(e)=>setFTag(e.target.value)}><option value="전체">태그 전체</option>{allTags.map((g)=><option key={g} value={g}>{g}</option>)}</select>}
           <span className="mdsep" />
           {(()=>{
             const pid=parentOf(fCh);
             if(pid){
               const par=data.channels.find((c)=>c.id===pid);
               return <>
-                <button className="chip back" onClick={()=>setFCh("?�체")}>???�체</button>
-                <button className={"chip"+(fCh===pid?" sel":"")} onClick={()=>setFCh(pid)}><b style={{background:par?.color||"#888"}} />{pid} ?�체</button>
+                <button className="chip back" onClick={()=>setFCh("전체")}>← 전체</button>
+                <button className={"chip"+(fCh===pid?" sel":"")} onClick={()=>setFCh(pid)}><b style={{background:par?.color||"#888"}} />{pid} 전체</button>
                 {subsOf(pid).map((k)=><button key={k.id} className={"chip"+(fCh===k.id?" sel":"")} onClick={()=>setFCh(k.id)}><b style={{background:k.color}} />{k.id}</button>)}
               </>;
             }
-            const kids=fCh!=="?�체"?subsOf(fCh):[];
+            const kids=fCh!=="전체"?subsOf(fCh):[];
             if(kids.length){
               const par=data.channels.find((c)=>c.id===fCh);
               return <>
-                <button className="chip back" onClick={()=>setFCh("?�체")}>???�체</button>
-                <button className="chip sel"><b style={{background:par?.color||"#888"}} />{fCh} ?�체</button>
+                <button className="chip back" onClick={()=>setFCh("전체")}>← 전체</button>
+                <button className="chip sel"><b style={{background:par?.color||"#888"}} />{fCh} 전체</button>
                 {kids.map((k)=><button key={k.id} className="chip" onClick={()=>setFCh(k.id)}><b style={{background:k.color}} />{k.id}</button>)}
               </>;
             }
             return <>
-              <button className={"chip"+(fCh==="?�체"?" sel":"")} onClick={()=>setFCh("?�체")}>?�체</button>
+              <button className={"chip"+(fCh==="전체"?" sel":"")} onClick={()=>setFCh("전체")}>전체</button>
               {topChannels.map((c)=>{
                 const has=subsOf(c.id).length;
                 return <button key={c.id} className={"chip"+(fCh===c.id?" sel":"")} onClick={()=>setFCh(c.id)}>
-                  <b style={{background:c.color}} />{c.id}{has>0&&<span style={{fontSize:10,opacity:.65}}>??has}</span>}
+                  <b style={{background:c.color}} />{c.id}{has>0&&<span style={{fontSize:10,opacity:.65}}>▸{has}</span>}
                 </button>;
               })}
             </>;
           })()}
-          <span className="spacer" />{canEdit&&<button className="btn" onClick={()=>openNew()}>?�무 추�?</button>}
+          <span className="spacer" />{canEdit&&<button className="btn" onClick={()=>openNew()}>업무 추가</button>}
         </div>
       </>)}
 
@@ -1404,9 +1404,9 @@ function Board() {
           <div key={col.id} className="colwrap">
             <div className="colhead"><span>{col.label}</span><em>{items.length}</em></div>
             <div className={"colbody"+(overCol===col.id?" over":"")} onDragOver={(e)=>{if(dragId){e.preventDefault();setOverCol(col.id);}}} onDragLeave={()=>setOverCol((c)=>c===col.id?null:c)} onDrop={(e)=>{e.preventDefault();const t=data.tasks.find((x)=>x.id===dragId);if(t)moveTask(t,col.id);setDragId(null);setOverCol(null);}}>
-              {items.length===0&&<div className="empty">{dragId?"?�기�??�기":col.id==="todo"?"?�무�?추�????�작?�세??:"비어 ?�음"}</div>}
+              {items.length===0&&<div className="empty">{dragId?"여기로 놓기":col.id==="todo"?"업무를 추가해 시작하세요":"비어 있음"}</div>}
               {items.map(renderCard)}
-              {canEdit&&<button className="addbtn" onClick={()=>openNew(col.id)}>+ 카드 추�?</button>}
+              {canEdit&&<button className="addbtn" onClick={()=>openNew(col.id)}>+ 카드 추가</button>}
             </div>
           </div>
         );})}</div>
@@ -1421,13 +1421,13 @@ function Board() {
           <div className="panel" style={{padding:14,marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
               <div>
-                <div style={{fontSize:14,fontWeight:800}}>반복 ?�무</div>
+                <div style={{fontSize:14,fontWeight:800}}>반복 업무</div>
                 <div style={{fontFamily:"monospace",fontSize:11,color:"#8F959C",marginTop:3}}>{riDate.replace(/-/g,".")} · {doneToday}/{totalToday}</div>
               </div>
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
                 <input type="date" className="sel" value={riDate} onChange={(e)=>e.target.value&&setRiDate(e.target.value)} />
-                <button className="btn ghost" onClick={()=>setRiDate(todayStr())}>?�늘</button>
-                {canEdit&&<button className="btn-save" onClick={()=>setRiAdd({cat:"",sub:"",title:""})}>+ ??�� 추�?</button>}
+                <button className="btn ghost" onClick={()=>setRiDate(todayStr())}>오늘</button>
+                {canEdit&&<button className="btn-save" onClick={()=>setRiAdd({cat:"",sub:"",title:""})}>+ 항목 추가</button>}
               </div>
             </div>
           </div>
@@ -1435,20 +1435,20 @@ function Board() {
           <div className="panel" style={{padding:14,marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}} onClick={()=>setRiIssueOpen(!riIssueOpen)}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span className="richev">{riIssueOpen?"??:"??}</span>
-                <span style={{fontSize:14,fontWeight:800}}>?�슈</span>
-                <span className="ricount">{riIssues.filter((i)=>!i.resolved).length}�?미해�?/span>
+                <span className="richev">{riIssueOpen?"▾":"▸"}</span>
+                <span style={{fontSize:14,fontWeight:800}}>이슈</span>
+                <span className="ricount">{riIssues.filter((i)=>!i.resolved).length}건 미해결</span>
               </div>
             </div>
             {riIssueOpen&&(
               <div style={{marginTop:12}} onClick={(e)=>e.stopPropagation()}>
                 <div style={{display:"flex",gap:7,marginBottom:10,flexWrap:"wrap"}}>
-                  {[{id:"open",label:`미해�?${riIssues.filter((i)=>!i.resolved).length}`},{id:"done",label:`?�결 ${riIssues.filter((i)=>i.resolved).length}`},{id:"all",label:`?�체 ${riIssues.length}`}].map((f)=>(
+                  {[{id:"open",label:`미해결 ${riIssues.filter((i)=>!i.resolved).length}`},{id:"done",label:`해결 ${riIssues.filter((i)=>i.resolved).length}`},{id:"all",label:`전체 ${riIssues.length}`}].map((f)=>(
                     <button key={f.id} className={"chip"+(riIssueFilter===f.id?" sel":"")} onClick={()=>setRiIssueFilter(f.id)}>{f.label}</button>
                   ))}
-                  <input className="inp" style={{flex:1,minWidth:140}} placeholder="?�슈 검??(?�용·??���?" value={riIssueQuery} onChange={(e)=>setRiIssueQuery(e.target.value)} />
+                  <input className="inp" style={{flex:1,minWidth:140}} placeholder="이슈 검색 (내용·항목명)" value={riIssueQuery} onChange={(e)=>setRiIssueQuery(e.target.value)} />
                 </div>
-                {riIssues.filter((i)=>(riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved)&&(!riIssueQuery.trim()||`${i.text} ${i.path}`.toLowerCase().includes(riIssueQuery.trim().toLowerCase()))).length===0&&<div className="hint" style={{marginBottom:10}}>?�당?�는 ?�슈가 ?�습?�다</div>}
+                {riIssues.filter((i)=>(riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved)&&(!riIssueQuery.trim()||`${i.text} ${i.path}`.toLowerCase().includes(riIssueQuery.trim().toLowerCase()))).length===0&&<div className="hint" style={{marginBottom:10}}>해당하는 이슈가 없습니다</div>}
                 {riIssues.filter((i)=>(riIssueFilter==="all"?true:riIssueFilter==="open"?!i.resolved:i.resolved)&&(!riIssueQuery.trim()||`${i.text} ${i.path}`.toLowerCase().includes(riIssueQuery.trim().toLowerCase()))).map((i)=>{
                   const expanded=!!riIssueExpand[i.id];
                   const editing=riIssueEditId===i.id;
@@ -1460,26 +1460,26 @@ function Board() {
                     onDragEnd={()=>setRiIssueDrag(null)}
                     className={"iss"+(i.resolved?" done":"")+(riIssueDrag===i.id?" dragging":"")} style={{marginBottom:6,flexDirection:"column",alignItems:"stretch"}}>
                     <div style={{display:"flex",alignItems:"flex-start",gap:9}}>
-                      <button className="issck" onClick={()=>toggleRiIssue(i.itemId,i.id)}>{i.resolved?"??:""}</button>
+                      <button className="issck" onClick={()=>toggleRiIssue(i.itemId,i.id)}>{i.resolved?"✓":""}</button>
                       <div style={{flex:1,minWidth:0}}>
                         {editing
                           ? <textarea className="hinput" defaultValue={i.text} autoFocus style={{width:"100%"}}
                               onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editRiIssueText(i.itemId,i.id,e.target.value);setRiIssueEditId(null);}}
                               onBlur={(e)=>{editRiIssueText(i.itemId,i.id,e.target.value);setRiIssueEditId(null);}} />
-                          : <div className="isstext" style={{whiteSpace:"pre-wrap"}}>{i.text}{i.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (?�정??</span>}</div>}
+                          : <div className="isstext" style={{whiteSpace:"pre-wrap"}}>{i.text}{i.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (수정됨)</span>}</div>}
                         <div className="issmeta">{i.path} · {i.author} · {fmtTs(i.ts)}</div>
                       </div>
-                      <button className="riedit" onClick={()=>setRiIssueExpand({...riIssueExpand,[i.id]:!expanded})}>{(i.subs||[]).length>0?`?�위 ${(i.subs||[]).length}`:"+?�위"}</button>
-                      {canEdit&&!editing&&<button className="riedit" onClick={()=>setRiIssueEditId(i.id)}>?�정</button>}
+                      <button className="riedit" onClick={()=>setRiIssueExpand({...riIssueExpand,[i.id]:!expanded})}>{(i.subs||[]).length>0?`하위 ${(i.subs||[]).length}`:"+하위"}</button>
+                      {canEdit&&!editing&&<button className="riedit" onClick={()=>setRiIssueEditId(i.id)}>수정</button>}
                       {canEdit&&<button className="riedit" onClick={()=>duplicateRiIssue(i.itemId,i)}>복사</button>}
                       {canEdit&&<button style={{background:"none",border:"none",color:"#8F959C",cursor:"pointer"}} onClick={()=>removeRiIssue(i.itemId,i.id)}>×</button>}
                     </div>
                     {expanded&&(
                       <div style={{marginTop:8,paddingLeft:33,borderTop:"1px solid var(--line)",paddingTop:8}}>
-                        {(i.subs||[]).length===0&&<span className="hint">?�스?�리가 ?�습?�다</span>}
+                        {(i.subs||[]).length===0&&<span className="hint">히스토리가 없습니다</span>}
                         {(i.subs||[]).map((s)=>(
                           <div key={s.id} className="cmt">
-                            <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}{s.edited&&<span style={{color:"var(--ink3)"}}> (?�정??</span>}</div>
+                            <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}{s.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
                             {riIssueSubEditId===s.id
                               ? <div style={{display:"flex",gap:6,marginTop:4}}>
                                   <textarea className="hinput" defaultValue={s.text} autoFocus style={{flex:1}}
@@ -1488,13 +1488,13 @@ function Board() {
                                 </div>
                               : <p>{s.text}</p>}
                             {canEdit&&riIssueSubEditId!==s.id&&<div style={{display:"flex",gap:10}}>
-                              <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setRiIssueSubEditId(s.id)}>?�정</button>
-                              <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeRiIssueSub(i.itemId,i.id,s.id)}>??��</button>
+                              <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setRiIssueSubEditId(s.id)}>수정</button>
+                              <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeRiIssueSub(i.itemId,i.id,s.id)}>삭제</button>
                             </div>}
                           </div>
                         ))}
                         {canEdit&&<div className="addrow">
-                          <textarea className="hinput" placeholder="?�스?�리 ?�력 (Enter ?�송, Shift+Enter 줄바�?"
+                          <textarea className="hinput" placeholder="히스토리 입력 (Enter 전송, Shift+Enter 줄바꿈)"
                             value={riIssueSubText[i.id]||""} onChange={(e)=>setRiIssueSubText({...riIssueSubText,[i.id]:e.target.value})}
                             onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addRiIssueSub(i.itemId,i.id,riIssueSubText[i.id]||"");setRiIssueSubText({...riIssueSubText,[i.id]:""});}} />
                         </div>}
@@ -1506,19 +1506,19 @@ function Board() {
                 {canEdit&&rItems.length>0&&(
                   <div style={{display:"flex",gap:7,marginTop:10}}>
                     <select className="sel" value={riIssueItem} onChange={(e)=>setRiIssueItem(e.target.value)} style={{maxWidth:220}}>
-                      <option value="">??�� ?�택</option>
+                      <option value="">항목 선택</option>
                       {rItems.map((it)=><option key={it.id} value={it.id}>{it.cat} &gt; {it.sub} &gt; {it.title}</option>)}
                     </select>
-                    <textarea className="hinput" style={{flex:1}} placeholder="?�슈 ?�력 (Enter 추�?, Shift+Enter 줄바�?" value={riIssueText} onChange={(e)=>setRiIssueText(e.target.value)}
-                      onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();if(!riIssueItem){alert("??��??먼�? ?�택?�세??");return;}addRiIssue(riIssueItem,riIssueText);setRiIssueText("");}} />
-                    <button className="btn-save" onClick={()=>{if(!riIssueItem){alert("??��??먼�? ?�택?�세??");return;}if(!riIssueText.trim()){alert("?�슈 ?�용???�력?�세??");return;}addRiIssue(riIssueItem,riIssueText);setRiIssueText("");}}>추�?</button>
+                    <textarea className="hinput" style={{flex:1}} placeholder="이슈 입력 (Enter 추가, Shift+Enter 줄바꿈)" value={riIssueText} onChange={(e)=>setRiIssueText(e.target.value)}
+                      onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();if(!riIssueItem){alert("항목을 먼저 선택하세요.");return;}addRiIssue(riIssueItem,riIssueText);setRiIssueText("");}} />
+                    <button className="btn-save" onClick={()=>{if(!riIssueItem){alert("항목을 먼저 선택하세요.");return;}if(!riIssueText.trim()){alert("이슈 내용을 입력하세요.");return;}addRiIssue(riIssueItem,riIssueText);setRiIssueText("");}}>추가</button>
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {riTree.length===0&&<div className="empty">?�록????��???�습?�다. + ??�� 추�?�??�작?�세??</div>}
+          {riTree.length===0&&<div className="empty">등록된 항목이 없습니다. + 항목 추가로 시작하세요.</div>}
 
           {riTree.map((cat)=>{
             const catKey=`c:${cat.name}`;
@@ -1528,7 +1528,7 @@ function Board() {
             return (
               <div key={cat.name} className="ritop">
                 <div className="rihead" onClick={()=>toggleCollapse(catKey)}>
-                  <span className="richev">{catOpen?"??:"??}</span>
+                  <span className="richev">{catOpen?"▾":"▸"}</span>
                   <span className="ricatname">{cat.name}</span>
                   <span className="ricount">{catDone}/{catItems.length}</span>
                 </div>
@@ -1539,7 +1539,7 @@ function Board() {
                   return (
                     <div key={sub.name} className="risub">
                       <div className="risubhead" onClick={()=>toggleCollapse(subKey)}>
-                        <span className="richev sm">{subOpen?"??:"??}</span>
+                        <span className="richev sm">{subOpen?"▾":"▸"}</span>
                         <span className="risubname">{sub.name}</span>
                         <span className="ricount">{subDone}/{sub.items.length}</span>
                       </div>
@@ -1553,19 +1553,19 @@ function Board() {
                             onDrop={()=>{if(riItemDrag)reorderRi(cat.name,sub.name,riItemDrag,it.id);setRiItemDrag(null);}}
                             onDragEnd={()=>setRiItemDrag(null)}
                             className={"rirow"+(riItemDrag===it.id?" dragging":"")}>
-                            <button className={"ckbox"+(checked?" on":"")} disabled={!canEdit} onClick={()=>toggleRi(it,riDate)}>{checked?"??:""}</button>
+                            <button className={"ckbox"+(checked?" on":"")} disabled={!canEdit} onClick={()=>toggleRi(it,riDate)}>{checked?"✓":""}</button>
                             <span style={{flex:1,fontSize:13.5,textDecoration:checked?"line-through":"none",color:checked?"var(--ink3)":"inherit"}}>{it.title}</span>
-                            {(it.issues||[]).filter((i)=>!i.resolved).length>0&&<span style={{fontSize:11,color:"#C9372C",fontWeight:700}}>??{(it.issues||[]).filter((i)=>!i.resolved).length}</span>}
+                            {(it.issues||[]).filter((i)=>!i.resolved).length>0&&<span style={{fontSize:11,color:"#C9372C",fontWeight:700}}>⚠ {(it.issues||[]).filter((i)=>!i.resolved).length}</span>}
                             {checked&&it.checkins[riDate].by&&<span style={{fontSize:11,color:"var(--ink3)"}}>{it.checkins[riDate].by}</span>}
-                            {canEdit&&<button className="riedit" onClick={()=>{setRiQuickIssueId(riQuickIssueId===it.id?null:it.id);setRiQuickIssueText("");}}>?�슈</button>}
+                            {canEdit&&<button className="riedit" onClick={()=>{setRiQuickIssueId(riQuickIssueId===it.id?null:it.id);setRiQuickIssueText("");}}>이슈</button>}
                             {canEdit&&<button className="riedit" onClick={()=>duplicateRi(it)}>복사</button>}
-                            {canEdit&&<button className="riedit" onClick={()=>setRiAdd({id:it.id,cat:it.cat,sub:it.sub,title:it.title})}>?�정</button>}
+                            {canEdit&&<button className="riedit" onClick={()=>setRiAdd({id:it.id,cat:it.cat,sub:it.sub,title:it.title})}>수정</button>}
                           </div>
                           {riQuickIssueId===it.id&&(
                             <div style={{display:"flex",gap:7,padding:"6px 16px 10px 52px"}}>
-                              <textarea className="hinput" autoFocus placeholder="?�슈 ?�력 (Enter 추�?, Shift+Enter 줄바�?" value={riQuickIssueText} onChange={(e)=>setRiQuickIssueText(e.target.value)}
+                              <textarea className="hinput" autoFocus placeholder="이슈 입력 (Enter 추가, Shift+Enter 줄바꿈)" value={riQuickIssueText} onChange={(e)=>setRiQuickIssueText(e.target.value)}
                                 onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();if(!riQuickIssueText.trim())return;addRiIssue(it.id,riQuickIssueText);setRiQuickIssueId(null);setRiQuickIssueText("");}} />
-                              <button className="btn-save" onClick={()=>{if(!riQuickIssueText.trim())return;addRiIssue(it.id,riQuickIssueText);setRiQuickIssueId(null);setRiQuickIssueText("");}}>추�?</button>
+                              <button className="btn-save" onClick={()=>{if(!riQuickIssueText.trim())return;addRiIssue(it.id,riQuickIssueText);setRiQuickIssueId(null);setRiQuickIssueText("");}}>추가</button>
                               <button className="btn ghost" onClick={()=>setRiQuickIssueId(null)}>취소</button>
                             </div>
                           )}
@@ -1587,27 +1587,27 @@ function Board() {
           <div className="panel" style={{marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
               <div>
-                <h3 style={{margin:0}}>?�간 ?�무</h3>
-                <p className="sub" style={{margin:"4px 0 0"}}>?�별�??�야 ????��??관리합?�다. ?�위 ??��???�을 ???�습?�다.</p>
+                <h3 style={{margin:0}}>월간 업무</h3>
+                <p className="sub" style={{margin:"4px 0 0"}}>월별로 해야 할 항목을 관리합니다. 하위 항목을 넣을 수 있습니다.</p>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <input type="month" className="sel" value={mlyDate} onChange={(e)=>setMlyDate(e.target.value)} />
-                {canEdit&&<button className="btn-save" onClick={()=>setMlyDraft({_new:true,id:uid(),month:mlyDate,title:"",desc:"",done:false,subs:[],history:[]})}>+ 추�?</button>}
+                {canEdit&&<button className="btn-save" onClick={()=>setMlyDraft({_new:true,id:uid(),month:mlyDate,title:"",desc:"",done:false,subs:[],history:[]})}>+ 추가</button>}
               </div>
             </div>
           </div>
-          {mlyByMonth(mlyDate).length===0&&<div className="empty">{mlyDate} ??��???�습?�다. + 추�?�?만들?�보?�요.</div>}
+          {mlyByMonth(mlyDate).length===0&&<div className="empty">{mlyDate} 항목이 없습니다. + 추가로 만들어보세요.</div>}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {mlyByMonth(mlyDate).map((m)=>{
               const subs=m.subs||[];const subDone=subs.filter((s)=>s.done).length;
               return (
                 <div key={m.id} style={{background:"var(--card)",borderRadius:10,boxShadow:"var(--sh)",padding:"13px 16px",opacity:m.done?.65:1}}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:11}}>
-                    <button className={"ckbox"+(m.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMly(m)}>{m.done?"??:""}</button>
+                    <button className={"ckbox"+(m.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMly(m)}>{m.done?"✓":""}</button>
                     <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setMlyDraft({...m,subs:[...m.subs||[]],history:[...m.history||[]]})}>
                       <div style={{fontSize:15,fontWeight:700,textDecoration:m.done?"line-through":"none",color:m.done?"var(--ink3)":"inherit"}}>{m.title}</div>
                       {m.desc&&<div style={{fontSize:12.5,color:"var(--ink3)",marginTop:3}}>{m.desc}</div>}
-                      {subs.length>0&&<div style={{fontSize:12,color:"var(--ink3)",marginTop:4,fontWeight:600}}>?�위 {subDone}/{subs.length}</div>}
+                      {subs.length>0&&<div style={{fontSize:12,color:"var(--ink3)",marginTop:4,fontWeight:600}}>하위 {subDone}/{subs.length}</div>}
                     </div>
                   </div>
                   {(subs.length>0||canEdit)&&(
@@ -1619,45 +1619,45 @@ function Board() {
                         return (
                         <div key={s.id}>
                           <div style={{display:"flex",alignItems:"center",gap:8}}>
-                            <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySub(m,s.id)}>{s.done?"??:""}</button>
+                            <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySub(m,s.id)}>{s.done?"✓":""}</button>
                             <span style={{fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",flex:1}}>{s.text}</span>
-                            <button className="riedit" onClick={()=>setMlySubsubOpen({...mlySubsubOpen,[s.id]:!subsubOpen})}>{subsubs.length>0?`?�위목록 ${subsubs.filter((x)=>x.done).length}/${subsubs.length}`:"+?�위목록"}</button>
-                            <button className="riedit" onClick={()=>setMlySubHistOpen({...mlySubHistOpen,[s.id]:!subOpen})}>{(s.history||[]).length>0?`?�스?�리 ${s.history.length}`:"+?�스?�리"}</button>
+                            <button className="riedit" onClick={()=>setMlySubsubOpen({...mlySubsubOpen,[s.id]:!subsubOpen})}>{subsubs.length>0?`하위목록 ${subsubs.filter((x)=>x.done).length}/${subsubs.length}`:"+하위목록"}</button>
+                            <button className="riedit" onClick={()=>setMlySubHistOpen({...mlySubHistOpen,[s.id]:!subOpen})}>{(s.history||[]).length>0?`히스토리 ${s.history.length}`:"+히스토리"}</button>
                           </div>
                           {subsubOpen&&(
                             <div style={{paddingLeft:31,marginTop:6,marginBottom:8}}>
-                              {subsubs.length===0&&<span className="hint">?�위 목록???�습?�다</span>}
+                              {subsubs.length===0&&<span className="hint">하위 목록이 없습니다</span>}
                               {subsubs.map((x)=>(
                                 <div key={x.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                                  <button className={"ckbox sm"+(x.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySubsubDirect(m.id,s.id,x.id)}>{x.done?"??:""}</button>
+                                  <button className={"ckbox sm"+(x.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySubsubDirect(m.id,s.id,x.id)}>{x.done?"✓":""}</button>
                                   <span style={{fontSize:12.5,textDecoration:x.done?"line-through":"none",color:x.done?"var(--ink3)":"inherit",flex:1}}>{x.text}</span>
                                   {canEdit&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:14}} onClick={()=>removeMlySubsubDirect(m.id,s.id,x.id)}>×</button>}
                                 </div>
                               ))}
                               {canEdit&&<div className="addrow">
-                                <input className="inp" placeholder="?�위목록 ??�� ?�력 ??Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addMlySubsubDirect(m.id,s.id,e.target.value);e.target.value="";}} />
+                                <input className="inp" placeholder="하위목록 항목 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addMlySubsubDirect(m.id,s.id,e.target.value);e.target.value="";}} />
                               </div>}
                             </div>
                           )}
                           {subOpen&&(
                             <div style={{paddingLeft:31,marginTop:6,marginBottom:8}}>
-                              {(s.history||[]).length===0&&<span className="hint">기록???�습?�다</span>}
+                              {(s.history||[]).length===0&&<span className="hint">기록이 없습니다</span>}
                               {(s.history||[]).map((h)=>(
                                 <div key={h.id} className="cmt">
-                                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (?�정??</span>}</div>
+                                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
                                   {mlySubHistEditId===h.id
                                     ? <textarea className="hinput" defaultValue={h.text} autoFocus style={{width:"100%",marginTop:4}}
                                         onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editMlySubHistoryDirect(m.id,s.id,h.id,e.target.value);setMlySubHistEditId(null);}}
                                         onBlur={(e)=>{editMlySubHistoryDirect(m.id,s.id,h.id,e.target.value);setMlySubHistEditId(null);}} />
                                     : <p>{h.text}</p>}
                                   {canEdit&&mlySubHistEditId!==h.id&&<div style={{display:"flex",gap:10}}>
-                                    <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setMlySubHistEditId(h.id)}>?�정</button>
-                                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeMlySubHistoryDirect(m.id,s.id,h.id)}>??��</button>
+                                    <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setMlySubHistEditId(h.id)}>수정</button>
+                                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeMlySubHistoryDirect(m.id,s.id,h.id)}>삭제</button>
                                   </div>}
                                 </div>
                               ))}
                               {canEdit&&<div className="addrow">
-                                <textarea className="hinput" placeholder="?�스?�리 ?�력 (Enter 추�?, Shift+Enter 줄바�?"
+                                <textarea className="hinput" placeholder="히스토리 입력 (Enter 추가, Shift+Enter 줄바꿈)"
                                   value={mlySubHistText[s.id]||""} onChange={(e)=>setMlySubHistText({...mlySubHistText,[s.id]:e.target.value})}
                                   onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addMlySubHistoryDirect(m.id,s.id,mlySubHistText[s.id]||"");setMlySubHistText({...mlySubHistText,[s.id]:""});}} />
                               </div>}
@@ -1667,7 +1667,7 @@ function Board() {
                         );
                       })}
                       {canEdit&&<div className="addrow" style={{marginTop:4}}>
-                        <input className="inp" placeholder="?�위 ??�� ?�력 ??Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addMlySubDirect(m.id,e.target.value);e.target.value="";}} />
+                        <input className="inp" placeholder="하위 항목 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addMlySubDirect(m.id,e.target.value);e.target.value="";}} />
                       </div>}
                     </div>
                   )}
@@ -1691,7 +1691,7 @@ function Board() {
                     {canEdit&&<button className="ckplus" style={{background:"#0C66E4",color:"#fff"}} onClick={()=>setCkDraft({_new:true,id:uid(),tab:tab.id,title:"",start:"",due:"",desc:"",done:false,subs:isCL?[]:undefined})}>+</button>}                  </div>
                 </div>
                 <div className="ckcolbody">
-                  {items.length===0&&<div className="ckempty">??��???�습?�다</div>}
+                  {items.length===0&&<div className="ckempty">항목이 없습니다</div>}
                   {items.map((c)=>{
                     const dd=dayDiff(c.due);const over=dd!==null&&dd<0&&!c.done;
                     const subs=c.subs||[];const subDone=subs.filter((s)=>s.done).length;
@@ -1703,27 +1703,27 @@ function Board() {
                         onDrop={()=>{if(ckDrag)reorderCk(tab.id,ckDrag,c.id);setCkDrag(null);}} onDragEnd={()=>setCkDrag(null)}
                         className={"ckrow"+(c.done?" done":"")+(over?" over":"")+(ckDrag===c.id?" dragging":"")}>
                         <div className="ckrowmain">
-                          <button className={"ckbox"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCk(c)}>{c.done?"??:""}</button>
+                          <button className={"ckbox"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCk(c)}>{c.done?"✓":""}</button>
                           <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setCkDraft({...c,subs:c.subs?[...c.subs]:(isCL?[]:undefined)})}>
                             <div className={"cktitle"+(over?" red":"")}>{c.title}</div>
                             <div className={"ckmeta"+(over?" red":"")}>
-                              {c.start&&<span>{c.start.slice(5).replace("-","??")}??/span>}
+                              {c.start&&<span>{c.start.slice(5).replace("-","월 ")}일</span>}
                               {(c.start&&c.due)&&<span>~</span>}
-                              {c.due&&<span>{c.due.slice(5).replace("-","??")}??over?` (${Math.abs(dd)}??지??`:""}</span>}
-                              {!c.start&&!c.due&&<span style={{color:"var(--ink3)"}}>기한 ?�음</span>}
+                              {c.due&&<span>{c.due.slice(5).replace("-","월 ")}일{over?` (${Math.abs(dd)}일 지남)`:""}</span>}
+                              {!c.start&&!c.due&&<span style={{color:"var(--ink3)"}}>기한 없음</span>}
                               {isCL&&subs.length>0&&<span>· {subDone}/{subs.length}</span>}
                             </div>
                             <div className="ckunderline" />
                           </div>
-                          {isCL&&subs.length>0&&<button className="ckexp" onClick={(e)=>{e.stopPropagation();setCkExpand({...ckExpand,[c.id]:!exp});}}>{exp?"??:"??}</button>}
-                          {isCL&&(c.subs||[]).some((s)=>s.done)&&<button className="riedit" onClick={(e)=>{e.stopPropagation();clearCkItem(c);}}>체크 ?�제</button>}
+                          {isCL&&subs.length>0&&<button className="ckexp" onClick={(e)=>{e.stopPropagation();setCkExpand({...ckExpand,[c.id]:!exp});}}>{exp?"▲":"▼"}</button>}
+                          {isCL&&(c.subs||[]).some((s)=>s.done)&&<button className="riedit" onClick={(e)=>{e.stopPropagation();clearCkItem(c);}}>체크 해제</button>}
                           {canEdit&&<button className="riedit" onClick={(e)=>{e.stopPropagation();duplicateCk(c);}}>복사</button>}
                         </div>
                         {isCL&&exp&&subs.length>0&&(
                           <div className="cksubs">
                             {subs.map((s)=>(
                               <div key={s.id} className="cksub">
-                                <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"??:""}</button>
+                                <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"✓":""}</button>
                                 <span style={{textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
                               </div>
                             ))}
@@ -1744,14 +1744,14 @@ function Board() {
         <div className="aiwrap">
           <div className="panel" style={{marginBottom:12}}>
             <h3>AI 비서</h3>
-            <p className="sub">보드·반복?�무·체크리스?�·이???�이?��? 조회?�서 ?�합?�다. ?�이?��? 바꾸지??못합?�다.</p>
+            <p className="sub">보드·반복업무·체크리스트·이슈 데이터를 조회해서 답합니다. 데이터를 바꾸지는 못합니다.</p>
           </div>
           <div className="aichat">
             {aiMessages.length===0&&(
               <div className="aiempty">
-                <p>?�시�??�렇�?물어보세??/p>
+                <p>예시로 이렇게 물어보세요</p>
                 <div className="aisugg">
-                  {["?�늘 마감???�무 �??�어?","김?��? ?�당 ?�무 진행중인 �??�려�?,"반복?�무 중에 ?�늘 체크 ????�??�어?","미해�??�슈 �?개야?"].map((s)=>(
+                  {["오늘 마감인 업무 뭐 있어?","김현민 담당 업무 진행중인 거 알려줘","반복업무 중에 오늘 체크 안 한 거 있어?","미해결 이슈 몇 개야?"].map((s)=>(
                     <button key={s} onClick={()=>setAiInput(s)}>{s}</button>
                   ))}
                 </div>
@@ -1762,12 +1762,12 @@ function Board() {
                 <div className="aibubble">{m.text}</div>
               </div>
             ))}
-            {aiLoading&&<div className="aimsg ai"><div className="aibubble aithink">?�각 중�?/div></div>}
+            {aiLoading&&<div className="aimsg ai"><div className="aibubble aithink">생각 중…</div></div>}
           </div>
           <div className="aiinput">
-            <input placeholder="질문???�력?�세?? value={aiInput} onChange={(e)=>setAiInput(e.target.value)}
+            <input placeholder="질문을 입력하세요" value={aiInput} onChange={(e)=>setAiInput(e.target.value)}
               onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;sendAiMessage();}} disabled={aiLoading} />
-            <button className="btn-save" onClick={sendAiMessage} disabled={aiLoading||!aiInput.trim()}>?�송</button>
+            <button className="btn-save" onClick={sendAiMessage} disabled={aiLoading||!aiInput.trim()}>전송</button>
           </div>
         </div>
       )}
@@ -1777,17 +1777,17 @@ function Board() {
           <div className="panel" style={{padding:14,marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
               <div style={{fontSize:14,fontWeight:800}}>메모</div>
-              {canEdit&&<button className="btn-save" onClick={()=>setMemoDraft({cat:"",sub:"",title:"",text:""})}>+ 메모 추�?</button>}
+              {canEdit&&<button className="btn-save" onClick={()=>setMemoDraft({cat:"",sub:"",title:"",text:""})}>+ 메모 추가</button>}
             </div>
             <div style={{display:"flex",gap:7,marginTop:12,flexWrap:"wrap"}}>
-              <input className="inp" style={{flex:1,minWidth:160}} placeholder="검??(분류·?�목·?�용·?�위??��)" value={memoQuery} onChange={(e)=>setMemoQuery(e.target.value)} />
+              <input className="inp" style={{flex:1,minWidth:160}} placeholder="검색 (분류·제목·내용·하위항목)" value={memoQuery} onChange={(e)=>setMemoQuery(e.target.value)} />
               <select className="sel" value={memoCatFilter} onChange={(e)=>setMemoCatFilter(e.target.value)}>
                 {memoCatOptions.map((c)=><option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
 
-          {memoFiltered.length===0&&<div className="empty">{memoQuery||memoCatFilter!=="?�체"?"조건??맞는 메모가 ?�습?�다":"메모가 ?�습?�다. + 메모 추�?�??�작?�세??"}</div>}
+          {memoFiltered.length===0&&<div className="empty">{memoQuery||memoCatFilter!=="전체"?"조건에 맞는 메모가 없습니다":"메모가 없습니다. + 메모 추가로 시작하세요."}</div>}
 
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {memoFiltered.map((m)=>{
@@ -1806,30 +1806,30 @@ function Board() {
                       <div className="memotext">{m.text}</div>
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0}}>
-                      <button className="riedit" onClick={()=>setMemoExpand({...memoExpand,[m.id]:!expanded})}>{(m.subs||[]).length>0?`?�위 ${(m.subs||[]).length}`:"+?�위"}</button>
+                      <button className="riedit" onClick={()=>setMemoExpand({...memoExpand,[m.id]:!expanded})}>{(m.subs||[]).length>0?`하위 ${(m.subs||[]).length}`:"+하위"}</button>
                       {canEdit&&<button className="riedit" onClick={()=>duplicateMemo(m)}>복사</button>}
-                      {canEdit&&<button className="riedit" onClick={()=>setMemoDraft({...m,subs:[...(m.subs||[])]})}>?�정</button>}
+                      {canEdit&&<button className="riedit" onClick={()=>setMemoDraft({...m,subs:[...(m.subs||[])]})}>수정</button>}
                     </div>
                   </div>
                   {expanded&&(
                     <div className="memosubs">
-                      {(m.subs||[]).length===0&&<span className="hint">?�위 ??��???�습?�다</span>}
+                      {(m.subs||[]).length===0&&<span className="hint">하위 항목이 없습니다</span>}
                       {(m.subs||[]).map((s)=>(
                         <div key={s.id} className="cmt">
-                          <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}{s.edited&&<span style={{color:"var(--ink3)"}}> (?�정??</span>}</div>
+                          <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}{s.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
                           {memoSubEditId===s.id
                             ? <textarea className="hinput" defaultValue={s.text} autoFocus style={{width:"100%",marginTop:4}}
                                 onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editMemoSub(m.id,s.id,e.target.value);setMemoSubEditId(null);}}
                                 onBlur={(e)=>{editMemoSub(m.id,s.id,e.target.value);setMemoSubEditId(null);}} />
                             : <p>{s.text}</p>}
                           {canEdit&&memoSubEditId!==s.id&&<div style={{display:"flex",gap:10}}>
-                            <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setMemoSubEditId(s.id)}>?�정</button>
-                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeMemoSub(m.id,s.id)}>??��</button>
+                            <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setMemoSubEditId(s.id)}>수정</button>
+                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeMemoSub(m.id,s.id)}>삭제</button>
                           </div>}
                         </div>
                       ))}
                       {canEdit&&<div className="addrow">
-                        <textarea className="hinput" placeholder="?�위 ??�� ?�력 (Enter 추�?, Shift+Enter 줄바�?"
+                        <textarea className="hinput" placeholder="하위 항목 입력 (Enter 추가, Shift+Enter 줄바꿈)"
                           value={memoSubText[m.id]||""} onChange={(e)=>setMemoSubText({...memoSubText,[m.id]:e.target.value})}
                           onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addMemoSub(m.id,memoSubText[m.id]||"");setMemoSubText({...memoSubText,[m.id]:""});}} />
                       </div>}
@@ -1844,17 +1844,17 @@ function Board() {
 
       {view==="issue"&&(
         <div>
-          <div className="panel"><h3>?�슈 모아보기</h3>
-            <p className="sub">반복 ?�무?� ?�반 ?�무?�서 ?�록???�슈가 ?��? 모입?�다. ?�슈�??�릭?�면 ?�스?�리�?기록?????�습?�다.</p>
+          <div className="panel"><h3>이슈 모아보기</h3>
+            <p className="sub">반복 업무와 일반 업무에서 등록된 이슈가 전부 모입니다. 이슈를 클릭하면 히스토리를 기록할 수 있습니다.</p>
             <div style={{display:"flex",gap:7}}>
-              {[{id:"all",label:`?�체 ${allIssues.length}`},{id:"done",label:`?�결 ${allIssues.filter((i)=>i.resolved).length}`},{id:"open",label:`미해�?${allIssues.filter((i)=>!i.resolved).length}`}].map((f)=>(
+              {[{id:"all",label:`전체 ${allIssues.length}`},{id:"done",label:`해결 ${allIssues.filter((i)=>i.resolved).length}`},{id:"open",label:`미해결 ${allIssues.filter((i)=>!i.resolved).length}`}].map((f)=>(
                 <button key={f.id} className={"chip"+(issueFilter===f.id?" sel":"")} onClick={()=>setIssueFilter(f.id)}>{f.label}</button>
               ))}
             </div>
           </div>
           {(()=>{
             const list=allIssues.filter((i)=>issueFilter==="all"?true:issueFilter==="open"?!i.resolved:i.resolved);
-            if(!list.length)return <div className="empty">?�당?�는 ?�슈가 ?�습?�다</div>;
+            if(!list.length)return <div className="empty">해당하는 이슈가 없습니다</div>;
             const toggleAny=(i)=>{
               if(i.routineId)toggleIssue(i.routineId,i.id);
               else commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===i.taskId?{...t,issues:(t.issues||[]).map((x)=>x.id===i.id?{...x,resolved:!x.resolved,resolvedBy:me}:x),updatedAt:Date.now()}:t)}),[]);
@@ -1862,13 +1862,13 @@ function Board() {
             return list.map((i)=>(
               <div key={i.id} className={"issrow"+(i.resolved?" done":"")}>
                 <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setIssueDetail(i)}>
-                  <div className="isstext">{i.text}{(i.history||[]).length>0&&<span style={{fontSize:11,color:"var(--pri)",marginLeft:6,fontWeight:700}}>?��{(i.history||[]).length}</span>}</div>
-                  <div className="issmeta"><b style={{color:i.src==="?�무"?"#0055CC":"#1F845A"}}>{i.src}</b> · {i.routineTitle} · {i.author} · {fmtTs(i.ts)}{i.owner&&` · ?�당 ${i.owner}`}</div>
+                  <div className="isstext">{i.text}{(i.history||[]).length>0&&<span style={{fontSize:11,color:"var(--pri)",marginLeft:6,fontWeight:700}}>💬{(i.history||[]).length}</span>}</div>
+                  <div className="issmeta"><b style={{color:i.src==="업무"?"#0055CC":"#1F845A"}}>{i.src}</b> · {i.routineTitle} · {i.author} · {fmtTs(i.ts)}{i.owner&&` · 담당 ${i.owner}`}</div>
                 </div>
-                <button className={"issbtn"+(i.resolved?"":" active")} onClick={()=>toggleAny(i)}>{i.resolved?"?�결????:"미해�?}</button>
+                <button className={"issbtn"+(i.resolved?"":" active")} onClick={()=>toggleAny(i)}>{i.resolved?"해결됨 ✓":"미해결"}</button>
                 {!i.routineId&&<button className="btn ghost" onClick={()=>{
                   const t=data.tasks.find((x)=>x.id===i.taskId);if(t){setView("board");openTask(t);}
-                }}>?�동</button>}
+                }}>이동</button>}
               </div>
             ));
           })()}
@@ -1889,7 +1889,7 @@ function Board() {
           const upd={[k]:v};
           if(k==="status")upd.doneAt=v==="done"?(t.doneAt||now):null;
           commit((d)=>({...d,tasks:d.tasks.map((x)=>x.id===t.id?{...x,...upd,updatedAt:now,updatedBy:me}:x)}),
-            [mkLog("?� ?�정",t,`${k} ??${v}`)]);
+            [mkLog("셀 수정",t,`${k} → ${v}`)]);
         };
         const groups=grpBy==="status"
           ? cols.map((c)=>({key:c.id,label:c.label,color:STCOL[c.id],items:mdVisible.filter((t)=>t.status===c.id)}))
@@ -1897,18 +1897,18 @@ function Board() {
         return (
         <div>
           <div className="mdtoolbar">
-            <button className="btn" onClick={()=>openNew()}>+ ?�로???�스??/button>
+            <button className="btn" onClick={()=>openNew()}>+ 새로운 태스크</button>
             <span style={{width:12}} />
-            <input className="inp" placeholder="검?? value={q} onChange={(e)=>setQ(e.target.value)} style={{width:140}} />
+            <input className="inp" placeholder="검색" value={q} onChange={(e)=>setQ(e.target.value)} style={{width:140}} />
             <span className="mdsep" />
             <span className="mdlbl">그룹</span>
             <select className="sel" value={grpBy} onChange={(e)=>setGrpBy(e.target.value)}>
-              <option value="status">?�태�?/option>
-              <option value="channel">채널�?/option>
+              <option value="status">상태별</option>
+              <option value="channel">채널별</option>
             </select>
             <span className="mdsep" />
             <select className="sel" value={fOwner} onChange={(e)=>setFOwner(e.target.value)}>
-              <option value="?�체">?�당???�체</option>
+              <option value="전체">담당자 전체</option>
               {owners.map((o)=><option key={o} value={o}>{o}</option>)}
             </select>
             <span className="mdsep" />
@@ -1916,9 +1916,9 @@ function Board() {
             <input type="date" className="sel" value={listDateFrom} onChange={(e)=>setListDateFrom(e.target.value)} />
             <span style={{color:"var(--ink3)"}}>~</span>
             <input type="date" className="sel" value={listDateTo} onChange={(e)=>setListDateTo(e.target.value)} />
-            {(listDateFrom||listDateTo)&&<button className="chip" onClick={()=>{setListDateFrom("");setListDateTo("");}}>?�제</button>}
+            {(listDateFrom||listDateTo)&&<button className="chip" onClick={()=>{setListDateFrom("");setListDateTo("");}}>해제</button>}
             <span className="spacer" />
-            <span className="mdlbl">{mdVisible.length}�?/span>
+            <span className="mdlbl">{mdVisible.length}건</span>
           </div>
 
           {groups.map((g)=>{
@@ -1931,7 +1931,7 @@ function Board() {
             return (
             <div key={g.key} className="mdgroup">
               <button className="mdghead" onClick={()=>setCollapsed({...collapsed,[g.key]:open})}>
-                <span className="mdarrow" style={{color:g.color}}>{open?"??:"??}</span>
+                <span className="mdarrow" style={{color:g.color}}>{open?"▾":"▸"}</span>
                 <span className="mdgtitle" style={{color:g.color}}>{g.label}</span>
                 <span className="mdgcount">{items.length}</span>
               </button>
@@ -1941,17 +1941,17 @@ function Board() {
                     <thead>
                       <tr>
                         <th className="mdspine" />
-                        <th style={{minWidth:220}}>?�스??/th>
-                        <th style={{width:110}}>?�유??/th>
-                        <th style={{width:130}}>?�태</th>
-                        <th style={{width:130}}>마감??/th>
-                        <th style={{width:120}}>?�선?�위</th>
-                        <th style={{width:120}}>진행�?/th>
+                        <th style={{minWidth:220}}>태스크</th>
+                        <th style={{width:110}}>소유자</th>
+                        <th style={{width:130}}>상태</th>
+                        <th style={{width:130}}>마감일</th>
+                        <th style={{width:120}}>우선순위</th>
+                        <th style={{width:120}}>진행률</th>
                         <th style={{minWidth:150}}>메모</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {items.length===0&&<tr><td className="mdspine" /><td colSpan={7} className="mdempty">??��???�습?�다</td></tr>}
+                      {items.length===0&&<tr><td className="mdspine" /><td colSpan={7} className="mdempty">항목이 없습니다</td></tr>}
                       {items.map((t)=>{
                         const d=dayDiff(t.due),late=d!==null&&d<0&&t.status!=="done";
                         return (
@@ -1961,12 +1961,12 @@ function Board() {
                             <input defaultValue={t.title} disabled={!canEdit}
                               onBlur={(e)=>{const v=e.target.value.trim();if(v&&v!==t.title)patch(t,"title",v);}}
                               onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter")e.target.blur();}} />
-                            <button className="mdopen" onClick={()=>openTask(t)} title="?�세 ?�기">�?/button>
+                            <button className="mdopen" onClick={()=>openTask(t)} title="상세 열기">⤢</button>
                           </td>
                           <td>
                             <select className="mdplain" value={t.owner||""} disabled={!canEdit}
                               onChange={(e)=>patch(t,"owner",e.target.value)}>
-                              <option value="">??/option>
+                              <option value="">—</option>
                               {[...new Set([...owners,...data.members.map((m)=>m.name)].filter(Boolean))].map((o)=><option key={o} value={o}>{o}</option>)}
                             </select>
                           </td>
@@ -1978,8 +1978,8 @@ function Board() {
                           </td>
                           <td>
                             <div className="mddue">
-                              {late&&<span className="mdwarn" title={`${Math.abs(d)}??지??}>!</span>}
-                              {t.status==="done"&&<span className="mdok">??/span>}
+                              {late&&<span className="mdwarn" title={`${Math.abs(d)}일 지연`}>!</span>}
+                              {t.status==="done"&&<span className="mdok">✓</span>}
                               <input type="date" className="mdplain" value={t.due||""} disabled={!canEdit}
                                 style={t.status==="done"?{textDecoration:"line-through",color:"var(--ink3)"}:late?{color:"#E2445C",fontWeight:700}:{}}
                                 onChange={(e)=>patch(t,"due",e.target.value)} />
@@ -1998,7 +1998,7 @@ function Board() {
                             </div>
                           </td>
                           <td>
-                            <input className="mdplain" defaultValue={t.memo||""} placeholder="?? disabled={!canEdit}
+                            <input className="mdplain" defaultValue={t.memo||""} placeholder="—" disabled={!canEdit}
                               onBlur={(e)=>{const v=e.target.value;if(v!==(t.memo||""))patch(t,"memo",v);}}
                               onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter")e.target.blur();}} />
                           </td>
@@ -2008,7 +2008,7 @@ function Board() {
                         <tr className="mdaddrow">
                           <td className="mdspine" />
                           <td colSpan={7}>
-                            <button className="mdadd" onClick={()=>openNew(grpBy==="status"?g.key:"todo")}>+ ?�스??추�?</button>
+                            <button className="mdadd" onClick={()=>openNew(grpBy==="status"?g.key:"todo")}>+ 태스크 추가</button>
                           </td>
                         </tr>
                       )}
@@ -2022,14 +2022,14 @@ function Board() {
                           </div>}
                         </td>
                         <td>
-                          {dues.length>0&&<span className="mdrange">{dues[0].slice(5).replace("-","??")}????{dues[dues.length-1].slice(5).replace("-","??")}??/span>}
+                          {dues.length>0&&<span className="mdrange">{dues[0].slice(5).replace("-","월 ")}일 – {dues[dues.length-1].slice(5).replace("-","월 ")}일</span>}
                         </td>
                         <td>
                           {prCount.length>0&&<div className="mdstack">
                             {prCount.map((p)=><i key={p.id} title={`${p.label} ${p.n}`} style={{background:p.color,flex:p.n}} />)}
                           </div>}
                         </td>
-                        <td><span className="mdrange">?�균 {avgPg}%</span></td>
+                        <td><span className="mdrange">평균 {avgPg}%</span></td>
                         <td />
                       </tr>
                     </tbody>
@@ -2043,42 +2043,42 @@ function Board() {
       })()}
 
       {view==="archive"&&(<>
-        <div className="panel"><h3>?�료 ?�무 보�???/h3><p className="sub">보드?�서 치운 ?�무?�니?? ?�돌리면 ?�시 보드�??�라?�니??</p>
-          <div style={{display:"flex",gap:7}}>{canEdit&&<button className="btn ghost" onClick={()=>setConfirmBox({kind:"archiveDone"})}>?�료 {live.filter((t)=>t.status==="done").length}�?보�??�기</button>}{isAdmin&&archived.length>0&&<button className="btn warn" onClick={()=>setConfirmBox({kind:"purge"})}>보�????�구 ??��</button>}</div>
+        <div className="panel"><h3>완료 업무 보관함</h3><p className="sub">보드에서 치운 업무입니다. 되돌리면 다시 보드로 올라옵니다.</p>
+          <div style={{display:"flex",gap:7}}>{canEdit&&<button className="btn ghost" onClick={()=>setConfirmBox({kind:"archiveDone"})}>완료 {live.filter((t)=>t.status==="done").length}건 보관하기</button>}{isAdmin&&archived.length>0&&<button className="btn warn" onClick={()=>setConfirmBox({kind:"purge"})}>보관함 영구 삭제</button>}</div>
         </div>
-        <table className="tbl"><thead><tr><th>채널</th><th>?�무�?/th><th>?�당</th><th>?�료</th><th></th></tr></thead>
+        <table className="tbl"><thead><tr><th>채널</th><th>업무명</th><th>담당</th><th>완료</th><th></th></tr></thead>
           <tbody>
-            {archived.length===0&&<tr><td colSpan={5} style={{textAlign:"center",color:"#8F959C",padding:20,fontSize:12}}>보�????�무가 ?�습?�다</td></tr>}
+            {archived.length===0&&<tr><td colSpan={5} style={{textAlign:"center",color:"#8F959C",padding:20,fontSize:12}}>보관된 업무가 없습니다</td></tr>}
             {archived.slice().sort((a,b)=>(b.doneAt||0)-(a.doneAt||0)).map((t)=>(
-              <tr key={t.id}><td><span className="chdot m"><b style={{background:chColor(t.channel)}} />{t.channel}</span></td><td style={{fontWeight:600,color:"#565C64"}}>{t.title}</td><td className="m">{t.owner||"??}</td><td className="m">{t.doneAt?fmtTs(t.doneAt):"??}</td><td style={{textAlign:"right"}}>{canEdit&&<button className="btn ghost" onClick={()=>setArchivedFlag(t,false)}>?�돌리기</button>}</td></tr>
+              <tr key={t.id}><td><span className="chdot m"><b style={{background:chColor(t.channel)}} />{t.channel}</span></td><td style={{fontWeight:600,color:"#565C64"}}>{t.title}</td><td className="m">{t.owner||"—"}</td><td className="m">{t.doneAt?fmtTs(t.doneAt):"—"}</td><td style={{textAlign:"right"}}>{canEdit&&<button className="btn ghost" onClick={()=>setArchivedFlag(t,false)}>되돌리기</button>}</td></tr>
             ))}
           </tbody>
         </table>
       </>)}
 
       {view==="log"&&(
-        <div><div className="panel"><h3>변�??�력</h3><p className="sub">최근 {LOG_CAP}건까지 ?�습?�다.</p></div>
-          {(data.log||[]).length===0&&<div className="empty">기록???�습?�다</div>}
-          {(data.log||[]).map((e)=><div key={e.id} className="logrow"><span className="t">{fmtTs(e.ts)}</span><span className="w">{e.who}</span><span><b style={{fontWeight:600}}>{e.action}</b>{e.taskTitle&&<span style={{color:"#565C64"}}> · {e.taskTitle}</span>}{e.detail&&<span style={{fontSize:10.5,color:"#8F959C"}}> ??{e.detail}</span>}</span></div>)}
+        <div><div className="panel"><h3>변경 이력</h3><p className="sub">최근 {LOG_CAP}건까지 남습니다.</p></div>
+          {(data.log||[]).length===0&&<div className="empty">기록이 없습니다</div>}
+          {(data.log||[]).map((e)=><div key={e.id} className="logrow"><span className="t">{fmtTs(e.ts)}</span><span className="w">{e.who}</span><span><b style={{fontWeight:600}}>{e.action}</b>{e.taskTitle&&<span style={{color:"#565C64"}}> · {e.taskTitle}</span>}{e.detail&&<span style={{fontSize:10.5,color:"#8F959C"}}> — {e.detail}</span>}</span></div>)}
         </div>
       )}
 
       {view==="team"&&(<>
-        <div className="panel"><h3>?�?�과 권한</h3><p className="sub">관리자/멤버/뷰어 3?�계.</p>
-          {data.members.length===0&&<div className="empty">?�?�이 ?�습?�다</div>}
+        <div className="panel"><h3>팀원과 권한</h3><p className="sub">관리자/멤버/뷰어 3단계.</p>
+          {data.members.length===0&&<div className="empty">팀원이 없습니다</div>}
           {data.members.map((m)=>(
             <div key={m.name} className="mrow" style={{borderTop:"1px solid var(--line)"}}>
-              <span style={{fontWeight:600,fontSize:13,minWidth:90}}>{m.name}{m.name===me&&<span style={{fontSize:10,color:"#8F959C",fontFamily:"monospace"}}> (??</span>}</span>
-              <span style={{fontSize:11,fontFamily:"monospace",color:m.pw?"var(--ok)":"var(--warn)"}}>{m.pw?"?�� ?�정??:"??비번?�음"}</span>
-              <select className="sel" value={m.role} disabled={!isAdmin} onChange={(e)=>{const role=e.target.value;commit((d)=>({...d,members:d.members.map((x)=>x.name===m.name?{...x,role,updatedAt:Date.now()}:x)}),[mkLog("권한 변�?,null,`${m.name} -> ${ROLES.find((r)=>r.id===role).label}`)]);}}>
+              <span style={{fontWeight:600,fontSize:13,minWidth:90}}>{m.name}{m.name===me&&<span style={{fontSize:10,color:"#8F959C",fontFamily:"monospace"}}> (나)</span>}</span>
+              <span style={{fontSize:11,fontFamily:"monospace",color:m.pw?"var(--ok)":"var(--warn)"}}>{m.pw?"🔒 설정됨":"⚠ 비번없음"}</span>
+              <select className="sel" value={m.role} disabled={!isAdmin} onChange={(e)=>{const role=e.target.value;commit((d)=>({...d,members:d.members.map((x)=>x.name===m.name?{...x,role,updatedAt:Date.now()}:x)}),[mkLog("권한 변경",null,`${m.name} -> ${ROLES.find((r)=>r.id===role).label}`)]);}}>
                 {ROLES.map((r)=><option key={r.id} value={r.id}>{r.label}</option>)}
               </select>
-              <span className="spacer" />{isAdmin&&m.name!==me&&<button className="del" onClick={()=>{if(window.confirm(`"${m.name}" ?�을 ?�?�서 ?�보?�까?? 로그?�할 ???�게 ?�니??`))commit((d)=>({...d,members:d.members.filter((x)=>x.name!==m.name)}),[mkLog("?�????��",null,m.name)]);}}>?�보?�기</button>}
+              <span className="spacer" />{isAdmin&&m.name!==me&&<button className="del" onClick={()=>{if(window.confirm(`"${m.name}" 님을 팀에서 내보낼까요? 로그인할 수 없게 됩니다.`))commit((d)=>({...d,members:d.members.filter((x)=>x.name!==m.name)}),[mkLog("팀원 삭제",null,m.name)]);}}>내보내기</button>}
             </div>
           ))}
         </div>
         
-        <div className="panel"><h3>?�매 채널</h3><p className="sub">?�위 채널 ?�래???�위 채널???�을 ???�습?�다. ?�름???�릭?�면 ?�정?�니??</p>
+        <div className="panel"><h3>판매 채널</h3><p className="sub">상위 채널 아래에 하위 채널을 넣을 수 있습니다. 이름을 클릭하면 수정됩니다.</p>
           {topChannels.map((c)=>{
             const i=data.channels.findIndex((x)=>x.id===c.id);
             const kids=subsOf(c.id);
@@ -2093,16 +2093,16 @@ function Board() {
                     commit((d)=>({...d,
                       channels:d.channels.map((x)=>x.id===c.id?{...x,id:newId}:(x.parent===c.id?{...x,parent:newId}:x)),
                       tasks:d.tasks.map((t)=>t.channel===c.id?{...t,channel:newId}:t),
-                      channelsUpdatedAt:Date.now()}),[mkLog("채널 ?�름 변�?,null,`${c.id} ??${newId}`)]);}}
+                      channelsUpdatedAt:Date.now()}),[mkLog("채널 이름 변경",null,`${c.id} → ${newId}`)]);}}
                   style={{fontSize:14,fontWeight:700,border:"none",background:"transparent",width:120,padding:"2px 4px",borderBottom:isAdmin?"1px dashed #A9B0A6":"none"}} />
-                <span style={{fontSize:11,color:"var(--ink2)",fontFamily:"monospace"}}>{cnt(c.id)}�?/span>
+                <span style={{fontSize:11,color:"var(--ink2)",fontFamily:"monospace"}}>{cnt(c.id)}건</span>
                 <span className="spacer" />
-                {isAdmin&&<button className="btn ghost" style={{padding:"3px 9px",fontSize:11.5}} onClick={()=>setSubTarget(c.id)}>+ ?�위</button>}
-                {isAdmin&&topChannels.length>1&&<button className="del" onClick={()=>commit((d)=>({...d,channels:d.channels.filter((x)=>x.id!==c.id&&x.parent!==c.id),channelsUpdatedAt:Date.now()}),[mkLog("채널 ??��",null,c.id)])}>??��</button>}
+                {isAdmin&&<button className="btn ghost" style={{padding:"3px 9px",fontSize:11.5}} onClick={()=>setSubTarget(c.id)}>+ 하위</button>}
+                {isAdmin&&topChannels.length>1&&<button className="del" onClick={()=>commit((d)=>({...d,channels:d.channels.filter((x)=>x.id!==c.id&&x.parent!==c.id),channelsUpdatedAt:Date.now()}),[mkLog("채널 삭제",null,c.id)])}>삭제</button>}
               </div>
               {kids.map((k)=>(
                 <div key={k.id} className="mrow" style={{borderTop:"none",paddingLeft:22,paddingTop:3,paddingBottom:3}}>
-                  <span style={{color:"var(--ink2)",fontSize:12}}>??/span>
+                  <span style={{color:"var(--ink2)",fontSize:12}}>└</span>
                   <input type="color" value={k.color} disabled={!isAdmin} style={{width:26,height:20,padding:0,border:"1px solid #A9B0A6"}}
                     onChange={(e)=>{const color=e.target.value;commit((d)=>({...d,channels:d.channels.map((x)=>x.id===k.id?{...x,color}:x),channelsUpdatedAt:Date.now()}),[]);}} />
                   <input defaultValue={k.id} disabled={!isAdmin}
@@ -2110,17 +2110,17 @@ function Board() {
                       commit((d)=>({...d,
                         channels:d.channels.map((x)=>x.id===k.id?{...x,id:newId}:x),
                         tasks:d.tasks.map((t)=>t.channel===k.id?{...t,channel:newId}:t),
-                        channelsUpdatedAt:Date.now()}),[mkLog("?�위 채널 ?�름 변�?,null,`${k.id} ??${newId}`)]);}}
+                        channelsUpdatedAt:Date.now()}),[mkLog("하위 채널 이름 변경",null,`${k.id} → ${newId}`)]);}}
                     style={{fontSize:13,border:"none",background:"transparent",width:110,padding:"2px 4px",borderBottom:isAdmin?"1px dashed #CDD3CA":"none"}} />
-                  <span style={{fontSize:11,color:"var(--ink2)",fontFamily:"monospace"}}>{cnt(k.id)}�?/span>
+                  <span style={{fontSize:11,color:"var(--ink2)",fontFamily:"monospace"}}>{cnt(k.id)}건</span>
                   <span className="spacer" />
-                  {isAdmin&&<button className="del" onClick={()=>commit((d)=>({...d,channels:d.channels.filter((x)=>x.id!==k.id),channelsUpdatedAt:Date.now()}),[mkLog("?�위 채널 ??��",null,k.id)])}>??��</button>}
+                  {isAdmin&&<button className="del" onClick={()=>commit((d)=>({...d,channels:d.channels.filter((x)=>x.id!==k.id),channelsUpdatedAt:Date.now()}),[mkLog("하위 채널 삭제",null,k.id)])}>삭제</button>}
                 </div>
               ))}
               {subTarget===c.id&&isAdmin&&(
                 <div className="addrow" style={{paddingLeft:22,marginTop:4}}>
-                  <input autoFocus placeholder={`${c.id} ?�위 채널�?} value={newSub} onChange={(e)=>setNewSub(e.target.value)} />
-                  <button onClick={()=>addChannel(c.id)}>추�?</button>
+                  <input autoFocus placeholder={`${c.id} 하위 채널명`} value={newSub} onChange={(e)=>setNewSub(e.target.value)} />
+                  <button onClick={()=>addChannel(c.id)}>추가</button>
                   <button style={{background:"transparent",border:"1px solid #A9B0A6",color:"var(--ink2)",padding:"6px 11px",fontSize:12}} onClick={()=>{setSubTarget(null);setNewSub("");}}>취소</button>
                 </div>
               )}
@@ -2128,12 +2128,12 @@ function Board() {
           );})}
           {isAdmin&&(
             <div className="addrow" style={{marginTop:14,borderTop:"1px solid var(--line)",paddingTop:14}}>
-              <input placeholder="?�위 채널�??�력 ??추�? 버튼 ?�릭" value={newChannel} onChange={(e)=>setNewChannel(e.target.value)} />
-              <button onClick={()=>addChannel(null)}>추�?</button>
+              <input placeholder="상위 채널명 입력 후 추가 버튼 클릭" value={newChannel} onChange={(e)=>setNewChannel(e.target.value)} />
+              <button onClick={()=>addChannel(null)}>추가</button>
             </div>
           )}
         </div>
-        <div className="panel"><h3>보드 컬럼 ?�름</h3><p className="sub">보드??5�?컬럼(?�기·진?�중·검?�컨?�·이?�·완�? ?�름???�하???��?바꿉?�다.</p>
+        <div className="panel"><h3>보드 컬럼 이름</h3><p className="sub">보드의 5개 컬럼(대기·진행중·검토컨펌·이슈·완료) 이름을 원하는 대로 바꿉니다.</p>
           {cols.map((c)=>(
             <div key={c.id} className="mrow" style={{borderTop:"1px solid var(--line)"}}>
               <span style={{fontSize:11,fontFamily:"monospace",color:"var(--ink3)",minWidth:70}}>{c.id}</span>
@@ -2141,100 +2141,100 @@ function Board() {
                 onBlur={(e)=>{
                   const v=e.target.value.trim();
                   if(!v||v===c.label)return;
-                  commit((d)=>({...d,colLabels:{...(d.colLabels||{}),[c.id]:v},colLabelsUpdatedAt:Date.now()}),[mkLog("컬럼�?변�?,null,`${c.id} -> ${v}`)]);
+                  commit((d)=>({...d,colLabels:{...(d.colLabels||{}),[c.id]:v},colLabelsUpdatedAt:Date.now()}),[mkLog("컬럼명 변경",null,`${c.id} -> ${v}`)]);
                 }}
                 onKeyDown={(e)=>{if(e.key==="Enter")e.target.blur();}}
                 style={{flex:1,maxWidth:220,background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"6px 9px",fontSize:13}} />
-              {(data.colLabels||{})[c.id]&&isAdmin&&<button className="del" onClick={()=>commit((d)=>{const cl={...(d.colLabels||{})};delete cl[c.id];return{...d,colLabels:cl,colLabelsUpdatedAt:Date.now()};},[mkLog("컬럼�?초기??,null,c.id)])}>초기??/button>}
+              {(data.colLabels||{})[c.id]&&isAdmin&&<button className="del" onClick={()=>commit((d)=>{const cl={...(d.colLabels||{})};delete cl[c.id];return{...d,colLabels:cl,colLabelsUpdatedAt:Date.now()};},[mkLog("컬럼명 초기화",null,c.id)])}>초기화</button>}
             </div>
           ))}
         </div>
 
-        <div className="panel"><h3>?�무 ?�형</h3><p className="sub">?�무 ?�세?�서 ?�택?????�는 ?�형??추�?·??��?�니??</p>
+        <div className="panel"><h3>업무 유형</h3><p className="sub">업무 상세에서 선택할 수 있는 유형을 추가·삭제합니다.</p>
           <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
             {(data.types||TYPES).map((t)=>(
               <span key={t} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#EBECF0",borderRadius:16,padding:"5px 12px",fontSize:13,fontWeight:600,color:"var(--ink2)"}}>
                 {t}
-                {isAdmin&&(data.types||TYPES).length>1&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}} onClick={()=>{commit((d)=>({...d,types:(d.types||TYPES).filter((x)=>x!==t),typesUpdatedAt:Date.now()}),[mkLog("?�무?�형 ??��",null,t)]);}}>×</button>}
+                {isAdmin&&(data.types||TYPES).length>1&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}} onClick={()=>{commit((d)=>({...d,types:(d.types||TYPES).filter((x)=>x!==t),typesUpdatedAt:Date.now()}),[mkLog("업무유형 삭제",null,t)]);}}>×</button>}
               </span>
             ))}
           </div>
           {isAdmin&&(
             <div className="addrow" style={{marginTop:12}}>
-              <input placeholder="???�무 ?�형 ?�력 ??추�?" value={newType} onChange={(e)=>setNewType(e.target.value)} />
-              <button onClick={()=>{const t=newType.trim();if(!t)return;if((data.types||TYPES).includes(t)){alert("?��? ?�는 ?�형?�니??");return;}commit((d)=>({...d,types:[...(d.types||TYPES),t],typesUpdatedAt:Date.now()}),[mkLog("?�무?�형 추�?",null,t)]);setNewType("");}}>추�?</button>
+              <input placeholder="새 업무 유형 입력 후 추가" value={newType} onChange={(e)=>setNewType(e.target.value)} />
+              <button onClick={()=>{const t=newType.trim();if(!t)return;if((data.types||TYPES).includes(t)){alert("이미 있는 유형입니다.");return;}commit((d)=>({...d,types:[...(d.types||TYPES),t],typesUpdatedAt:Date.now()}),[mkLog("업무유형 추가",null,t)]);setNewType("");}}>추가</button>
             </div>
           )}
         </div>
 
-        <div className="panel"><h3>반복?�무 분류</h3><p className="sub">반복?�무�?묶어??보여�?분류�??�유�?�� 만듭?�다. (?? ?�전/?�후 ?�???��? 채널�???</p>
+        <div className="panel"><h3>반복업무 분류</h3><p className="sub">반복업무를 묶어서 보여줄 분류를 자유롭게 만듭니다. (예: 오전/오후 대신 팀별, 채널별 등)</p>
           <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-            {(data.routineCats&&data.routineCats.length?data.routineCats:["?�전","?�후"]).map((c)=>(
+            {(data.routineCats&&data.routineCats.length?data.routineCats:["오전","오후"]).map((c)=>(
               <span key={c} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#EBECF0",borderRadius:16,padding:"5px 12px",fontSize:13,fontWeight:600,color:"var(--ink2)"}}>
                 {c}
-                {isAdmin&&(data.routineCats||["?�전","?�후"]).length>1&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}} onClick={()=>{commit((d)=>({...d,routineCats:(d.routineCats&&d.routineCats.length?d.routineCats:["?�전","?�후"]).filter((x)=>x!==c),routineCatsUpdatedAt:Date.now()}),[mkLog("반복?�무분류 ??��",null,c)]);}}>×</button>}
+                {isAdmin&&(data.routineCats||["오전","오후"]).length>1&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}} onClick={()=>{commit((d)=>({...d,routineCats:(d.routineCats&&d.routineCats.length?d.routineCats:["오전","오후"]).filter((x)=>x!==c),routineCatsUpdatedAt:Date.now()}),[mkLog("반복업무분류 삭제",null,c)]);}}>×</button>}
               </span>
             ))}
           </div>
           {isAdmin&&(
             <div className="addrow" style={{marginTop:12}}>
-              <input placeholder="??분류 ?�력 ??추�?" value={newRcat} onChange={(e)=>setNewRcat(e.target.value)} />
-              <button onClick={()=>{const c=newRcat.trim();if(!c)return;const cur=data.routineCats&&data.routineCats.length?data.routineCats:["?�전","?�후"];if(cur.includes(c)){alert("?��? ?�는 분류?�니??");return;}commit((d)=>({...d,routineCats:[...cur,c],routineCatsUpdatedAt:Date.now()}),[mkLog("반복?�무분류 추�?",null,c)]);setNewRcat("");}}>추�?</button>
+              <input placeholder="새 분류 입력 후 추가" value={newRcat} onChange={(e)=>setNewRcat(e.target.value)} />
+              <button onClick={()=>{const c=newRcat.trim();if(!c)return;const cur=data.routineCats&&data.routineCats.length?data.routineCats:["오전","오후"];if(cur.includes(c)){alert("이미 있는 분류입니다.");return;}commit((d)=>({...d,routineCats:[...cur,c],routineCatsUpdatedAt:Date.now()}),[mkLog("반복업무분류 추가",null,c)]);setNewRcat("");}}>추가</button>
             </div>
           )}
         </div>
 
-        <div className="panel"><h3>백업</h3><p className="sub">주기?�으�??�려받아 ?�세??</p>
+        <div className="panel"><h3>백업</h3><p className="sub">주기적으로 내려받아 두세요.</p>
           <div style={{display:"flex",gap:7}}>
-            <button className="btn ghost" onClick={exportJson}>JSON ?�려받기</button>
-            {isAdmin&&<button className="btn ghost" onClick={()=>importRef.current?.click()}>JSON 가?�오�?/button>}
+            <button className="btn ghost" onClick={exportJson}>JSON 내려받기</button>
+            {isAdmin&&<button className="btn ghost" onClick={()=>importRef.current?.click()}>JSON 가져오기</button>}
             <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={(e)=>{const f=e.target.files?.[0];if(f)importJson(f);e.target.value="";}} />
           </div>
         </div>
       </>)}
 
       </div>
-      <div className="note" style={{margin:"18px 16px 0"}}>?�이?�는 Firebase(구�?)???�시�??�?�됩?�다. 계약 조건?�나 개인?�보???�리지 마세??</div>
+      <div className="note" style={{margin:"18px 16px 0"}}>데이터는 Firebase(구글)에 실시간 저장됩니다. 계약 조건이나 개인정보는 올리지 마세요.</div>
 
       {pwChange&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setPwChange(null)}><div className="modal sm">
-          <h2>비�?번호 변�?/h2>
+          <h2>비밀번호 변경</h2>
           <div className="modal-body">
-            <div className="fld"><label>?�재 비�?번호</label><input type="password" value={pwChange.cur} onChange={(e)=>setPwChange({...pwChange,cur:e.target.value})} placeholder="?�재 비�?번호" /></div>
-            <div className="fld"><label>??비�?번호</label><input type="password" value={pwChange.next} onChange={(e)=>setPwChange({...pwChange,next:e.target.value})} placeholder="4???�상" /></div>
-            <div className="fld"><label>??비�?번호 ?�인</label><input type="password" value={pwChange.next2} onChange={(e)=>setPwChange({...pwChange,next2:e.target.value})} onKeyDown={(e)=>{if(e.key==="Enter")changePw();}} placeholder="??비�?번호 ?�시 ?�력" /></div>
+            <div className="fld"><label>현재 비밀번호</label><input type="password" value={pwChange.cur} onChange={(e)=>setPwChange({...pwChange,cur:e.target.value})} placeholder="현재 비밀번호" /></div>
+            <div className="fld"><label>새 비밀번호</label><input type="password" value={pwChange.next} onChange={(e)=>setPwChange({...pwChange,next:e.target.value})} placeholder="4자 이상" /></div>
+            <div className="fld"><label>새 비밀번호 확인</label><input type="password" value={pwChange.next2} onChange={(e)=>setPwChange({...pwChange,next2:e.target.value})} onKeyDown={(e)=>{if(e.key==="Enter")changePw();}} placeholder="새 비밀번호 다시 입력" /></div>
           </div>
           <div className="modal-foot"><span className="spacer" />
             <button className="btn ghost" onClick={()=>setPwChange(null)}>취소</button>
-            <button className="btn-save" onClick={changePw}>변�?/button>
+            <button className="btn-save" onClick={changePw}>변경</button>
           </div>
         </div></div>
       )}
 
       {askName&&(
-        <div className="mask"><div className="modal sm"><h2>?�름???�려주세??/h2><p className="hint" style={{lineHeight:1.6,marginBottom:14}}>?�당?? ?��?, 변�??�력?????�름???�습?�다.</p>
-          <div className="fld"><label>?�름</label><input autoFocus value={nameInput} onChange={(e)=>setNameInput(e.target.value)} onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;saveMe(nameInput);}} placeholder="?? 김?��?" /></div>
-          <div className="mfoot"><span className="spacer" />{me&&<button className="btn ghost" onClick={()=>setAskName(false)}>취소</button>}<button className="btn" onClick={()=>saveMe(nameInput)}>?�작?�기</button></div>
+        <div className="mask"><div className="modal sm"><h2>이름을 알려주세요</h2><p className="hint" style={{lineHeight:1.6,marginBottom:14}}>담당자, 댓글, 변경 이력에 이 이름이 남습니다.</p>
+          <div className="fld"><label>이름</label><input autoFocus value={nameInput} onChange={(e)=>setNameInput(e.target.value)} onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;saveMe(nameInput);}} placeholder="예) 김현민" /></div>
+          <div className="mfoot"><span className="spacer" />{me&&<button className="btn ghost" onClick={()=>setAskName(false)}>취소</button>}<button className="btn" onClick={()=>saveMe(nameInput)}>시작하기</button></div>
         </div></div>
       )}
 
       {riAdd&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setRiAdd(null)}><div className="modal sm">
-          <h2>{riAdd.id?"??�� ?�정":"????�� 추�?"}</h2>
+          <h2>{riAdd.id?"항목 수정":"새 항목 추가"}</h2>
           <div className="modal-body">
-            <div className="fld"><label>?�분류</label><input list="ri-cats" autoFocus value={riAdd.cat} onChange={(e)=>setRiAdd({...riAdd,cat:e.target.value})} placeholder="?? ?��?채널" />
+            <div className="fld"><label>대분류</label><input list="ri-cats" autoFocus value={riAdd.cat} onChange={(e)=>setRiAdd({...riAdd,cat:e.target.value})} placeholder="예) 외부채널" />
               <datalist id="ri-cats">{riCatNames.map((c)=><option key={c} value={c} />)}</datalist>
             </div>
-            <div className="fld"><label>중분�?/label><input list="ri-subs" value={riAdd.sub} onChange={(e)=>setRiAdd({...riAdd,sub:e.target.value})} placeholder="?? 지그재�? />
+            <div className="fld"><label>중분류</label><input list="ri-subs" value={riAdd.sub} onChange={(e)=>setRiAdd({...riAdd,sub:e.target.value})} placeholder="예) 지그재그" />
               <datalist id="ri-subs">{riSubNames(riAdd.cat).map((s)=><option key={s} value={s} />)}</datalist>
             </div>
-            <div className="fld"><label>?�분�?(체크 ??��)</label><input value={riAdd.title} onChange={(e)=>setRiAdd({...riAdd,title:e.target.value})} placeholder="?? CPC ?�인" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;saveRi();}} /></div>
+            <div className="fld"><label>소분류 (체크 항목)</label><input value={riAdd.title} onChange={(e)=>setRiAdd({...riAdd,title:e.target.value})} placeholder="예) CPC 확인" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;saveRi();}} /></div>
           </div>
           <div className="mfoot">
-            {riAdd.id&&<button className="del" onClick={()=>removeRi(riAdd)}>??��</button>}
+            {riAdd.id&&<button className="del" onClick={()=>removeRi(riAdd)}>삭제</button>}
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setRiAdd(null)}>취소</button>
-            <button className="btn-save" onClick={saveRi}>?�??/button>
+            <button className="btn-save" onClick={saveRi}>저장</button>
           </div>
         </div></div>
       )}
@@ -2243,7 +2243,7 @@ function Board() {
         const i=issueDetail;
         const addHistory=(text)=>{
           const t=text.trim();if(!t)return;
-          const entry={id:uid(),text:t,author:me||"?�명",ts:Date.now()};
+          const entry={id:uid(),text:t,author:me||"익명",ts:Date.now()};
           if(i.routineId){
             commit((d)=>({...d,routines:(d.routines||[]).map((r)=>r.id===i.routineId?{...r,issues:(r.issues||[]).map((x)=>x.id===i.id?{...x,history:[...(x.history||[]),entry]}:x),updatedAt:Date.now()}:r)}),[]);
           }else{
@@ -2265,18 +2265,18 @@ function Board() {
         };
         return (
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setIssueDetail(null)}><div className="modal">
-          <h2>?�슈 ?�세</h2>
+          <h2>이슈 상세</h2>
           <div className="modal-body">
             <div style={{background:"#F5F6F8",borderRadius:8,padding:"12px 14px",marginBottom:16}}>
               <div style={{fontSize:15,fontWeight:700,marginBottom:6}}>{i.text}</div>
-              <div className="issmeta"><b style={{color:i.src==="?�무"?"#0055CC":"#1F845A"}}>{i.src}</b> · {i.routineTitle} · ?�록 {i.author} · {fmtTs(i.ts)}{i.owner&&` · ?�당 ${i.owner}`}</div>
-              <button className={"issbtn"+(i.resolved?"":" active")} style={{marginTop:10}} onClick={toggleR}>{i.resolved?"?�결????(?�르�?미해�?":"미해�?(?�르�??�결)"}</button>
+              <div className="issmeta"><b style={{color:i.src==="업무"?"#0055CC":"#1F845A"}}>{i.src}</b> · {i.routineTitle} · 등록 {i.author} · {fmtTs(i.ts)}{i.owner&&` · 담당 ${i.owner}`}</div>
+              <button className={"issbtn"+(i.resolved?"":" active")} style={{marginTop:10}} onClick={toggleR}>{i.resolved?"해결됨 ✓ (누르면 미해결)":"미해결 (누르면 해결)"}</button>
             </div>
-            <div className="sect" style={{marginTop:0,borderTop:"none"}}><h4>?�스?�리 · 진행 기록</h4>
-              {(i.history||[]).length===0&&<span className="hint">?�직 기록???�습?�다. ?�래??진행 ?�황???�어보세??</span>}
+            <div className="sect" style={{marginTop:0,borderTop:"none"}}><h4>히스토리 · 진행 기록</h4>
+              {(i.history||[]).length===0&&<span className="hint">아직 기록이 없습니다. 아래에 진행 상황을 적어보세요.</span>}
               {(i.history||[]).map((h)=>(
                 <div key={h.id} className="cmt">
-                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (?�정??</span>}</div>
+                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
                   {h.editing
                     ? <div style={{display:"flex",gap:6,marginTop:4}}>
                         <input defaultValue={h.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14}}
@@ -2289,13 +2289,13 @@ function Board() {
                       </div>
                     : <p>{h.text}</p>}
                   {canEdit&&!h.editing&&<div style={{display:"flex",gap:10,marginTop:3}}>
-                    <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setIssueDetail({...i,history:i.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>?�정</button>
-                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>delHistory(h.id)}>??��</button>
+                    <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setIssueDetail({...i,history:i.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>수정</button>
+                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>delHistory(h.id)}>삭제</button>
                   </div>}
                 </div>
               ))}
               {canEdit&&<div className="addrow">
-                <textarea className="hinput" placeholder="진행 ?�황·조치 ?�용 ?�력 (Enter ?�송, Shift+Enter 줄바�?" onKeyDown={(e)=>{
+                <textarea className="hinput" placeholder="진행 상황·조치 내용 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{
                   if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;
                   e.preventDefault();
                   const v=e.target.value.trim();if(!v)return;
@@ -2306,7 +2306,7 @@ function Board() {
           </div>
           <div className="modal-foot">
             <span className="spacer" />
-            <button className="btn ghost" onClick={()=>setIssueDetail(null)}>?�기</button>
+            <button className="btn ghost" onClick={()=>setIssueDetail(null)}>닫기</button>
           </div>
         </div></div>
         );
@@ -2314,41 +2314,41 @@ function Board() {
 
       {memoDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMemoDraft(null)}><div className="modal">
-          <h2>{memoDraft.id?"메모 ?�정":"??메모"}</h2>
+          <h2>{memoDraft.id?"메모 수정":"새 메모"}</h2>
           <div className="modal-body">
             <div className="r3">
-              <div className="fld"><label>?�분류 (?�택)</label><input list="memo-cats" value={memoDraft.cat||""} onChange={(e)=>setMemoDraft({...memoDraft,cat:e.target.value})} placeholder="?? 마�??? />
+              <div className="fld"><label>대분류 (선택)</label><input list="memo-cats" value={memoDraft.cat||""} onChange={(e)=>setMemoDraft({...memoDraft,cat:e.target.value})} placeholder="예) 마케팅" />
                 <datalist id="memo-cats">{memoCatNames.map((c)=><option key={c} value={c} />)}</datalist>
               </div>
-              <div className="fld"><label>중분�?(?�택)</label><input list="memo-subs" value={memoDraft.sub||""} onChange={(e)=>setMemoDraft({...memoDraft,sub:e.target.value})} placeholder="?? 브랜?��??? />
+              <div className="fld"><label>중분류 (선택)</label><input list="memo-subs" value={memoDraft.sub||""} onChange={(e)=>setMemoDraft({...memoDraft,sub:e.target.value})} placeholder="예) 브랜드검색" />
                 <datalist id="memo-subs">{memoSubNames(memoDraft.cat||"").map((s)=><option key={s} value={s} />)}</datalist>
               </div>
-              <div className="fld"><label>?�분�?(?�택)</label><input value={memoDraft.title||""} onChange={(e)=>setMemoDraft({...memoDraft,title:e.target.value})} placeholder="?? ?�워???�이?�어" /></div>
+              <div className="fld"><label>소분류 (선택)</label><input value={memoDraft.title||""} onChange={(e)=>setMemoDraft({...memoDraft,title:e.target.value})} placeholder="예) 키워드 아이디어" /></div>
             </div>
-            <div className="fld"><label>?�용</label><textarea autoFocus value={memoDraft.text||""} onChange={(e)=>setMemoDraft({...memoDraft,text:e.target.value})} placeholder="메모 ?�용???�력?�세?? style={{minHeight:100}} /></div>
+            <div className="fld"><label>내용</label><textarea autoFocus value={memoDraft.text||""} onChange={(e)=>setMemoDraft({...memoDraft,text:e.target.value})} placeholder="메모 내용을 입력하세요" style={{minHeight:100}} /></div>
           </div>
           <div className="modal-foot">
-            {memoDraft.id&&<button className="del" onClick={()=>removeMemo(memoDraft)}>??��</button>}
+            {memoDraft.id&&<button className="del" onClick={()=>removeMemo(memoDraft)}>삭제</button>}
             {memoDraft.id&&<button className="btn ghost" onClick={()=>duplicateMemo(memoDraft)}>복사</button>}
             <span className="spacer" />
-            <button className="btn ghost" onClick={()=>setMemoDraft(null)}>?�기</button>
-            <button className="btn-save" onClick={saveMemo}>?�??/button>
+            <button className="btn ghost" onClick={()=>setMemoDraft(null)}>닫기</button>
+            <button className="btn-save" onClick={saveMemo}>저장</button>
           </div>
         </div></div>
       )}
 
       {mlyDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMlyDraft(null)}><div className="modal">
-          <h2>{mlyDraft._new?"???�간 ??��":"?�간 ??�� ?�세"} · {mlyDraft.month}</h2>
+          <h2>{mlyDraft._new?"새 월간 항목":"월간 항목 상세"} · {mlyDraft.month}</h2>
           <div className="modal-body">
-            <div className="fld"><label>?�목</label><input autoFocus value={mlyDraft.title} onChange={(e)=>setMlyDraft({...mlyDraft,title:e.target.value})} placeholder="?? ??마감 ?�고 ?�인" /></div>
-            <div className="fld"><label>?�명</label><textarea value={mlyDraft.desc||""} onChange={(e)=>setMlyDraft({...mlyDraft,desc:e.target.value})} placeholder="?�차, 기�?�? 참고 링크" /></div>
+            <div className="fld"><label>제목</label><input autoFocus value={mlyDraft.title} onChange={(e)=>setMlyDraft({...mlyDraft,title:e.target.value})} placeholder="예) 월 마감 재고 확인" /></div>
+            <div className="fld"><label>설명</label><textarea value={mlyDraft.desc||""} onChange={(e)=>setMlyDraft({...mlyDraft,desc:e.target.value})} placeholder="절차, 기준값, 참고 링크" /></div>
             <div className="sect">
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                <h4 style={{margin:0}}>?�위 ??��</h4>
-                {(mlyDraft.subs||[]).some((s)=>s.done)&&<button className="ckclear" onClick={()=>setMlyDraft({...mlyDraft,subs:(mlyDraft.subs||[]).map((s)=>({...s,done:false}))})}>체크 ?�체 ?�제</button>}
+                <h4 style={{margin:0}}>하위 항목</h4>
+                {(mlyDraft.subs||[]).some((s)=>s.done)&&<button className="ckclear" onClick={()=>setMlyDraft({...mlyDraft,subs:(mlyDraft.subs||[]).map((s)=>({...s,done:false}))})}>체크 전체 해제</button>}
               </div>
-              {(mlyDraft.subs||[]).length===0&&<span className="hint">?�위 ??��???�습?�다</span>}
+              {(mlyDraft.subs||[]).length===0&&<span className="hint">하위 항목이 없습니다</span>}
               {(mlyDraft.subs||[]).map((s)=>{
                 const subOpen=!!mlySubHistOpen[s.id];
                 const subsubOpen=!!mlySubsubOpen[s.id];
@@ -2356,49 +2356,49 @@ function Board() {
                 return (
                 <div key={s.id}>
                   <div className="fcitem">
-                    <button className={"fccheck"+(s.done?" on":"")} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"??:""}</button>
+                    <button className={"fccheck"+(s.done?" on":"")} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"✓":""}</button>
                     {s.editing
                       ? <input defaultValue={s.text} autoFocus style={{flex:1,fontSize:13,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 7px"}}
                           onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,editing:false}:x)});}}
                           onBlur={(e)=>{const v=e.target.value.trim();if(v)setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}} />
                       : <span style={{flex:1,fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",cursor:"pointer"}} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((x)=>x.id===s.id?{...x,editing:true}:x)})}>{s.text}</span>}
-                    <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:11}} onClick={()=>setMlySubsubOpen({...mlySubsubOpen,[s.id]:!subsubOpen})}>{subsubs.length>0?`?�위목록 ${subsubs.filter((x)=>x.done).length}/${subsubs.length}`:"+?�위목록"}</button>
-                    <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:11}} onClick={()=>setMlySubHistOpen({...mlySubHistOpen,[s.id]:!subOpen})}>{(s.history||[]).length>0?`?�스?�리 ${s.history.length}`:"+?�스?�리"}</button>
+                    <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:11}} onClick={()=>setMlySubsubOpen({...mlySubsubOpen,[s.id]:!subsubOpen})}>{subsubs.length>0?`하위목록 ${subsubs.filter((x)=>x.done).length}/${subsubs.length}`:"+하위목록"}</button>
+                    <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:11}} onClick={()=>setMlySubHistOpen({...mlySubHistOpen,[s.id]:!subOpen})}>{(s.history||[]).length>0?`히스토리 ${s.history.length}`:"+히스토리"}</button>
                     <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15}} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.filter((x)=>x.id!==s.id)})}>×</button>
                   </div>
                   {subsubOpen&&(
                     <div style={{paddingLeft:31,marginBottom:8}}>
-                      {subsubs.length===0&&<span className="hint">?�위 목록???�습?�다</span>}
+                      {subsubs.length===0&&<span className="hint">하위 목록이 없습니다</span>}
                       {subsubs.map((x)=>(
                         <div key={x.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                          <button className={"fccheck"+(x.done?" on":"")} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((y)=>y.id===s.id?{...y,subsubs:y.subsubs.map((z)=>z.id===x.id?{...z,done:!z.done}:z)}:y)})}>{x.done?"??:""}</button>
+                          <button className={"fccheck"+(x.done?" on":"")} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((y)=>y.id===s.id?{...y,subsubs:y.subsubs.map((z)=>z.id===x.id?{...z,done:!z.done}:z)}:y)})}>{x.done?"✓":""}</button>
                           <span style={{flex:1,fontSize:12.5,textDecoration:x.done?"line-through":"none",color:x.done?"var(--ink3)":"inherit"}}>{x.text}</span>
                           <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:14}} onClick={()=>setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((y)=>y.id===s.id?{...y,subsubs:y.subsubs.filter((z)=>z.id!==x.id)}:y)})}>×</button>
                         </div>
                       ))}
-                      <div className="addrow"><input placeholder="?�위목록 ??�� ?�력 ??Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((y)=>y.id===s.id?{...y,subsubs:[...(y.subsubs||[]),{id:uid(),text:v,done:false}]}:y)});e.target.value="";}} /></div>
+                      <div className="addrow"><input placeholder="하위목록 항목 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,subs:mlyDraft.subs.map((y)=>y.id===s.id?{...y,subsubs:[...(y.subsubs||[]),{id:uid(),text:v,done:false}]}:y)});e.target.value="";}} /></div>
                     </div>
                   )}
                   {subOpen&&(
                     <div style={{paddingLeft:31,marginBottom:8}}>
-                      {(s.history||[]).length===0&&<span className="hint">기록???�습?�다</span>}
+                      {(s.history||[]).length===0&&<span className="hint">기록이 없습니다</span>}
 
                       {(s.history||[]).map((h)=>(
                         <div key={h.id} className="cmt">
-                          <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (?�정??</span>}</div>
+                          <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
                           {mlySubHistEditId===h.id
                             ? <textarea className="hinput" defaultValue={h.text} autoFocus style={{width:"100%",marginTop:4}}
                                 onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editMlySubHistory(s.id,h.id,e.target.value);setMlySubHistEditId(null);}}
                                 onBlur={(e)=>{editMlySubHistory(s.id,h.id,e.target.value);setMlySubHistEditId(null);}} />
                             : <p>{h.text}</p>}
                           {mlySubHistEditId!==h.id&&<div style={{display:"flex",gap:10}}>
-                            <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setMlySubHistEditId(h.id)}>?�정</button>
-                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeMlySubHistory(s.id,h.id)}>??��</button>
+                            <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setMlySubHistEditId(h.id)}>수정</button>
+                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeMlySubHistory(s.id,h.id)}>삭제</button>
                           </div>}
                         </div>
                       ))}
                       <div className="addrow">
-                        <textarea className="hinput" placeholder="?�스?�리 ?�력 (Enter 추�?, Shift+Enter 줄바�?"
+                        <textarea className="hinput" placeholder="히스토리 입력 (Enter 추가, Shift+Enter 줄바꿈)"
                           value={mlySubHistText[s.id]||""} onChange={(e)=>setMlySubHistText({...mlySubHistText,[s.id]:e.target.value})}
                           onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addMlySubHistory(s.id,mlySubHistText[s.id]||"");setMlySubHistText({...mlySubHistText,[s.id]:""});}} />
                       </div>
@@ -2407,33 +2407,33 @@ function Board() {
                 </div>
                 );
               })}
-              <div className="addrow"><input placeholder="?�위 ??�� ?�력 ??Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,subs:[...(mlyDraft.subs||[]),{id:uid(),text:v,done:false,history:[]}]});e.target.value="";}} /></div>
+              <div className="addrow"><input placeholder="하위 항목 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,subs:[...(mlyDraft.subs||[]),{id:uid(),text:v,done:false,history:[]}]});e.target.value="";}} /></div>
             </div>
-            <div className="sect"><h4>?�스?�리</h4>
-              {(mlyDraft.history||[]).length===0&&<span className="hint">진행 기록???�습?�다</span>}
+            <div className="sect"><h4>히스토리</h4>
+              {(mlyDraft.history||[]).length===0&&<span className="hint">진행 기록이 없습니다</span>}
               {(mlyDraft.history||[]).map((h)=>(
                 <div key={h.id} className="cmt">
-                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (?�정??</span>}</div>
+                  <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
                   {mlyHistEditId===h.id
                     ? <textarea className="hinput" defaultValue={h.text} autoFocus style={{width:"100%",marginTop:4}}
                         onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editMlyHistory(h.id,e.target.value);setMlyHistEditId(null);}}
                         onBlur={(e)=>{editMlyHistory(h.id,e.target.value);setMlyHistEditId(null);}} />
                     : <p>{h.text}</p>}
                   {mlyHistEditId!==h.id&&<div style={{display:"flex",gap:10}}>
-                    <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setMlyHistEditId(h.id)}>?�정</button>
-                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeMlyHistory(h.id)}>??��</button>
+                    <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setMlyHistEditId(h.id)}>수정</button>
+                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeMlyHistory(h.id)}>삭제</button>
                   </div>}
                 </div>
               ))}
-              <div className="addrow"><textarea className="hinput" placeholder="진행 ?�황 ?�력 (Enter ?�송, Shift+Enter 줄바�?" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,history:[...(mlyDraft.history||[]),{id:uid(),text:v,author:me||"?�명",ts:Date.now()}]});e.target.value="";}} /></div>
+              <div className="addrow"><textarea className="hinput" placeholder="진행 상황 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setMlyDraft({...mlyDraft,history:[...(mlyDraft.history||[]),{id:uid(),text:v,author:me||"익명",ts:Date.now()}]});e.target.value="";}} /></div>
             </div>
           </div>
           <div className="modal-foot">
-            {!mlyDraft._new&&<button className="del" onClick={()=>removeMly(mlyDraft)}>??��</button>}
-            {!mlyDraft._new&&<button className="btn ghost" onClick={()=>duplicateMlyToNextMonth(mlyDraft)}>?�음?�로 복사</button>}
+            {!mlyDraft._new&&<button className="del" onClick={()=>removeMly(mlyDraft)}>삭제</button>}
+            {!mlyDraft._new&&<button className="btn ghost" onClick={()=>duplicateMlyToNextMonth(mlyDraft)}>다음달로 복사</button>}
             <span className="spacer" />
-            <button className="btn ghost" onClick={()=>setMlyDraft(null)}>?�기</button>
-            <button className="btn-save" onClick={saveMly}>?�??/button>
+            <button className="btn ghost" onClick={()=>setMlyDraft(null)}>닫기</button>
+            <button className="btn-save" onClick={saveMly}>저장</button>
           </div>
         </div></div>
       )}
@@ -2442,21 +2442,21 @@ function Board() {
         const isCL=ckDraft.tab==="checklist";
         return (
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setCkDraft(null)}><div className="modal">
-          <h2>{ckDraft._new?"????��":"??�� ?�세"} · {CKTABS.find((t)=>t.id===ckDraft.tab)?.label}</h2>
+          <h2>{ckDraft._new?"새 항목":"항목 상세"} · {CKTABS.find((t)=>t.id===ckDraft.tab)?.label}</h2>
           <div className="modal-body">
-            <div className="fld"><label>?�목</label><input autoFocus value={ckDraft.title} onChange={(e)=>setCkDraft({...ckDraft,title:e.target.value})} placeholder="?? ?�름 ?��???배너 ?�복" /></div>
+            <div className="fld"><label>제목</label><input autoFocus value={ckDraft.title} onChange={(e)=>setCkDraft({...ckDraft,title:e.target.value})} placeholder="예) 여름 특가전 배너 원복" /></div>
             <div className="r2">
-              <div className="fld"><label>?�작??/label><input type="date" value={ckDraft.start||""} onChange={(e)=>setCkDraft({...ckDraft,start:e.target.value})} /></div>
-              <div className="fld"><label>종료??(마감)</label><input type="date" value={ckDraft.due||""} onChange={(e)=>setCkDraft({...ckDraft,due:e.target.value})} /></div>
+              <div className="fld"><label>시작일</label><input type="date" value={ckDraft.start||""} onChange={(e)=>setCkDraft({...ckDraft,start:e.target.value})} /></div>
+              <div className="fld"><label>종료일 (마감)</label><input type="date" value={ckDraft.due||""} onChange={(e)=>setCkDraft({...ckDraft,due:e.target.value})} /></div>
             </div>
-            <div className="fld"><label>?�명</label><textarea value={ckDraft.desc||""} onChange={(e)=>setCkDraft({...ckDraft,desc:e.target.value})} placeholder="?�복 ?�?? ?�차, 참고 링크" /></div>
+            <div className="fld"><label>설명</label><textarea value={ckDraft.desc||""} onChange={(e)=>setCkDraft({...ckDraft,desc:e.target.value})} placeholder="원복 대상, 절차, 참고 링크" /></div>
             {isCL&&(
               <div className="sect">
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                  <h4 style={{margin:0}}>체크리스??/h4>
-                  {(ckDraft.subs||[]).some((s)=>s.done)&&<button className="ckclear" onClick={()=>setCkDraft({...ckDraft,subs:(ckDraft.subs||[]).map((s)=>({...s,done:false}))})}>체크 ?�체 ?�제</button>}
+                  <h4 style={{margin:0}}>체크리스트</h4>
+                  {(ckDraft.subs||[]).some((s)=>s.done)&&<button className="ckclear" onClick={()=>setCkDraft({...ckDraft,subs:(ckDraft.subs||[]).map((s)=>({...s,done:false}))})}>체크 전체 해제</button>}
                 </div>
-                {(ckDraft.subs||[]).length===0&&<span className="hint">?�위 체크 ??��???�습?�다</span>}
+                {(ckDraft.subs||[]).length===0&&<span className="hint">하위 체크 항목이 없습니다</span>}
                 {(ckDraft.subs||[]).map((s)=>(
                   <div key={s.id} draggable
                     onDragStart={()=>setCkSubDrag(s.id)}
@@ -2474,7 +2474,7 @@ function Board() {
                     }}
                     onDragEnd={()=>setCkSubDrag(null)}
                     className={"fcitem"+(ckSubDrag===s.id?" dragging":"")} style={{cursor:"grab"}}>
-                    <button className={"fccheck"+(s.done?" on":"")} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"??:""}</button>
+                    <button className={"fccheck"+(s.done?" on":"")} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"✓":""}</button>
                     {s.editing
                       ? <input defaultValue={s.text} autoFocus style={{flex:1,fontSize:13,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 7px"}}
                           onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,editing:false}:x)});}}
@@ -2484,7 +2484,7 @@ function Board() {
                   </div>
                 ))}
                 <div className="addrow">
-                  <input placeholder="체크 ??�� ?�력 ??Enter" onKeyDown={(e)=>{
+                  <input placeholder="체크 항목 입력 후 Enter" onKeyDown={(e)=>{
                     if(e.nativeEvent.isComposing||e.key!=="Enter")return;
                     const v=e.target.value.trim();if(!v)return;
                     setCkDraft({...ckDraft,subs:[...(ckDraft.subs||[]),{id:uid(),text:v,done:false}]});e.target.value="";
@@ -2492,8 +2492,8 @@ function Board() {
                 </div>
               </div>
             )}
-            <div className="sect"><h4>?�스?�리</h4>
-              {(ckDraft.history||[]).length===0&&<span className="hint">진행 기록???�습?�다</span>}
+            <div className="sect"><h4>히스토리</h4>
+              {(ckDraft.history||[]).length===0&&<span className="hint">진행 기록이 없습니다</span>}
               {(ckDraft.history||[]).map((h)=>(
                 <div key={h.id} className="cmt">
                   <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}</div>
@@ -2501,11 +2501,11 @@ function Board() {
                 </div>
               ))}
               <div className="addrow">
-                <textarea className="hinput" placeholder="진행 ?�황·메모 ?�력 (Enter ?�송, Shift+Enter 줄바�?" onKeyDown={(e)=>{
+                <textarea className="hinput" placeholder="진행 상황·메모 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{
                   if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;
                   e.preventDefault();
                   const v=e.target.value.trim();if(!v)return;
-                  const entry={id:uid(),text:v,author:me||"?�명",ts:Date.now()};
+                  const entry={id:uid(),text:v,author:me||"익명",ts:Date.now()};
                   setCkDraft({...ckDraft,history:[...(ckDraft.history||[]),entry]});
                   e.target.value="";
                 }} />
@@ -2513,11 +2513,11 @@ function Board() {
             </div>
           </div>
           <div className="modal-foot">
-            {!ckDraft._new&&<button className="del" onClick={()=>removeCk(ckDraft)}>??��</button>}
+            {!ckDraft._new&&<button className="del" onClick={()=>removeCk(ckDraft)}>삭제</button>}
             {!ckDraft._new&&<button className="btn ghost" onClick={()=>duplicateCk(ckDraft)}>복사</button>}
             <span className="spacer" />
-            <button className="btn ghost" onClick={()=>setCkDraft(null)}>?�기</button>
-            <button className="btn-save" onClick={saveCk}>?�??/button>
+            <button className="btn ghost" onClick={()=>setCkDraft(null)}>닫기</button>
+            <button className="btn-save" onClick={saveCk}>저장</button>
           </div>
         </div></div>
         );
@@ -2525,44 +2525,44 @@ function Board() {
 
       {confirmBox&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setConfirmBox(null)}><div className="modal sm">
-          <h2>{confirmBox.kind==="purge"?"?�구 ??��?�까??":confirmBox.kind==="archiveOne"?"보�??�으�???��까요?":confirmBox.kind==="archiveCk"?"목록?�서 ?�리?�까??":"?�료 ?�무�?보�??�까??"}</h2>
-          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보�??�의 ${archived.length}건이 ?�전???�라집니??`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" ?�무�?보�??�으�???��?�겠?�요?`:confirmBox.kind==="archiveCk"?`"${confirmBox.ckTitle}" ??��???�료?�습?�다. 목록?�서 ??��?�까?? ?�겨?�면 ?�료 ?�태�??�시?�니??`:`?�료 ${live.filter((t)=>t.status==="done").length}건이 보�??�으�??�동?�니??`}</p>
+          <h2>{confirmBox.kind==="purge"?"영구 삭제할까요?":confirmBox.kind==="archiveOne"?"보관함으로 옮길까요?":confirmBox.kind==="archiveCk"?"목록에서 정리할까요?":"완료 업무를 보관할까요?"}</h2>
+          <p style={{fontSize:12.5,color:"#565C64",lineHeight:1.6}}>{confirmBox.kind==="purge"?`보관함의 ${archived.length}건이 완전히 사라집니다.`:confirmBox.kind==="archiveOne"?`"${confirmBox.taskTitle}" 업무를 보관함으로 옮기시겠어요?`:confirmBox.kind==="archiveCk"?`"${confirmBox.ckTitle}" 항목을 완료했습니다. 목록에서 삭제할까요? 남겨두면 완료 상태로 표시됩니다.`:`완료 ${live.filter((t)=>t.status==="done").length}건이 보관함으로 이동합니다.`}</p>
           <div className="mfoot"><span className="spacer" />
-            <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드???�기":confirmBox.kind==="archiveCk"?"?�겨?�기":"취소"}</button>
+            <button className="btn ghost" onClick={()=>setConfirmBox(null)}>{confirmBox.kind==="archiveOne"?"보드에 두기":confirmBox.kind==="archiveCk"?"남겨두기":"취소"}</button>
             <button className={confirmBox.kind==="purge"?"btn warn":"btn-save"} onClick={()=>{
               if(confirmBox.kind==="purge")purgeArchive();
               else if(confirmBox.kind==="archiveCk"){const cid=confirmBox.ckId;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===cid?{...x,deleted:true,updatedAt:Date.now()}:x)}),[]);setConfirmBox(null);}
-              else if(confirmBox.kind==="archiveOne"){const tid=confirmBox.taskId;commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===tid?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("?�카?�브",{id:tid,title:confirmBox.taskTitle})]);setConfirmBox(null);}
+              else if(confirmBox.kind==="archiveOne"){const tid=confirmBox.taskId;commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===tid?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("아카이브",{id:tid,title:confirmBox.taskTitle})]);setConfirmBox(null);}
               else archiveDone();
-            }}>{confirmBox.kind==="purge"?"?�구 ??��":confirmBox.kind==="archiveCk"?"??��":"보�??�기"}</button>
+            }}>{confirmBox.kind==="purge"?"영구 삭제":confirmBox.kind==="archiveCk"?"삭제":"보관하기"}</button>
           </div>
         </div></div>
       )}
 
       {draft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setDraft(null)}><div className="modal">
-          <h2>{draft._new?"???�무":"?�무 ?�세"}</h2>
+          <h2>{draft._new?"새 업무":"업무 상세"}</h2>
           <div className="modal-body">
-          <div className="fld"><label>?�무�?/label><input autoFocus disabled={!canEdit} value={draft.title} onChange={(e)=>setDraft({...draft,title:e.target.value})} placeholder="?? 쿠팡 ?�토�??�세?�이지 개편" /></div>
+          <div className="fld"><label>업무명</label><input autoFocus disabled={!canEdit} value={draft.title} onChange={(e)=>setDraft({...draft,title:e.target.value})} placeholder="예) 쿠팡 락토컷 상세페이지 개편" /></div>
           <div className="r3">
-            <div className="fld"><label>브랜??/label><select disabled={!canEdit} value={draft.brand||""} onChange={(e)=>setDraft({...draft,brand:e.target.value})}>
-              <option value="">?�택 ????/option>
-              {subsOf("브랜??).map((k)=><option key={k.id} value={k.id}>{k.id}</option>)}
+            <div className="fld"><label>브랜드</label><select disabled={!canEdit} value={draft.brand||""} onChange={(e)=>setDraft({...draft,brand:e.target.value})}>
+              <option value="">선택 안 함</option>
+              {subsOf("브랜드").map((k)=><option key={k.id} value={k.id}>{k.id}</option>)}
             </select></div>
             <div className="fld"><label>채널</label><select disabled={!canEdit} value={draft.channel} onChange={(e)=>setDraft({...draft,channel:e.target.value})}>
-              {topChannels.filter((c)=>c.id!=="브랜??).map((c)=>{
+              {topChannels.filter((c)=>c.id!=="브랜드").map((c)=>{
                 const kids=subsOf(c.id);
                 if(!kids.length)return <option key={c.id} value={c.id}>{c.id}</option>;
                 return <optgroup key={c.id} label={c.id}>
-                  <option value={c.id}>{c.id} (?�체)</option>
-                  {kids.map((k)=><option key={k.id} value={k.id}>?�??{k.id}</option>)}
+                  <option value={c.id}>{c.id} (전체)</option>
+                  {kids.map((k)=><option key={k.id} value={k.id}>　└ {k.id}</option>)}
                 </optgroup>;
               })}
             </select></div>
-            <div className="fld"><label>?�무 ?�형</label><select disabled={!canEdit} value={draft.type} onChange={(e)=>setDraft({...draft,type:e.target.value})}>{(data.types||TYPES).map((t)=><option key={t} value={t}>{t}</option>)}</select></div>
+            <div className="fld"><label>업무 유형</label><select disabled={!canEdit} value={draft.type} onChange={(e)=>setDraft({...draft,type:e.target.value})}>{(data.types||TYPES).map((t)=><option key={t} value={t}>{t}</option>)}</select></div>
           </div>
-          <div className="fld"><label>?�당??/label>
-            <input list="wb-owners" value={draft.owner} onChange={(e)=>setDraft({...draft,owner:e.target.value})} placeholder="?�름 직접 ?�력 ?�는 목록 ?�택" style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13}} />
+          <div className="fld"><label>담당자</label>
+            <input list="wb-owners" value={draft.owner} onChange={(e)=>setDraft({...draft,owner:e.target.value})} placeholder="이름 직접 입력 또는 목록 선택" style={{width:"100%",background:"#FBFCFA",border:"1px solid #C4C9C1",padding:"7px 9px",fontSize:13}} />
             <datalist id="wb-owners">
               {[...new Set([...owners,...data.members.map((m)=>m.name),me].filter(Boolean))].map((o)=><option key={o} value={o} />)}
             </datalist>
@@ -2578,16 +2578,16 @@ function Board() {
             )}
           </div>
           <div className="r2">
-            <div className="fld"><label>?�작??/label><input type="date" disabled={!canEdit} value={draft.start||""} onChange={(e)=>setDraft({...draft,start:e.target.value})} /></div>
-            <div className="fld"><label>마감??/label><input type="date" disabled={!canEdit} value={draft.due} onChange={(e)=>setDraft({...draft,due:e.target.value})} /></div>
+            <div className="fld"><label>시작일</label><input type="date" disabled={!canEdit} value={draft.start||""} onChange={(e)=>setDraft({...draft,start:e.target.value})} /></div>
+            <div className="fld"><label>마감일</label><input type="date" disabled={!canEdit} value={draft.due} onChange={(e)=>setDraft({...draft,due:e.target.value})} /></div>
           </div>
           <div className="r3">
-            <div className="fld"><label>?�선?�위</label><select disabled={!canEdit} value={draft.priority} onChange={(e)=>setDraft({...draft,priority:e.target.value})}>{PRIORITIES.map((p)=><option key={p.id} value={p.id}>{p.label}</option>)}</select></div>
-            <div className="fld"><label>?�태</label><select disabled={!canEdit} value={draft.status} onChange={(e)=>setDraft({...draft,status:e.target.value})}>{cols.map((c)=><option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
+            <div className="fld"><label>우선순위</label><select disabled={!canEdit} value={draft.priority} onChange={(e)=>setDraft({...draft,priority:e.target.value})}>{PRIORITIES.map((p)=><option key={p.id} value={p.id}>{p.label}</option>)}</select></div>
+            <div className="fld"><label>상태</label><select disabled={!canEdit} value={draft.status} onChange={(e)=>setDraft({...draft,status:e.target.value})}>{cols.map((c)=><option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
             <div className="fld"><label>반복</label><select disabled={!canEdit} value={draft.repeat} onChange={(e)=>setDraft({...draft,repeat:e.target.value})}>{REPEATS.map((r)=><option key={r.id} value={r.id}>{r.label}</option>)}</select></div>
           </div>
           <div className="fld">
-            <label>진행�?/label>
+            <label>진행률</label>
             <div className="prow">
               <span className="ppct">{draft.progress||0}%</span>
               <input type="range" min="0" max="100" step="5" disabled={!canEdit}
@@ -2598,12 +2598,12 @@ function Board() {
             </div>
             <div className="pticks"><span>0</span><span>50</span><span>100</span></div>
           </div>
-          <div className="fld"><label>메모</label><textarea disabled={!canEdit} value={draft.memo} onChange={(e)=>setDraft({...draft,memo:e.target.value})} placeholder="진행 ?�황, 공급???�신, 참고 ?�치" /></div>
-          <div className="sect"><h4>?�스?�리</h4>
-            {(draft.history||[]).length===0&&<span className="hint">진행 기록???�습?�다</span>}
+          <div className="fld"><label>메모</label><textarea disabled={!canEdit} value={draft.memo} onChange={(e)=>setDraft({...draft,memo:e.target.value})} placeholder="진행 상황, 공급사 회신, 참고 수치" /></div>
+          <div className="sect"><h4>히스토리</h4>
+            {(draft.history||[]).length===0&&<span className="hint">진행 기록이 없습니다</span>}
             {(draft.history||[]).map((h)=>(
               <div key={h.id} className="cmt">
-                <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (?�정??</span>}</div>
+                <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (수정됨)</span>}</div>
                 {h.editing
                   ? <div style={{display:"flex",gap:6,marginTop:4}}>
                       <input defaultValue={h.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14}}
@@ -2616,18 +2616,18 @@ function Board() {
                     </div>
                   : <p>{h.text}</p>}
                 {canEdit&&!h.editing&&<div style={{display:"flex",gap:10,marginTop:3}}>
-                  <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>?�정</button>
-                  <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.filter((x)=>x.id!==h.id)})}>??��</button>
+                  <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>수정</button>
+                  <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.filter((x)=>x.id!==h.id)})}>삭제</button>
                 </div>}
               </div>
             ))}
-            {canEdit&&<div className="addrow"><textarea className="hinput" placeholder="진행 ?�황·메모 ?�력 (Enter ?�송, Shift+Enter 줄바�?" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"?�명",text:v,ts:Date.now()}]});e.target.value="";}} /></div>}
+            {canEdit&&<div className="addrow"><textarea className="hinput" placeholder="진행 상황·메모 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}} /></div>}
           </div>
-          <div className="sect"><h4>?�그</h4>
-            <div className="ctags">{(draft.tags||[]).map((g)=><span key={g} className="tag">{g}{canEdit&&<button className="x" style={{fontSize:11,marginLeft:3,border:"none",cursor:"pointer",background:"none"}} onClick={()=>setDraft({...draft,tags:draft.tags.filter((x)=>x!==g)})}>x</button>}</span>)}{!(draft.tags||[]).length&&<span className="hint">?�음</span>}</div>
-            {canEdit&&<div className="addrow"><input placeholder="?�그 ?�력 ??Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v&&!(draft.tags||[]).includes(v)){setDraft({...draft,tags:[...(draft.tags||[]),v]});e.target.value="";}}} /></div>}
+          <div className="sect"><h4>태그</h4>
+            <div className="ctags">{(draft.tags||[]).map((g)=><span key={g} className="tag">{g}{canEdit&&<button className="x" style={{fontSize:11,marginLeft:3,border:"none",cursor:"pointer",background:"none"}} onClick={()=>setDraft({...draft,tags:draft.tags.filter((x)=>x!==g)})}>x</button>}</span>)}{!(draft.tags||[]).length&&<span className="hint">없음</span>}</div>
+            {canEdit&&<div className="addrow"><input placeholder="태그 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v&&!(draft.tags||[]).includes(v)){setDraft({...draft,tags:[...(draft.tags||[]),v]});e.target.value="";}}} /></div>}
           </div>
-          <div className="sect"><h4>?��? ?�계{(draft.checklist||[]).length>0&&` (${draft.checklist.filter((c)=>c.done).length}/${draft.checklist.length})`}</h4>
+          <div className="sect"><h4>세부 단계{(draft.checklist||[]).length>0&&` (${draft.checklist.filter((c)=>c.done).length}/${draft.checklist.length})`}</h4>
             {(draft.checklist||[]).map((c)=>(
               <div key={c.id} style={{marginBottom:6}}>
                 <div className="item">
@@ -2637,7 +2637,7 @@ function Board() {
                         onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,editing:false}:x)});}}
                         onBlur={(e)=>{const v=e.target.value.trim();if(v)setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,text:v,editing:false}:x)});}} />
                     : <span style={{flex:1,textDecoration:c.done?"line-through":"none",color:c.done?"#8F959C":"inherit",cursor:canEdit?"pointer":"default"}} onClick={()=>canEdit&&setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,editing:true}:x)})}>{c.text}</span>}
-                  {canEdit&&!c.editing&&<button style={{background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",fontSize:11,padding:"0 4px"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,expand:!x.expand}:x)})}>{(c.subs||[]).length>0?`?�위 ${(c.subs||[]).filter((s)=>s.done).length}/${(c.subs||[]).length}`:"+?�위"}</button>}
+                  {canEdit&&!c.editing&&<button style={{background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",fontSize:11,padding:"0 4px"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,expand:!x.expand}:x)})}>{(c.subs||[]).length>0?`하위 ${(c.subs||[]).filter((s)=>s.done).length}/${(c.subs||[]).length}`:"+하위"}</button>}
                   {canEdit&&<button style={{background:"none",border:"none",cursor:"pointer",color:"#8F959C"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.filter((x)=>x.id!==c.id)})}>×</button>}
                 </div>
                 {canEdit&&c.expand&&(
@@ -2653,20 +2653,20 @@ function Board() {
                         <button style={{background:"none",border:"none",cursor:"pointer",color:"#8F959C"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:x.subs.filter((y)=>y.id!==s.id)}:x)})}>×</button>
                       </div>
                     ))}
-                    <div className="addrow" style={{marginTop:3}}><input placeholder="?�위 ??�� ?�력 ??Enter" style={{fontSize:12.5}} onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:[...(x.subs||[]),{id:uid(),text:v,done:false}]}:x)});e.target.value="";}}} /></div>
+                    <div className="addrow" style={{marginTop:3}}><input placeholder="하위 항목 입력 후 Enter" style={{fontSize:12.5}} onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,subs:[...(x.subs||[]),{id:uid(),text:v,done:false}]}:x)});e.target.value="";}}} /></div>
                   </div>
                 )}
               </div>
             ))}
-            {!(draft.checklist||[]).length&&<span className="hint">?�음</span>}
-            {canEdit&&<div className="addrow"><input placeholder="?�계 ?�력 ??Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:[...(draft.checklist||[]),{id:uid(),text:v,done:false,subs:[]}]});e.target.value="";}}} /></div>}
+            {!(draft.checklist||[]).length&&<span className="hint">없음</span>}
+            {canEdit&&<div className="addrow"><input placeholder="단계 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:[...(draft.checklist||[]),{id:uid(),text:v,done:false,subs:[]}]});e.target.value="";}}} /></div>}
           </div>
-          <div className="sect"><h4>?�슈</h4>
-            {(draft.issues||[]).length===0&&<span className="hint">?�음</span>}
+          <div className="sect"><h4>이슈</h4>
+            {(draft.issues||[]).length===0&&<span className="hint">없음</span>}
             {(draft.issues||[]).map((iss)=>(
               <div key={iss.id} className={"iss"+(iss.resolved?" done":"")}>
                 <button className="issck" onClick={()=>setDraft({...draft,issues:(draft.issues||[]).map((x)=>x.id===iss.id?{...x,resolved:!x.resolved}:x)})}>
-                  {iss.resolved?"??:""}
+                  {iss.resolved?"✓":""}
                 </button>
                 <div style={{flex:1}}>
                   <div className="isstext">{iss.text}</div>
@@ -2676,10 +2676,10 @@ function Board() {
               </div>
             ))}
             <div className="addrow">
-              <input placeholder="?�슈 ?�력 ??Enter" onKeyDown={(e)=>{
+              <input placeholder="이슈 입력 후 Enter" onKeyDown={(e)=>{
                 if(e.nativeEvent.isComposing||e.key!=="Enter")return;
                 const v=e.target.value.trim();if(!v)return;
-                const iss={id:uid(),text:v,author:me||"?�명",ts:Date.now(),resolved:false};
+                const iss={id:uid(),text:v,author:me||"익명",ts:Date.now(),resolved:false};
                 setDraft({...draft,issues:[iss,...(draft.issues||[])]});
                 e.target.value="";
               }} />
@@ -2687,19 +2687,19 @@ function Board() {
           </div>
 
           {!draft._new&&(
-            <div className="sect"><h4>???�무???�력</h4>
+            <div className="sect"><h4>이 업무의 이력</h4>
               {(data.log||[]).filter((e)=>e.taskId===draft.id).slice(0,6).map((e)=><div key={e.id} className="item" style={{fontSize:11.5,color:"#565C64"}}><span style={{fontSize:10.5,color:"#8F959C",minWidth:96,fontFamily:"monospace"}}>{fmtTs(e.ts)}</span><span style={{fontSize:10.5,minWidth:54,fontFamily:"monospace"}}>{e.who}</span><span>{e.action}{e.detail&&` · ${e.detail}`}</span></div>)}
-              {!(data.log||[]).some((e)=>e.taskId===draft.id)&&<span className="hint">기록 ?�음</span>}
+              {!(data.log||[]).some((e)=>e.taskId===draft.id)&&<span className="hint">기록 없음</span>}
             </div>
           )}
           </div>
           <div className="modal-foot">
-            {!draft._new&&isAdmin&&<button className="del" onClick={()=>removeTask(draft)}>??��</button>}
+            {!draft._new&&isAdmin&&<button className="del" onClick={()=>removeTask(draft)}>삭제</button>}
             {!draft._new&&canEdit&&<button className="btn ghost" onClick={()=>duplicateTask(draft)}>복사</button>}
-            {!draft._new&&canEdit&&!draft.archived&&<button className="btn ghost" onClick={()=>{setArchivedFlag(draft,true);setDraft(null);}}>보�?</button>}
+            {!draft._new&&canEdit&&!draft.archived&&<button className="btn ghost" onClick={()=>{setArchivedFlag(draft,true);setDraft(null);}}>보관</button>}
             <span className="spacer" />
-            <button className="btn ghost" onClick={()=>setDraft(null)}>?�기</button>
-            <button className="btn" onClick={saveDraft} style={{background:"#0C66E4",color:"#fff"}}>?�??/button>         </div>
+            <button className="btn ghost" onClick={()=>setDraft(null)}>닫기</button>
+            <button className="btn" onClick={saveDraft} style={{background:"#0C66E4",color:"#fff"}}>저장</button>         </div>
         </div></div>
       )}
     </div>
