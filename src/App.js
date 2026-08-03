@@ -921,7 +921,7 @@ function Board() {
             response: { output: JSON.stringify(runAiFunction(c.name, c.args || {})) },
           },
         }));
-        result = await chat.sendMessage([{ role: "user", parts }]);
+        result = await chat.sendMessage(parts);
         calls = result.response.functionCalls();
         guard++;
       }
