@@ -54,7 +54,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -539,7 +539,19 @@ function Board() {
   const [memoSubEditId, setMemoSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const prevTasksRef = useRef(null);
-  const notifiedRef = useRef(new Set());
+  const notifiedRef = useRef(null);
+  const getNotified = () => {
+    if(notifiedRef.current) return notifiedRef.current;
+    const key = `wb-notified-${todayStr()}`;
+    try { const s=localStorage.getItem(key); notifiedRef.current=new Set(s?JSON.parse(s):[]); }
+    catch(e) { notifiedRef.current=new Set(); }
+    return notifiedRef.current;
+  };
+  const markNotified = (id) => {
+    const set = getNotified();
+    set.add(id);
+    try { localStorage.setItem(`wb-notified-${todayStr()}`,JSON.stringify([...set])); } catch(e) {}
+  };
   const [mlyDraft, setMlyDraft] = useState(null);
   const [mlyHistEditId, setMlyHistEditId] = useState(null);
   const [mlySubHistOpen, setMlySubHistOpen] = useState({});
@@ -1078,6 +1090,27 @@ function Board() {
     try{const n=new Notification(title,{body,icon:"/favicon.ico"});n.onclick=()=>{window.focus();n.close();};}catch(e){}
   },[notifOn]);
 
+  const sendManualNotif=(task,targetOwner,msg)=>{
+    if(!task||!targetOwner)return;
+    const notif={id:uid(),from:me||"익명",to:targetOwner,taskId:task.id,taskTitle:task.title,msg:msg||(me||"팀원")+"님이 \""+task.title+"\" 업무를 업데이트했습니다.",ts:Date.now(),read:false};
+    commit((d)=>({...d,notifications:[...(d.notifications||[]),notif],updatedAt:Date.now()}),[]);
+  };
+
+  const prevNotifsLen = useRef(null);
+  useEffect(()=>{
+    if(!notifOn||!me)return;
+    const myNotifs=(data.notifications||[]).filter((n)=>n.to===me&&!n.read);
+    if(prevNotifsLen.current===null){prevNotifsLen.current=myNotifs.length;return;}
+    if(myNotifs.length>prevNotifsLen.current){
+      const newOnes=myNotifs.slice(prevNotifsLen.current);
+      newOnes.forEach((n)=>{
+        const key=`manualnotif:${n.id}`;
+        if(!getNotified().has(key)){notify("📬 "+n.taskTitle,n.msg);markNotified(key);}
+      });
+    }
+    prevNotifsLen.current=myNotifs.length;
+  },[data.notifications,notifOn,me,notify]);
+
   const enableNotif=()=>{
     if(typeof Notification==="undefined"){alert("이 브라우저는 알림을 지원하지 않습니다.");return;}
     if(Notification.permission==="granted"){setNotifOn(true);return;}
@@ -1115,7 +1148,7 @@ function Board() {
         if(dd<0){key=`overdue:${t.id}`;ttl="마감이 지났어요";body=`"${t.title}" 마감 ${Math.abs(dd)}일 지남`;}
         else if(dd===0){key=`due0:${t.id}`;ttl="오늘 마감이에요";body=`"${t.title}"`;}
         else if(dd===1){key=`due1:${t.id}`;ttl="마감이 임박했어요";body=`"${t.title}" 내일 마감`;}
-        if(key&&!notifiedRef.current.has(key)){notify(ttl,body);notifiedRef.current.add(key);}
+        if(key&&!getNotified().has(key)){notify(ttl,body);markNotified(key);}
       });
     };
     check();
@@ -2577,6 +2610,7 @@ function Board() {
             {!draft._new&&isAdmin&&<button className="del" onClick={()=>removeTask(draft)}>삭제</button>}
             {!draft._new&&canEdit&&<button className="btn ghost" onClick={()=>duplicateTask(draft)}>복사</button>}
             {!draft._new&&canEdit&&!draft.archived&&<button className="btn ghost" onClick={()=>{setArchivedFlag(draft,true);setDraft(null);}}>보관</button>}
+            {!draft._new&&canEdit&&draft.owner&&draft.owner!==me&&<button className="btn ghost" style={{color:"#0C66E4",borderColor:"#0C66E4"}} onClick={()=>{sendManualNotif(draft,draft.owner);alert(`${draft.owner}님에게 알림을 보냈습니다.`);}}>📬 알림 전송</button>}
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setDraft(null)}>닫기</button>
             <button className="btn" onClick={saveDraft} style={{background:"#0C66E4",color:"#fff"}}>저장</button>         </div>
