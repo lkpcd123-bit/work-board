@@ -22,68 +22,6 @@ initializeAppCheck(fbApp, {
 });
 
 /* ── AI 비서: Gemini 함수 선언 (조회 전용) ── */
-const aiTools = [{
-  functionDeclarations: [
-    {
-      name: "searchTasks",
-      description: "업무 보드의 업무 목록을 조건으로 검색합니다. 마감일, 담당자, 채널, 상태로 찾을 때 사용합니다.",
-      parameters: Schema.object({
-        properties: {
-          status: Schema.string({ description: "상태 필터: todo, doing, review, issuecol, done 중 하나. 생략하면 전체." }),
-          owner: Schema.string({ description: "담당자 이름. 생략하면 전체 담당자." }),
-          channel: Schema.string({ description: "채널명. 생략하면 전체 채널." }),
-          board: Schema.string({ description: "보드 이름: 공용, 김현민 중 하나. 생략하면 전체 보드." }),
-          onlyOverdue: Schema.boolean({ description: "true면 마감이 지난 업무만." }),
-          onlyToday: Schema.boolean({ description: "true면 오늘 마감인 업무만." }),
-        },
-        optionalProperties: ["status", "owner", "channel", "board", "onlyOverdue", "onlyToday"],
-      }),
-    },
-    {
-      name: "searchRoutines",
-      description: "반복 업무 목록과 오늘 체크 여부, 연속 기록을 조회합니다.",
-      parameters: Schema.object({
-        properties: {
-          owner: Schema.string({ description: "담당자 이름. 생략하면 전체." }),
-          onlyUnchecked: Schema.boolean({ description: "true면 오늘 아직 체크 안 한 반복업무만." }),
-        },
-        optionalProperties: ["owner", "onlyUnchecked"],
-      }),
-    },
-    {
-      name: "searchCheckitems",
-      description: "체크리스트(체크리스트/행사 원복/상품 원복) 항목을 조회합니다.",
-      parameters: Schema.object({
-        properties: {
-          tab: Schema.string({ description: "checklist, event, product 중 하나. 생략하면 전체 탭." }),
-          onlyPending: Schema.boolean({ description: "true면 아직 완료 안 한 항목만." }),
-          onlyOverdue: Schema.boolean({ description: "true면 마감(종료일)이 지난 미완료 항목만." }),
-        },
-        optionalProperties: ["tab", "onlyPending", "onlyOverdue"],
-      }),
-    },
-    {
-      name: "searchIssues",
-      description: "업무·반복업무에 등록된 이슈를 조회합니다.",
-      parameters: Schema.object({
-        properties: {
-          onlyUnresolved: Schema.boolean({ description: "true면 미해결 이슈만." }),
-        },
-        optionalProperties: ["onlyUnresolved"],
-      }),
-    },
-    {
-      name: "getTaskDetail",
-      description: "특정 업무 하나를 제목 키워드로 찾아 메모, 히스토리(진행 기록 전체), 세부 단계(체크리스트), 이슈까지 상세 정보를 전부 조회합니다. 업무의 진행 상황·내용·연락 결과 등 구체적인 질문에는 이 함수를 사용하세요.",
-      parameters: Schema.object({
-        properties: {
-          titleKeyword: Schema.string({ description: "찾을 업무 제목에 포함된 키워드. 예: '웰니스식품' 또는 '큐레이션 샵'" }),
-        },
-        optionalProperties: [],
-      }),
-    },
-  ],
-}];
 const BOARD_REF = () => doc(db, "board", "main");
 const ME_KEY = "wb-me";
 const LOG_CAP = 400;
@@ -901,30 +839,31 @@ function Board() {
     setAiMessages((m) => [...m, { role: "user", text: q }]);
     setAiLoading(true);
     try {
-      if (!aiChatRef.current) {
-        const ai = getAI(fbApp, { backend: new GoogleAIBackend() });
-        const model = getGenerativeModel(ai, {
-          model: "gemini-3.5-flash-lite",
-          tools: aiTools,
-          systemInstruction: "당신은 ShakeBaby 팀의 업무보드 AI 비서입니다. 제공된 함수로 실제 업무·반복업무·체크리스트·이슈 데이터를 조회해서, 한국어로 간결하고 정확하게 답하세요. 특정 업무 하나의 메모·진행 상황·히스토리·세부 단계처럼 구체적인 내용을 물어보면 getTaskDetail 함수를 사용해 그 업무의 전체 상세를 확인한 뒤 답하세요. 데이터를 수정하거나 만들 수는 없고 오직 조회만 가능합니다. 숫자와 이름은 함수 결과에 있는 그대로 사용하고 추측하지 마세요.",
-        });
-        aiChatRef.current = model.startChat();
-      }
-      const chat = aiChatRef.current;
-      let result = await chat.sendMessage(q);
-      let calls = result.response.functionCalls();
-      let guard = 0;
-      while (calls && calls.length > 0 && guard < 5) {
-        const parts = calls.map((c) => ({
-          functionResponse: {
-            name: c.name,
-            response: { output: JSON.stringify(runAiFunction(c.name, c.args || {})) },
-          },
-        }));
-        result = await chat.sendMessage(parts);
-        calls = result.response.functionCalls();
-        guard++;
-      }
+      const d = dataRef.current;
+      const today = todayStr();
+      const tasks = d.tasks.filter((t) => !t.deleted && !t.archived).slice(0, 60).map((t) => ({
+        title: t.title, board: t.boardId || "공용", channel: t.channel, owner: t.owner || "미지정",
+        status: t.status, due: t.due || null, priority: t.priority, progress: t.progress || 0,
+        memo: t.memo || "", history: (t.history || []).slice(-3).map((h) => h.text),
+        issues: (t.issues || []).filter((i) => !i.resolved).map((i) => i.text),
+      }));
+      const rItems = (d.rItems || []).filter((x) => !x.deleted).slice(0, 40).map((r) => ({
+        cat: r.cat, sub: r.sub, title: r.title, checkedToday: !!(r.checkins || {})[today],
+        issues: (r.issues || []).filter((i) => !i.resolved).map((i) => i.text),
+      }));
+      const checks = (d.checkitems || []).filter((c) => !c.deleted).slice(0, 30).map((c) => ({
+        title: c.title, tab: c.tab, done: c.done, due: c.due || null,
+      }));
+      const dataCtx = `[오늘: ${today}]\n\n## 업무 목록\n${JSON.stringify(tasks, null, 1)}\n\n## 반복업무\n${JSON.stringify(rItems, null, 1)}\n\n## 체크리스트\n${JSON.stringify(checks, null, 1)}`;
+      const systemPrompt = `당신은 ShakeBaby 팀의 업무보드 AI 비서입니다. 아래 실제 데이터를 바탕으로 한국어로 간결하고 정확하게 답하세요. 데이터에 없는 내용은 추측하지 마세요.\n\n${dataCtx}`;
+
+      const ai = getAI(fbApp, { backend: new GoogleAIBackend() });
+      const model = getGenerativeModel(ai, {
+        model: "gemini-3.5-flash-lite",
+        systemInstruction: systemPrompt,
+      });
+      const chat = model.startChat();
+      const result = await chat.sendMessage(q);
       setAiMessages((m) => [...m, { role: "ai", text: result.response.text() || "답변을 만들지 못했습니다." }]);
     } catch (e) {
       setAiMessages((m) => [...m, { role: "ai", text: "오류가 발생했습니다: " + (e.message || "알 수 없는 오류") }]);
