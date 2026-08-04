@@ -538,6 +538,7 @@ function Board() {
   const [memoSubText, setMemoSubText] = useState({});
   const [memoSubEditId, setMemoSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
+  const [notifBoxOpen, setNotifBoxOpen] = useState(false);
   const prevTasksRef = useRef(null);
   const notifiedRef = useRef(null);
   const getNotified = useCallback(() => {
@@ -1090,6 +1091,12 @@ function Board() {
     try{const n=new Notification(title,{body,icon:"/favicon.ico"});n.onclick=()=>{window.focus();n.close();};}catch(e){}
   },[notifOn]);
 
+  const myNotifs=useMemo(()=>(data.notifications||[]).filter((n)=>n.to===me).slice().sort((a,b)=>b.ts-a.ts),[data.notifications,me]);
+  const unreadNotifs=useMemo(()=>myNotifs.filter((n)=>!n.read),[myNotifs]);
+  const markAllNotifsRead=()=>{
+    if(!unreadNotifs.length)return;
+    commit((d)=>({...d,notifications:(d.notifications||[]).map((n)=>n.to===me?{...n,read:true}:n),updatedAt:Date.now()}),[]);
+  };
   const sendManualNotif=(task,targetOwner,msg)=>{
     if(!task||!targetOwner)return;
     const notif={id:uid(),from:me||"익명",to:targetOwner,taskId:task.id,taskTitle:task.title,msg:msg||(me||"팀원")+"님이 \""+task.title+"\" 업무를 업데이트했습니다.",ts:Date.now(),read:false};
@@ -1240,6 +1247,26 @@ function Board() {
         <button className="ghostw" onClick={()=>load()}>새로고침</button>
         {!notifOn&&<button className="ghostw" onClick={enableNotif}>🔔 알림 켜기</button>}
         {notifOn&&<span style={{fontSize:12,color:"var(--ok)",fontWeight:700,display:"inline-flex",alignItems:"center",gap:4}}>🔔 알림 켜짐</span>}
+        <div style={{position:"relative"}}>
+          <button className="ghostw" style={{position:"relative"}} onClick={()=>{setNotifBoxOpen(!notifBoxOpen);if(!notifBoxOpen)markAllNotifsRead();}}>
+            📬{unreadNotifs.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#C9372C",color:"#fff",borderRadius:"50%",fontSize:10,width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900}}>{unreadNotifs.length}</span>}
+          </button>
+          {notifBoxOpen&&(
+            <div style={{position:"absolute",right:0,top:"calc(100% + 6px)",width:300,background:"var(--card)",boxShadow:"0 4px 20px rgba(0,0,0,.15)",borderRadius:10,zIndex:999,overflow:"hidden"}}>
+              <div style={{padding:"10px 14px",borderBottom:"1px solid var(--line)",fontWeight:700,fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span>받은 알림</span>
+                <button style={{background:"none",border:"none",fontSize:11,color:"var(--ink3)",cursor:"pointer"}} onClick={()=>setNotifBoxOpen(false)}>닫기</button>
+              </div>
+              {myNotifs.length===0&&<div style={{padding:16,fontSize:13,color:"var(--ink3)"}}>받은 알림이 없습니다</div>}
+              {myNotifs.slice(0,20).map((n)=>(
+                <div key={n.id} style={{padding:"10px 14px",borderBottom:"1px solid var(--line)",background:n.read?"var(--bg)":"#F0F7FF"}}>
+                  <div style={{fontSize:13,fontWeight:n.read?400:700,color:"var(--ink1)"}}>{n.msg}</div>
+                  <div style={{fontSize:11,color:"var(--ink3)",marginTop:3}}>{fmtTs(n.ts)} · {n.from}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
