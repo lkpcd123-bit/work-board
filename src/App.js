@@ -540,18 +540,18 @@ function Board() {
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const prevTasksRef = useRef(null);
   const notifiedRef = useRef(null);
-  const getNotified = () => {
+  const getNotified = useCallback(() => {
     if(notifiedRef.current) return notifiedRef.current;
     const key = `wb-notified-${todayStr()}`;
     try { const s=localStorage.getItem(key); notifiedRef.current=new Set(s?JSON.parse(s):[]); }
     catch(e) { notifiedRef.current=new Set(); }
     return notifiedRef.current;
-  };
-  const markNotified = (id) => {
+  }, []);
+  const markNotified = useCallback((id) => {
     const set = getNotified();
     set.add(id);
     try { localStorage.setItem(`wb-notified-${todayStr()}`,JSON.stringify([...set])); } catch(e) {}
-  };
+  }, [getNotified]);
   const [mlyDraft, setMlyDraft] = useState(null);
   const [mlyHistEditId, setMlyHistEditId] = useState(null);
   const [mlySubHistOpen, setMlySubHistOpen] = useState({});
@@ -1109,7 +1109,7 @@ function Board() {
       });
     }
     prevNotifsLen.current=myNotifs.length;
-  },[data.notifications,notifOn,me,notify]);
+  },[data.notifications,notifOn,me,notify,getNotified,markNotified]);
 
   const enableNotif=()=>{
     if(typeof Notification==="undefined"){alert("이 브라우저는 알림을 지원하지 않습니다.");return;}
@@ -1154,7 +1154,7 @@ function Board() {
     check();
     const iv=setInterval(check,5*60*1000);
     return()=>clearInterval(iv);
-  },[notifOn,data.tasks,me,notify]);
+  },[notifOn,data.tasks,me,notify,getNotified,markNotified]);
   useEffect(()=>{const h=(e)=>{if(e.key==="Escape"){setDraft(null);setConfirmBox(null);}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
 
   const renderCard=(t)=>{
