@@ -813,7 +813,7 @@ function Board() {
 
       const ai = getAI(fbApp, { backend: new GoogleAIBackend() });
       const model = getGenerativeModel(ai, {
-        model: "gemini-3.5-flash-lite",
+        model: "gemini-3.1-flash-lite",
         systemInstruction: systemPrompt,
       });
       const chat = model.startChat();
