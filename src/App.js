@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
-import { getAI, getGenerativeModel, GoogleAIBackend, Schema } from "firebase/ai";
+import { getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
@@ -514,7 +514,6 @@ function Board() {
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const aiChatRef = useRef(null);
   const [newType, setNewType] = useState("");
   const [newRcat, setNewRcat] = useState("");
   const [riDate, setRiDate] = useState(todayStr());
@@ -775,62 +774,6 @@ function Board() {
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
 
   /* ── AI 비서 ── */
-  const runAiFunction = useCallback((name, args) => {
-    const d = dataRef.current;
-    if (name === "searchTasks") {
-      let list = d.tasks.filter((t) => !t.deleted && !t.archived);
-      if (args.board) list = list.filter((t) => (t.boardId || "공용") === args.board);
-      if (args.status) list = list.filter((t) => t.status === args.status);
-      if (args.owner) list = list.filter((t) => t.owner === args.owner);
-      if (args.channel) list = list.filter((t) => t.channel === args.channel);
-      if (args.onlyOverdue) list = list.filter((t) => { const dd = dayDiff(t.due); return dd !== null && dd < 0 && t.status !== "done"; });
-      if (args.onlyToday) list = list.filter((t) => t.due === todayStr());
-      return list.slice(0, 40).map((t) => ({ title: t.title, channel: t.channel, owner: t.owner || "미지정", status: t.status, due: t.due || null, priority: t.priority, progress: t.progress || 0, board: t.boardId || "공용" }));
-    }
-    if (name === "searchRoutines") {
-      let list = routines;
-      if (args.owner) list = list.filter((r) => r.owner === args.owner);
-      const today = todayStr();
-      if (args.onlyUnchecked) list = list.filter((r) => !(r.checkins || {})[today]);
-      return list.slice(0, 40).map((r) => ({ title: r.title, when: r.when, owner: r.owner || "미지정", checkedToday: !!(r.checkins || {})[today], streak: streakOf(r.checkins || {}, today) }));
-    }
-    if (name === "searchCheckitems") {
-      let list = checkitems;
-      if (args.tab) list = list.filter((c) => c.tab === args.tab);
-      if (args.onlyPending) list = list.filter((c) => !c.done);
-      if (args.onlyOverdue) list = list.filter((c) => { const dd = dayDiff(c.due); return dd !== null && dd < 0 && !c.done; });
-      return list.slice(0, 40).map((c) => ({ title: c.title, tab: c.tab, done: c.done, start: c.start || null, due: c.due || null }));
-    }
-    if (name === "searchIssues") {
-      let list = allIssues;
-      if (args.onlyUnresolved) list = list.filter((i) => !i.resolved);
-      return list.slice(0, 40).map((i) => ({ text: i.text, source: i.src, related: i.routineTitle, owner: i.owner || "미지정", resolved: i.resolved }));
-    }
-    if (name === "getTaskDetail") {
-      const kw = (args.titleKeyword || "").trim();
-      if (!kw) return { error: "titleKeyword가 필요합니다." };
-      const t = d.tasks.find((x) => !x.deleted && x.title.includes(kw));
-      if (!t) return { error: `"${kw}"를 포함한 업무를 찾지 못했습니다.` };
-      return {
-        title: t.title,
-        board: t.boardId || "공용",
-        channel: t.channel,
-        brand: t.brand || null,
-        type: t.type,
-        owner: t.owner || "미지정",
-        status: t.status,
-        due: t.due || null,
-        start: t.start || null,
-        priority: t.priority,
-        progress: t.progress || 0,
-        memo: t.memo || "(메모 없음)",
-        checklist: (t.checklist || []).map((c) => ({ text: c.text, done: c.done, subs: (c.subs || []).map((s) => ({ text: s.text, done: s.done })) })),
-        history: (t.history || []).map((h) => ({ author: h.author, text: h.text, when: fmtTs(h.ts) })),
-        issues: (t.issues || []).map((i) => ({ text: i.text, resolved: i.resolved })),
-      };
-    }
-    return { error: "알 수 없는 함수" };
-  }, [routines, checkitems, allIssues]);
 
   const sendAiMessage = async () => {
     const q = aiInput.trim();
