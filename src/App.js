@@ -558,6 +558,8 @@ function Board() {
   const [mlySubHistOpen, setMlySubHistOpen] = useState({});
   const [mlySubHistText, setMlySubHistText] = useState({});
   const [mlySubHistEditId, setMlySubHistEditId] = useState(null);
+  const [mlySubEditId, setMlySubEditId] = useState(null);
+  const [mlySubEditText, setMlySubEditText] = useState("");
   const [mlySubsubOpen, setMlySubsubOpen] = useState({});
   const [mlyDate, setMlyDate] = useState(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;});
   const [confirmBox, setConfirmBox] = useState(null);
@@ -888,6 +890,13 @@ function Board() {
     const t=text.trim();if(!t)return;
     const sub={id:uid(),text:t,done:false,history:[],subsubs:[]};
     commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:[...(m.subs||[]),sub],updatedAt:Date.now()}:m)}),[]);
+  };
+  const editMlySubDirect=(monthlyId,subId,text)=>{
+    const t=text.trim();if(!t)return;
+    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).map((s)=>s.id===subId?{...s,text:t,updatedAt:Date.now()}:s),updatedAt:Date.now()}:m)}),[]);
+  };
+  const removeMlySubDirect=(monthlyId,subId)=>{
+    commit((d)=>({...d,monthlies:(d.monthlies||[]).map((m)=>m.id===monthlyId?{...m,subs:(m.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:m)}),[]);
   };
   const addMlySubsubDirect=(monthlyId,subId,text)=>{
     const t=text.trim();if(!t)return;
@@ -1549,6 +1558,8 @@ function Board() {
                       {m.desc&&<div style={{fontSize:12.5,color:"var(--ink3)",marginTop:3}}>{m.desc}</div>}
                       {subs.length>0&&<div style={{fontSize:12,color:"var(--ink3)",marginTop:4,fontWeight:600}}>하위 {subDone}/{subs.length}</div>}
                     </div>
+                    {canEdit&&<button className="riedit" onClick={()=>setMlyDraft({...m,subs:[...m.subs||[]],history:[...m.history||[]]})}>수정</button>}
+                    {canEdit&&isAdmin&&<button className="riedit" style={{color:"var(--danger)"}} onClick={()=>{if(window.confirm(`"${m.title}" 항목을 삭제할까요?`))removeMly(m);}}>삭제</button>}
                   </div>
                   {(subs.length>0||canEdit)&&(
                     <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--line)",display:"flex",flexDirection:"column",gap:6,paddingLeft:35}}>
@@ -1558,11 +1569,19 @@ function Board() {
                         const subsubs=s.subsubs||[];
                         return (
                         <div key={s.id}>
-                          <div style={{display:"flex",alignItems:"center",gap:8}}>
-                            <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleMlySub(m,s.id)}>{s.done?"✓":""}</button>
-                            <span style={{fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",flex:1}}>{s.text}</span>
+                          <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                            <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} style={{marginTop:2}} onClick={()=>toggleMlySub(m,s.id)}>{s.done?"✓":""}</button>
+                            {mlySubEditId===s.id
+                              ? <div style={{flex:1,display:"flex",gap:6}}>
+                                  <textarea className="hinput" autoFocus style={{flex:1}} value={mlySubEditText} onChange={(e)=>setMlySubEditText(e.target.value)}
+                                    onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editMlySubDirect(m.id,s.id,mlySubEditText);setMlySubEditId(null);}}
+                                    onBlur={()=>{editMlySubDirect(m.id,s.id,mlySubEditText);setMlySubEditId(null);}} />
+                                </div>
+                              : <span style={{fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",flex:1,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{s.text}</span>}
                             <button className="riedit" onClick={()=>setMlySubsubOpen({...mlySubsubOpen,[s.id]:!subsubOpen})}>{subsubs.length>0?`하위목록 ${subsubs.filter((x)=>x.done).length}/${subsubs.length}`:"+하위목록"}</button>
                             <button className="riedit" onClick={()=>setMlySubHistOpen({...mlySubHistOpen,[s.id]:!subOpen})}>{(s.history||[]).length>0?`히스토리 ${s.history.length}`:"+히스토리"}</button>
+                            {canEdit&&mlySubEditId!==s.id&&<button className="riedit" onClick={()=>{setMlySubEditId(s.id);setMlySubEditText(s.text);}}>수정</button>}
+                            {canEdit&&<button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:14,flexShrink:0}} onClick={()=>removeMlySubDirect(m.id,s.id)}>×</button>}
                           </div>
                           {subsubOpen&&(
                             <div style={{paddingLeft:31,marginTop:6,marginBottom:8}}>
@@ -1607,7 +1626,7 @@ function Board() {
                         );
                       })}
                       {canEdit&&<div className="addrow" style={{marginTop:4}}>
-                        <input className="inp" placeholder="하위 항목 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;addMlySubDirect(m.id,e.target.value);e.target.value="";}} />
+                        <textarea className="hinput" placeholder="하위 항목 입력 (Enter 추가, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addMlySubDirect(m.id,e.target.value);e.target.value="";}} />
                       </div>}
                     </div>
                   )}
