@@ -556,6 +556,7 @@ function Board() {
   const [memoSubEditId, setMemoSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const [notifBoxOpen, setNotifBoxOpen] = useState(false);
+  const [lightbox, setLightbox] = useState(null);
   const prevTasksRef = useRef(null);
   const notifiedRef = useRef(null);
   const getNotified = useCallback(() => {
@@ -2289,6 +2290,14 @@ function Board() {
         );
       })()}
 
+      {lightbox&&(
+        <div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
+          <img src={lightbox} alt="" style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.5)",objectFit:"contain"}} onClick={(e)=>e.stopPropagation()} />
+          <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:20,right:24,background:"none",border:"none",color:"#fff",fontSize:32,cursor:"pointer",lineHeight:1}}>×</button>
+          <a href={lightbox} download="image" onClick={(e)=>e.stopPropagation()} style={{position:"fixed",bottom:24,right:24,background:"#0C66E4",color:"#fff",borderRadius:8,padding:"8px 18px",fontSize:13,fontWeight:700,textDecoration:"none"}}>⬇ 다운로드</a>
+        </div>
+      )}
+
       {memoDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMemoDraft(null)}><div className="modal">
           <h2>{memoDraft.id?"메모 수정":"새 메모"}</h2>
@@ -2594,7 +2603,7 @@ function Board() {
             <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
               {(draft.images||[]).map((img)=>(
                 <div key={img.id} style={{position:"relative",display:"inline-block"}}>
-                  <img src={img.src} alt="" style={{width:120,height:90,objectFit:"cover",borderRadius:8,border:"1px solid var(--line)",cursor:"pointer"}} onClick={()=>window.open(img.src,"_blank")} />
+                  <img src={img.src} alt="" style={{width:120,height:90,objectFit:"cover",borderRadius:8,border:"1px solid var(--line)",cursor:"pointer"}} onClick={()=>setLightbox(img.src)} />
                   {canEdit&&<button onClick={()=>setDraft({...draft,images:(draft.images||[]).filter((x)=>x.id!==img.id)})}
                     style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.55)",color:"#fff",border:"none",borderRadius:"50%",width:20,height:20,cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>×</button>}
                   <div style={{fontSize:10,color:"var(--ink3)",marginTop:2,textAlign:"center"}}>{img.by}</div>
@@ -2607,6 +2616,7 @@ function Board() {
             {(draft.history||[]).map((h)=>(
               <div key={h.id} className="cmt">
                 <div className="ch2"><b>{h.author}</b> · {fmtTs(h.ts)}{h.edited&&<span style={{fontSize:10,color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                {h.image&&<img src={h.image} alt="" style={{maxWidth:"100%",maxHeight:240,borderRadius:8,cursor:"pointer",marginTop:6,border:"1px solid var(--line)"}} onClick={()=>setLightbox(h.image)} />}
                 {h.editing
                   ? <div style={{display:"flex",gap:6,marginTop:4}}>
                       <input defaultValue={h.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14}}
@@ -2617,14 +2627,24 @@ function Board() {
                         }} />
                       <button className="btn ghost" onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:false}:x)})}>취소</button>
                     </div>
-                  : <p>{h.text}</p>}
+                  : h.text&&<p>{h.text}</p>}
                 {canEdit&&!h.editing&&<div style={{display:"flex",gap:10,marginTop:3}}>
-                  <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>수정</button>
+                  {!h.image&&<button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>수정</button>}
                   <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.filter((x)=>x.id!==h.id)})}>삭제</button>
                 </div>}
               </div>
             ))}
-            {canEdit&&<div className="addrow"><textarea className="hinput" placeholder="진행 상황·메모 입력 (Enter 전송, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}} /></div>}
+            {canEdit&&<div className="addrow"><textarea className="hinput" placeholder="진행 상황·메모 입력 (Enter 전송, Shift+Enter 줄바꿈 / 이미지 Ctrl+V 붙여넣기 가능)"
+              onPaste={async(e)=>{
+                const items=Array.from(e.clipboardData.items||[]);
+                const imgItem=items.find((i)=>i.type.startsWith("image/"));
+                if(!imgItem)return;
+                e.preventDefault();
+                const file=imgItem.getAsFile();
+                const b64=await resizeImage(file);
+                setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:"",image:b64,ts:Date.now()}]});
+              }}
+              onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}} /></div>}
           </div>
           <div className="sect"><h4>태그</h4>
             <div className="ctags">{(draft.tags||[]).map((g)=><span key={g} className="tag">{g}{canEdit&&<button className="x" style={{fontSize:11,marginLeft:3,border:"none",cursor:"pointer",background:"none"}} onClick={()=>setDraft({...draft,tags:draft.tags.filter((x)=>x!==g)})}>x</button>}</span>)}{!(draft.tags||[]).length&&<span className="hint">없음</span>}</div>
