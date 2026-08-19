@@ -50,6 +50,23 @@ const REPEATS = [{ id:"none",label:"반복 없음" },{ id:"daily",label:"매일"
 const ROLES = [{ id:"admin",label:"관리자" },{ id:"member",label:"멤버" },{ id:"viewer",label:"뷰어" }];
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const resizeImage=(file,maxW=800,maxH=800,quality=0.75)=>new Promise((resolve)=>{
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    const img=new Image();
+    img.onload=()=>{
+      let {width:w,height:h}=img;
+      if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+      if(h>maxH){w=Math.round(w*maxH/h);h=maxH;}
+      const canvas=document.createElement("canvas");
+      canvas.width=w;canvas.height=h;
+      canvas.getContext("2d").drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL(file.type.includes("png")?"image/png":"image/jpeg",quality));
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+});
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
@@ -1190,6 +1207,7 @@ function Board() {
           <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
             {t.owner?<span className={"ownerchip"+(t.owner===me?" me":"")}>{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
             {t.due&&<span className={"due"+(late?" late":soon?" soon":"")}>{t.start?t.start.slice(5)+"~":""}{t.due.slice(5)}{late?` +${Math.abs(d)}d`:""}</span>}
+            {(t.images||[]).length>0&&<span style={{fontSize:11,color:"var(--ink3)"}}>🖼 {t.images.length}</span>}
           </span>
           <span style={{display:"flex",gap:6,alignItems:"center"}}>
             <span className="icons">{ck.length>0&&<span>☑{ckDone}/{ck.length}</span>}{!!(t.comments||[]).length&&<span>💬{t.comments.length}</span>}{!!(t.links||[]).length&&<span>🔗{t.links.length}</span>}</span>
@@ -2558,6 +2576,32 @@ function Board() {
             <div className="pticks"><span>0</span><span>50</span><span>100</span></div>
           </div>
           <div className="fld"><label>메모</label><textarea disabled={!canEdit} value={draft.memo} onChange={(e)=>setDraft({...draft,memo:e.target.value})} placeholder="진행 상황, 공급사 회신, 참고 수치" /></div>
+          <div className="sect" style={{paddingTop:10}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+              <h4 style={{margin:0}}>이미지</h4>
+              {canEdit&&<label style={{cursor:"pointer",fontSize:12,color:"#0C66E4",fontWeight:700,border:"1px solid #0C66E4",borderRadius:6,padding:"4px 10px"}}>
+                + 이미지 추가
+                <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={async(e)=>{
+                  const files=Array.from(e.target.files);
+                  const imgs=await Promise.all(files.map((f)=>resizeImage(f)));
+                  const newImgs=(imgs).map((b64)=>({id:uid(),src:b64,ts:Date.now(),by:me||"익명"}));
+                  setDraft({...draft,images:[...(draft.images||[]),...newImgs]});
+                  e.target.value="";
+                }} />
+              </label>}
+            </div>
+            {(draft.images||[]).length===0&&<span className="hint">이미지가 없습니다</span>}
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              {(draft.images||[]).map((img)=>(
+                <div key={img.id} style={{position:"relative",display:"inline-block"}}>
+                  <img src={img.src} alt="" style={{width:120,height:90,objectFit:"cover",borderRadius:8,border:"1px solid var(--line)",cursor:"pointer"}} onClick={()=>window.open(img.src,"_blank")} />
+                  {canEdit&&<button onClick={()=>setDraft({...draft,images:(draft.images||[]).filter((x)=>x.id!==img.id)})}
+                    style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.55)",color:"#fff",border:"none",borderRadius:"50%",width:20,height:20,cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>×</button>}
+                  <div style={{fontSize:10,color:"var(--ink3)",marginTop:2,textAlign:"center"}}>{img.by}</div>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="sect"><h4>히스토리</h4>
             {(draft.history||[]).length===0&&<span className="hint">진행 기록이 없습니다</span>}
             {(draft.history||[]).map((h)=>(
