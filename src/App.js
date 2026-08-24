@@ -559,12 +559,11 @@ function Board() {
   const [notifBoxOpen, setNotifBoxOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
   const [mmId, setMmId] = useState(null);
-  const [mmNodes, setMmNodes] = useState([]);
-  const [mmEdges, setMmEdges] = useState([]);
-  const [mmDrag, setMmDrag] = useState(null);
+  const [mmTree, setMmTree] = useState(null);
   const [mmSel, setMmSel] = useState(null);
-  const [mmConnecting, setMmConnecting] = useState(null);
   const [mmEditId, setMmEditId] = useState(null);
+  const [mmScroll, setMmScroll] = useState({x:0,y:0});
+  const [mmPan, setMmPan] = useState(null);
   const prevTasksRef = useRef(null);
   const notifiedRef = useRef(null);
   const getNotified = useCallback(() => {
@@ -1117,25 +1116,34 @@ function Board() {
     commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
   };
 
-  /* ── 마인드맵 ── */
+  /* ── 마인드맵 (계층형) ── */
   const mindmaps=useMemo(()=>(data.mindmaps||[]).filter((m)=>!m.deleted),[data.mindmaps]);
-  const loadMm=(mm)=>{setMmId(mm.id);setMmNodes(mm.nodes||[]);setMmEdges(mm.edges||[]);setMmSel(null);setMmEditId(null);setMmConnecting(null);};
-  const saveMm=(id,nodes,edges,title)=>{
+  const mmMakeNode=(text,color)=>({id:uid(),text:text||"노드",color:color||null,children:[],collapsed:false});
+  const mmSaveToDB=(id,tree,title)=>{
     const now=Date.now();
     const exists=(data.mindmaps||[]).find((m)=>m.id===id);
-    if(exists){commit((d)=>({...d,mindmaps:(d.mindmaps||[]).map((m)=>m.id===id?{...m,nodes,edges,title:title||m.title,updatedAt:now}:m)}),[]);}
-    else{commit((d)=>({...d,mindmaps:[...(d.mindmaps||[]),{id,title:title||"새 마인드맵",nodes,edges,createdAt:now,updatedAt:now,createdBy:me}]}),[]);}
+    if(exists){commit((d)=>({...d,mindmaps:(d.mindmaps||[]).map((m)=>m.id===id?{...m,tree,title:title||m.title,updatedAt:now}:m)}),[]);}
+    else{commit((d)=>({...d,mindmaps:[...(d.mindmaps||[]),{id,title:title||"새 마인드맵",tree,createdAt:now,updatedAt:now,createdBy:me}]}),[]);}
   };
+  const loadMm=(mm)=>{setMmId(mm.id);setMmTree(JSON.parse(JSON.stringify(mm.tree||mmMakeNode("중심"))));setMmSel(null);setMmEditId(null);};
   const deleteMm=(id)=>{
     commit((d)=>({...d,mindmaps:(d.mindmaps||[]).map((m)=>m.id===id?{...m,deleted:true,updatedAt:Date.now()}:m)}),[]);
-    if(mmId===id){setMmId(null);setMmNodes([]);setMmEdges([]);}
+    if(mmId===id){setMmId(null);setMmTree(null);}
   };
   const duplicateMm=(mm)=>{
     const id=uid();const now=Date.now();
-    const nodeMap={};
-    const nodes=(mm.nodes||[]).map((n)=>{const nid=uid();nodeMap[n.id]=nid;return{...n,id:nid};});
-    const edges=(mm.edges||[]).map((e)=>({from:nodeMap[e.from]||e.from,to:nodeMap[e.to]||e.to}));
-    commit((d)=>({...d,mindmaps:[...(d.mindmaps||[]),{id,title:(mm.title||"맵")+" (복사)",nodes,edges,createdAt:now,updatedAt:now,createdBy:me}]}),[]);
+    const deepCopy=(node)=>({...node,id:uid(),children:(node.children||[]).map(deepCopy)});
+    commit((d)=>({...d,mindmaps:[...(d.mindmaps||[]),{id,title:(mm.title||"맵")+" (복사)",tree:deepCopy(mm.tree||{}),createdAt:now,updatedAt:now,createdBy:me}]}),[]);
+  };
+  // 트리 조작 헬퍼
+  const mmUpdateNode=(tree,targetId,updater)=>{
+    if(!tree)return tree;
+    if(tree.id===targetId)return updater(tree);
+    return {...tree,children:(tree.children||[]).map((c)=>mmUpdateNode(c,targetId,updater))};
+  };
+  const mmDeleteNode=(tree,targetId)=>{
+    if(!tree)return tree;
+    return {...tree,children:(tree.children||[]).filter((c)=>c.id!==targetId).map((c)=>mmDeleteNode(c,targetId))};
   };
 
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
@@ -1779,17 +1787,85 @@ function Board() {
         </div>
       )}
 
-      {view==="mindmap"&&(
+      {view==="mindmap"&&(()=>{
+        const BRANCH_COLORS=["#E8453C","#F7B731","#20BF55","#0C66E4","#8854D0","#FF6B6B","#2980B9","#E67E22"];
+        const NODE_H=36,NODE_GAP=12,CHILD_INDENT=200;
+        // 트리 레이아웃 계산
+        const calcLayout=(node,depth,side,branchColor,parentX,parentY,colorIdx)=>{
+          if(!node)return{items:[],height:0};
+          const color=depth===0?"#1a1a2e":depth===1?(BRANCH_COLORS[colorIdx%BRANCH_COLORS.length]):branchColor;
+          const items=[];
+          if(node.collapsed||!(node.children||[]).length){
+            items.push({node,depth,side,color,x:0,y:0,h:NODE_H,parentX,parentY});
+            return{items,height:NODE_H};
+          }
+          const childResults=(node.children||[]).map((c,i)=>calcLayout(c,depth+1,side,color,0,0,colorIdx));
+          const totalH=childResults.reduce((s,r)=>s+r.height,0)+NODE_GAP*(childResults.length-1);
+          items.push({node,depth,side,color,x:0,y:0,h:NODE_H,parentX,parentY,totalChildH:totalH});
+          let cy=0;
+          childResults.forEach((r,i)=>{
+            r.items.forEach((item)=>{items.push({...item,_dy:cy+(r.height/2),_cidx:i});});
+            cy+=r.height+(i<childResults.length-1?NODE_GAP:0);
+          });
+          return{items,height:Math.max(NODE_H,totalH)};
+        };
+
+        const renderTree=()=>{
+          if(!mmTree)return null;
+          const svgPaths=[];const nodes=[];
+          const rootW=120;
+          // 좌우 분리
+          const children=mmTree.children||[];
+          const left=children.filter((_,i)=>i%2===1);
+          const right=children.filter((_,i)=>i%2===0);
+          const CX=600,CY=400;
+
+          const renderSide=(sideNodes,side)=>{
+            let cumY=0;
+            const allItems=[];
+            sideNodes.forEach((child,ci)=>{
+              const colorIdx=children.indexOf(child);
+              const res=calcLayout(child,1,side,null,0,0,colorIdx);
+              res.items.forEach((item)=>{allItems.push({...item,_groupY:cumY,_groupH:res.height,_colorIdx:colorIdx});});
+              cumY+=res.height+NODE_GAP*2;
+            });
+            const totalH=cumY;
+            const startY=CY-totalH/2;
+            allItems.forEach((item)=>{
+              const gY=startY+item._groupY;
+              const nodeY=gY+(item._dy!==undefined?item._dy:item.h/2);
+              const nodeX=side==="right"?CX+rootW/2+CHILD_INDENT*(item.depth):CX-rootW/2-CHILD_INDENT*(item.depth);
+              const branchColor=BRANCH_COLORS[item._colorIdx%BRANCH_COLORS.length];
+              const w=item.depth===1?110:100;
+              nodes.push({...item,x:nodeX,y:nodeY,w,branchColor});
+              if(item.depth>0){
+                const px=side==="right"?CX+rootW/2+CHILD_INDENT*(item.depth-1):CX-rootW/2-CHILD_INDENT*(item.depth-1);
+                const py=item.depth===1?CY:item.parentY||nodeY;
+                const mx=(nodeX+px)/2;
+                const x1=side==="right"?px+w:px,x2=side==="right"?nodeX:nodeX+w;
+                svgPaths.push(<path key={item.node.id+"l"} d={`M${x1},${py} C${mx},${py} ${mx},${nodeY} ${x2},${nodeY}`} stroke={branchColor} strokeWidth={item.depth===1?3:2} fill="none" opacity={0.85}/>);
+              }
+            });
+          };
+          renderSide(right,"right");
+          renderSide(left,"left");
+
+          return{svgPaths,nodes,rootW,CX,CY};
+        };
+
+        const layout=mmTree?renderTree():null;
+        const svgW=1400,svgH=900;
+
+        return(
         <div style={{display:"flex",gap:12,height:"calc(100vh - 130px)"}}>
           {/* 사이드바 */}
-          <div style={{width:190,flexShrink:0,background:"var(--card)",borderRadius:10,boxShadow:"var(--sh)",padding:12,display:"flex",flexDirection:"column",gap:8,overflowY:"auto"}}>
+          <div style={{width:180,flexShrink:0,background:"var(--card)",borderRadius:10,boxShadow:"var(--sh)",padding:12,display:"flex",flexDirection:"column",gap:8,overflowY:"auto"}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <span style={{fontSize:13,fontWeight:800}}>마인드맵</span>
               {canEdit&&<button className="btn-save" style={{fontSize:11,padding:"3px 9px"}} onClick={()=>{
-                const id=uid();
-                const root={id:uid(),x:380,y:260,text:"중심",color:"#0C66E4",root:true};
-                setMmId(id);setMmNodes([root]);setMmEdges([]);setMmSel(null);setMmEditId(null);setMmConnecting(null);
-                saveMm(id,[root],[],"새 마인드맵");
+                const id=uid();const root=mmMakeNode("중심");
+                setMmId(id);setMmTree(root);setMmSel(null);setMmEditId(null);
+                mmSaveToDB(id,root,"새 마인드맵");
               }}>+ 새로</button>}
             </div>
             {mindmaps.length===0&&<span className="hint" style={{fontSize:12}}>맵이 없습니다</span>}
@@ -1797,7 +1873,7 @@ function Board() {
               <div key={mm.id} onClick={()=>loadMm(mm)}
                 style={{padding:"8px 10px",borderRadius:8,cursor:"pointer",background:mmId===mm.id?"#E9F2FF":"var(--bg)",border:mmId===mm.id?"1.5px solid #0C66E4":"1px solid var(--line)",fontSize:13}}>
                 <div style={{fontWeight:mmId===mm.id?700:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{mm.title||"제목 없음"}</div>
-                <div style={{fontSize:11,color:"var(--ink3)",marginTop:2}}>{(mm.nodes||[]).length}개 노드</div>
+                <div style={{fontSize:11,color:"var(--ink3)",marginTop:2}}>노드 {(()=>{const cnt=(t)=>1+((t&&t.children)||[]).reduce((s,c)=>s+cnt(c),0);return mm.tree?cnt(mm.tree):0;})()}개</div>
                 {canEdit&&<div style={{display:"flex",gap:8,marginTop:4}}>
                   <button style={{background:"none",border:"none",color:"#0C66E4",fontSize:11,cursor:"pointer",padding:0}} onClick={(e)=>{e.stopPropagation();duplicateMm(mm);}}>복사</button>
                   <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={(e)=>{e.stopPropagation();if(window.confirm("삭제할까요?"))deleteMm(mm.id);}}>삭제</button>
@@ -1806,89 +1882,90 @@ function Board() {
             ))}
           </div>
           {/* 캔버스 */}
-          <div style={{flex:1,background:"var(--card)",borderRadius:10,boxShadow:"var(--sh)",position:"relative",overflow:"hidden",userSelect:"none"}}
-            onDoubleClick={(e)=>{
-              if(!canEdit||!mmId)return;
-              if(e.target.closest("[data-mmnode]"))return;
-              const rect=e.currentTarget.getBoundingClientRect();
-              const newNode={id:uid(),x:e.clientX-rect.left,y:e.clientY-rect.top,text:"노드",color:"#2D8CFF"};
-              const next=[...mmNodes,newNode];
-              setMmNodes(next);setMmEditId(newNode.id);
-              saveMm(mmId,next,mmEdges);
-            }}
-            onMouseMove={(e)=>{
-              if(!mmDrag)return;
-              const rect=e.currentTarget.getBoundingClientRect();
-              const x=e.clientX-rect.left-mmDrag.ox;
-              const y=e.clientY-rect.top-mmDrag.oy;
-              setMmNodes((ns)=>ns.map((n)=>n.id===mmDrag.id?{...n,x,y}:n));
-            }}
-            onMouseUp={()=>{if(mmDrag){saveMm(mmId,mmNodes,mmEdges);setMmDrag(null);}}}
-            onClick={(e)=>{if(e.target===e.currentTarget){setMmSel(null);setMmConnecting(null);}}}
+          <div style={{flex:1,background:"#F8F9FC",borderRadius:10,boxShadow:"var(--sh)",position:"relative",overflow:"hidden"}}
+            onMouseMove={(e)=>{if(mmPan){setMmScroll((s)=>({x:s.x+(e.clientX-mmPan.lx),y:s.y+(e.clientY-mmPan.ly)}));setMmPan({lx:e.clientX,ly:e.clientY});}}}
+            onMouseUp={()=>setMmPan(null)}
+            onMouseDown={(e)=>{if(e.target===e.currentTarget||e.target.tagName==="svg"||e.target.tagName==="path")setMmPan({lx:e.clientX,ly:e.clientY});}}
           >
-            {/* 빈 상태 */}
-            {!mmId&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"var(--ink3)",fontSize:14,gap:8}}>
-              <span style={{fontSize:32}}>🧠</span>
-              <span>왼쪽에서 마인드맵을 선택하거나 새로 만드세요</span>
-              <span style={{fontSize:12}}>캔버스 더블클릭: 노드 추가 · 노드 클릭: 선택 · 드래그: 이동</span>
+            {!mmId&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"var(--ink3)",gap:8}}>
+              <span style={{fontSize:40}}>🧠</span>
+              <span style={{fontSize:14}}>왼쪽에서 마인드맵을 선택하거나 새로 만드세요</span>
             </div>}
             {/* 툴바 */}
-            {mmId&&<div style={{position:"absolute",top:10,left:10,display:"flex",gap:6,zIndex:10,flexWrap:"wrap"}}>
-              {canEdit&&<button className="btn-save" style={{fontSize:12,padding:"4px 12px"}} onClick={()=>{
-                const newNode={id:uid(),x:200+Math.random()*200,y:150+Math.random()*150,text:"노드",color:"#2D8CFF"};
-                const next=[...mmNodes,newNode];
-                setMmNodes(next);setMmEditId(newNode.id);
-                saveMm(mmId,next,mmEdges);
-              }}>+ 노드</button>}
-              <button className="riedit" onClick={()=>{const t=prompt("맵 이름",mindmaps.find((m)=>m.id===mmId)?.title||"");if(t)saveMm(mmId,mmNodes,mmEdges,t);}}>이름 변경</button>
-              {mmSel&&canEdit&&<button className="riedit" style={{color:"var(--danger)"}} onClick={()=>{
-                const next=mmNodes.filter((n)=>n.id!==mmSel);
-                const ne=mmEdges.filter((e)=>e.from!==mmSel&&e.to!==mmSel);
-                setMmNodes(next);setMmEdges(ne);setMmSel(null);saveMm(mmId,next,ne);
-              }}>노드 삭제</button>}
-              {mmSel&&canEdit&&!mmConnecting&&<button className="riedit" style={{color:"#0C66E4",borderColor:"#0C66E4"}} onClick={()=>setMmConnecting(mmSel)}>연결 시작</button>}
-              {mmConnecting&&<span style={{fontSize:12,color:"#0C66E4",fontWeight:700,padding:"4px 10px",background:"#E9F2FF",borderRadius:6}}>연결할 다른 노드를 클릭하세요 (ESC 취소)</span>}
+            {mmId&&<div style={{position:"absolute",top:10,left:10,display:"flex",gap:6,zIndex:20}}>
+              <button className="riedit" onClick={()=>{const t=prompt("맵 이름",mindmaps.find((m)=>m.id===mmId)?.title||"");if(t&&mmTree)mmSaveToDB(mmId,mmTree,t);}}>이름 변경</button>
+              {mmSel&&mmSel!==mmTree?.id&&canEdit&&<>
+                <button className="riedit" style={{color:"#0C66E4",borderColor:"#0C66E4"}} onClick={()=>{
+                  const newNode=mmMakeNode("노드");
+                  const next=mmUpdateNode(mmTree,mmSel,(n)=>({...n,children:[...(n.children||[]),newNode]}));
+                  setMmTree(next);setMmEditId(newNode.id);mmSaveToDB(mmId,next);
+                }}>+ 하위 노드</button>
+                <button className="riedit" style={{color:"var(--danger)"}} onClick={()=>{
+                  const next=mmDeleteNode(mmTree,mmSel);
+                  setMmTree(next);setMmSel(null);mmSaveToDB(mmId,next);
+                }}>노드 삭제</button>
+              </>}
+              {mmSel===mmTree?.id&&canEdit&&<button className="riedit" style={{color:"#0C66E4",borderColor:"#0C66E4"}} onClick={()=>{
+                const newNode=mmMakeNode("노드");
+                const next=mmUpdateNode(mmTree,mmSel,(n)=>({...n,children:[...(n.children||[]),newNode]}));
+                setMmTree(next);setMmEditId(newNode.id);mmSaveToDB(mmId,next);
+              }}>+ 노드 추가</button>}
+              <button className="riedit" onClick={()=>setMmScroll({x:0,y:0})}>중앙으로</button>
             </div>}
-            {mmId&&<div style={{position:"absolute",bottom:10,right:10,fontSize:11,color:"var(--ink3)"}}>더블클릭: 노드 추가 · 노드 더블클릭: 텍스트 편집</div>}
-            {/* 엣지(연결선) SVG */}
-            <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
-              {mmEdges.map((e,i)=>{
-                const from=mmNodes.find((n)=>n.id===e.from);
-                const to=mmNodes.find((n)=>n.id===e.to);
-                if(!from||!to)return null;
-                const mx=(from.x+to.x)/2,my=(from.y+to.y)/2-30;
-                return <path key={i} d={`M${from.x},${from.y} Q${mx},${my} ${to.x},${to.y}`} stroke="#CBD0D8" strokeWidth={2} fill="none" strokeDasharray={e.dash?"6,3":""}/>;
-              })}
-            </svg>
-            {/* 노드 */}
-            {mmNodes.map((n)=>(
-              <div key={n.id} data-mmnode="1"
-                style={{position:"absolute",left:n.x-70,top:n.y-22,width:140,minHeight:44,background:n.root?"#0C66E4":n.color||"#2D8CFF",color:"#fff",borderRadius:n.root?14:8,display:"flex",alignItems:"center",justifyContent:"center",cursor:mmDrag?.id===n.id?"grabbing":"grab",fontSize:13,fontWeight:n.root?800:500,boxShadow:mmSel===n.id?"0 0 0 3px #FFD700,0 2px 10px rgba(0,0,0,.25)":"0 2px 8px rgba(0,0,0,.18)",border:mmConnecting===n.id?"3px dashed #FFD700":"2px solid transparent",padding:"6px 10px",textAlign:"center",wordBreak:"break-all",zIndex:mmSel===n.id?5:1,transition:"box-shadow .1s"}}
-                onMouseDown={(e)=>{e.stopPropagation();if(e.button!==0)return;const rect=e.currentTarget.parentElement.getBoundingClientRect();setMmDrag({id:n.id,ox:e.clientX-rect.left-n.x,oy:e.clientY-rect.top-n.y});}}
-                onClick={(e)=>{
-                  e.stopPropagation();
-                  if(mmConnecting&&mmConnecting!==n.id){
-                    const dup=mmEdges.find((ed)=>(ed.from===mmConnecting&&ed.to===n.id)||(ed.from===n.id&&ed.to===mmConnecting));
-                    if(!dup){const ne=[...mmEdges,{from:mmConnecting,to:n.id}];setMmEdges(ne);saveMm(mmId,mmNodes,ne);}
-                    setMmConnecting(null);return;
-                  }
-                  setMmSel(n.id);
-                }}
-                onDoubleClick={(e)=>{e.stopPropagation();setMmEditId(n.id);}}
-                onKeyDown={(e)=>{if(e.key==="Escape")setMmConnecting(null);}}
-              >
-                {mmEditId===n.id
-                  ?<input autoFocus defaultValue={n.text}
-                    style={{background:"transparent",border:"none",outline:"none",color:"#fff",fontSize:13,fontWeight:n.root?800:500,width:"100%",textAlign:"center"}}
-                    onBlur={(e)=>{const t=e.target.value.trim()||n.text;const next=mmNodes.map((x)=>x.id===n.id?{...x,text:t}:x);setMmNodes(next);setMmEditId(null);saveMm(mmId,next,mmEdges);}}
-                    onKeyDown={(e)=>{if(e.key==="Enter"||e.key==="Escape")e.target.blur();}}/>
-                  :<span style={{lineHeight:1.35}}>{n.text}</span>
-                }
+            {/* SVG + 노드 */}
+            {mmTree&&layout&&(
+              <div style={{position:"absolute",left:mmScroll.x,top:mmScroll.y,width:svgW,height:svgH,transformOrigin:"0 0"}}>
+                <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>{layout.svgPaths}</svg>
+                {/* 루트 노드 */}
+                <div style={{position:"absolute",left:layout.CX-60,top:layout.CY-20,width:120,height:40,background:"#1a1a2e",color:"#fff",borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,cursor:"pointer",boxShadow:mmSel===mmTree.id?"0 0 0 3px #FFD700,0 4px 16px rgba(0,0,0,.3)":"0 4px 16px rgba(0,0,0,.2)",zIndex:5,userSelect:"none"}}
+                  onClick={()=>setMmSel(mmTree.id)}
+                  onDoubleClick={()=>setMmEditId(mmTree.id)}>
+                  {mmEditId===mmTree.id
+                    ?<input autoFocus defaultValue={mmTree.text} style={{background:"transparent",border:"none",outline:"none",color:"#fff",fontSize:14,fontWeight:900,width:"90%",textAlign:"center"}}
+                        onBlur={(e)=>{const next=mmUpdateNode(mmTree,mmTree.id,(n)=>({...n,text:e.target.value.trim()||n.text}));setMmTree(next);setMmEditId(null);mmSaveToDB(mmId,next);}}
+                        onKeyDown={(e)=>{if(e.key==="Enter"||e.key==="Escape")e.target.blur();}}/>
+                    :<span>{mmTree.text}</span>}
+                </div>
+                {/* 하위 노드들 */}
+                {layout.nodes.map(({node,x,y,w,depth,branchColor,side})=>(
+                  <div key={node.id}
+                    style={{position:"absolute",left:side==="right"?x:x-w,top:y-NODE_H/2,width:w,height:NODE_H,
+                      background:depth===1?branchColor:"#fff",
+                      color:depth===1?"#fff":"#1a1a2e",
+                      borderRadius:depth===1?8:4,
+                      borderBottom:depth>1?`3px solid ${branchColor}`:"none",
+                      display:"flex",alignItems:"center",
+                      justifyContent:depth===1?"center":"flex-start",
+                      padding:depth===1?"0 10px":"0 6px",
+                      fontSize:depth===1?13:12.5,fontWeight:depth===1?700:400,
+                      cursor:"pointer",
+                      boxShadow:mmSel===node.id?`0 0 0 2px #FFD700,0 2px 8px rgba(0,0,0,.15)`:depth===1?"0 2px 8px rgba(0,0,0,.15)":"none",
+                      zIndex:mmSel===node.id?5:1,userSelect:"none",
+                      overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}
+                    onClick={(e)=>{e.stopPropagation();setMmSel(node.id);}}
+                    onDoubleClick={(e)=>{e.stopPropagation();setMmEditId(node.id);}}
+                  >
+                    {/* 접기/펼치기 */}
+                    {(node.children||[]).length>0&&(
+                      <span style={{marginRight:4,fontSize:10,opacity:.7,cursor:"pointer",flexShrink:0}}
+                        onClick={(e)=>{e.stopPropagation();const next=mmUpdateNode(mmTree,node.id,(n)=>({...n,collapsed:!n.collapsed}));setMmTree(next);mmSaveToDB(mmId,next);}}>
+                        {node.collapsed?"▶":"▼"}
+                      </span>
+                    )}
+                    {mmEditId===node.id
+                      ?<input autoFocus defaultValue={node.text} style={{background:"transparent",border:"none",outline:"none",color:"inherit",fontSize:"inherit",fontWeight:"inherit",width:"100%"}}
+                          onBlur={(e)=>{const next=mmUpdateNode(mmTree,node.id,(n)=>({...n,text:e.target.value.trim()||n.text}));setMmTree(next);setMmEditId(null);mmSaveToDB(mmId,next);}}
+                          onKeyDown={(e)=>{if(e.key==="Enter"||e.key==="Escape")e.target.blur();}}/>
+                      :<span style={{overflow:"hidden",textOverflow:"ellipsis"}}>{node.text}</span>}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            <div style={{position:"absolute",bottom:10,right:10,fontSize:11,color:"var(--ink3)"}}>드래그: 캔버스 이동 · 더블클릭: 텍스트 편집 · 노드 선택 후 툴바에서 하위 추가</div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {view==="memo"&&(
         <div>
