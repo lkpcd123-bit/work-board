@@ -1130,6 +1130,13 @@ function Board() {
     commit((d)=>({...d,mindmaps:(d.mindmaps||[]).map((m)=>m.id===id?{...m,deleted:true,updatedAt:Date.now()}:m)}),[]);
     if(mmId===id){setMmId(null);setMmNodes([]);setMmEdges([]);}
   };
+  const duplicateMm=(mm)=>{
+    const id=uid();const now=Date.now();
+    const nodeMap={};
+    const nodes=(mm.nodes||[]).map((n)=>{const nid=uid();nodeMap[n.id]=nid;return{...n,id:nid};});
+    const edges=(mm.edges||[]).map((e)=>({from:nodeMap[e.from]||e.from,to:nodeMap[e.to]||e.to}));
+    commit((d)=>({...d,mindmaps:[...(d.mindmaps||[]),{id,title:(mm.title||"맵")+" (복사)",nodes,edges,createdAt:now,updatedAt:now,createdBy:me}]}),[]);
+  };
 
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
@@ -1791,15 +1798,18 @@ function Board() {
                 style={{padding:"8px 10px",borderRadius:8,cursor:"pointer",background:mmId===mm.id?"#E9F2FF":"var(--bg)",border:mmId===mm.id?"1.5px solid #0C66E4":"1px solid var(--line)",fontSize:13}}>
                 <div style={{fontWeight:mmId===mm.id?700:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{mm.title||"제목 없음"}</div>
                 <div style={{fontSize:11,color:"var(--ink3)",marginTop:2}}>{(mm.nodes||[]).length}개 노드</div>
-                {canEdit&&<button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0,marginTop:4}}
-                  onClick={(e)=>{e.stopPropagation();if(window.confirm("삭제할까요?"))deleteMm(mm.id);}}>삭제</button>}
+                {canEdit&&<div style={{display:"flex",gap:8,marginTop:4}}>
+                  <button style={{background:"none",border:"none",color:"#0C66E4",fontSize:11,cursor:"pointer",padding:0}} onClick={(e)=>{e.stopPropagation();duplicateMm(mm);}}>복사</button>
+                  <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={(e)=>{e.stopPropagation();if(window.confirm("삭제할까요?"))deleteMm(mm.id);}}>삭제</button>
+                </div>}
               </div>
             ))}
           </div>
           {/* 캔버스 */}
           <div style={{flex:1,background:"var(--card)",borderRadius:10,boxShadow:"var(--sh)",position:"relative",overflow:"hidden",userSelect:"none"}}
             onDoubleClick={(e)=>{
-              if(!canEdit||!mmId||e.target!==e.currentTarget)return;
+              if(!canEdit||!mmId)return;
+              if(e.target.closest("[data-mmnode]"))return;
               const rect=e.currentTarget.getBoundingClientRect();
               const newNode={id:uid(),x:e.clientX-rect.left,y:e.clientY-rect.top,text:"노드",color:"#2D8CFF"};
               const next=[...mmNodes,newNode];
@@ -1824,6 +1834,12 @@ function Board() {
             </div>}
             {/* 툴바 */}
             {mmId&&<div style={{position:"absolute",top:10,left:10,display:"flex",gap:6,zIndex:10,flexWrap:"wrap"}}>
+              {canEdit&&<button className="btn-save" style={{fontSize:12,padding:"4px 12px"}} onClick={()=>{
+                const newNode={id:uid(),x:200+Math.random()*200,y:150+Math.random()*150,text:"노드",color:"#2D8CFF"};
+                const next=[...mmNodes,newNode];
+                setMmNodes(next);setMmEditId(newNode.id);
+                saveMm(mmId,next,mmEdges);
+              }}>+ 노드</button>}
               <button className="riedit" onClick={()=>{const t=prompt("맵 이름",mindmaps.find((m)=>m.id===mmId)?.title||"");if(t)saveMm(mmId,mmNodes,mmEdges,t);}}>이름 변경</button>
               {mmSel&&canEdit&&<button className="riedit" style={{color:"var(--danger)"}} onClick={()=>{
                 const next=mmNodes.filter((n)=>n.id!==mmSel);
@@ -1846,7 +1862,7 @@ function Board() {
             </svg>
             {/* 노드 */}
             {mmNodes.map((n)=>(
-              <div key={n.id}
+              <div key={n.id} data-mmnode="1"
                 style={{position:"absolute",left:n.x-70,top:n.y-22,width:140,minHeight:44,background:n.root?"#0C66E4":n.color||"#2D8CFF",color:"#fff",borderRadius:n.root?14:8,display:"flex",alignItems:"center",justifyContent:"center",cursor:mmDrag?.id===n.id?"grabbing":"grab",fontSize:13,fontWeight:n.root?800:500,boxShadow:mmSel===n.id?"0 0 0 3px #FFD700,0 2px 10px rgba(0,0,0,.25)":"0 2px 8px rgba(0,0,0,.18)",border:mmConnecting===n.id?"3px dashed #FFD700":"2px solid transparent",padding:"6px 10px",textAlign:"center",wordBreak:"break-all",zIndex:mmSel===n.id?5:1,transition:"box-shadow .1s"}}
                 onMouseDown={(e)=>{e.stopPropagation();if(e.button!==0)return;const rect=e.currentTarget.parentElement.getBoundingClientRect();setMmDrag({id:n.id,ox:e.clientX-rect.left-n.x,oy:e.clientY-rect.top-n.y});}}
                 onClick={(e)=>{
