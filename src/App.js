@@ -71,7 +71,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -80,10 +80,11 @@ function mergeData(r,l) {
   const mm2=new Map(); [...(r.monthlies||[]),...(l.monthlies||[])].forEach(t=>{const p=mm2.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mm2.set(t.id,t);});
   const ri=new Map(); [...(r.rItems||[]),...(l.rItems||[])].forEach(t=>{const p=ri.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))ri.set(t.id,t);});
   const mi=new Map(); [...(r.memoItems||[]),...(l.memoItems||[])].forEach(t=>{const p=mi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mi.set(t.id,t);});
+  const mmi=new Map(); [...(r.mindmaps||[]),...(l.mindmaps||[])].forEach(t=>{const p=mmi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mmi.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
+  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],mindmaps:[...mmi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
     routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
     colLabels:((l.colLabelsUpdatedAt||0)>=(r.colLabelsUpdatedAt||0)?l.colLabels:r.colLabels)||{},colLabelsUpdatedAt:Math.max(l.colLabelsUpdatedAt||0,r.colLabelsUpdatedAt||0),
     log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
@@ -557,6 +558,13 @@ function Board() {
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const [notifBoxOpen, setNotifBoxOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
+  const [mmId, setMmId] = useState(null);
+  const [mmNodes, setMmNodes] = useState([]);
+  const [mmEdges, setMmEdges] = useState([]);
+  const [mmDrag, setMmDrag] = useState(null);
+  const [mmSel, setMmSel] = useState(null);
+  const [mmConnecting, setMmConnecting] = useState(null);
+  const [mmEditId, setMmEditId] = useState(null);
   const prevTasksRef = useRef(null);
   const notifiedRef = useRef(null);
   const getNotified = useCallback(() => {
@@ -630,7 +638,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -1109,6 +1117,20 @@ function Board() {
     commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
   };
 
+  /* ── 마인드맵 ── */
+  const mindmaps=useMemo(()=>(data.mindmaps||[]).filter((m)=>!m.deleted),[data.mindmaps]);
+  const loadMm=(mm)=>{setMmId(mm.id);setMmNodes(mm.nodes||[]);setMmEdges(mm.edges||[]);setMmSel(null);setMmEditId(null);setMmConnecting(null);};
+  const saveMm=(id,nodes,edges,title)=>{
+    const now=Date.now();
+    const exists=(data.mindmaps||[]).find((m)=>m.id===id);
+    if(exists){commit((d)=>({...d,mindmaps:(d.mindmaps||[]).map((m)=>m.id===id?{...m,nodes,edges,title:title||m.title,updatedAt:now}:m)}),[]);}
+    else{commit((d)=>({...d,mindmaps:[...(d.mindmaps||[]),{id,title:title||"새 마인드맵",nodes,edges,createdAt:now,updatedAt:now,createdBy:me}]}),[]);}
+  };
+  const deleteMm=(id)=>{
+    commit((d)=>({...d,mindmaps:(d.mindmaps||[]).map((m)=>m.id===id?{...m,deleted:true,updatedAt:Date.now()}:m)}),[]);
+    if(mmId===id){setMmId(null);setMmNodes([]);setMmEdges([]);}
+  };
+
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
@@ -1298,7 +1320,7 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"mindmap",label:"마인드맵",n:null},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -1746,6 +1768,108 @@ function Board() {
             <input placeholder="질문을 입력하세요" value={aiInput} onChange={(e)=>setAiInput(e.target.value)}
               onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;sendAiMessage();}} disabled={aiLoading} />
             <button className="btn-save" onClick={sendAiMessage} disabled={aiLoading||!aiInput.trim()}>전송</button>
+          </div>
+        </div>
+      )}
+
+      {view==="mindmap"&&(
+        <div style={{display:"flex",gap:12,height:"calc(100vh - 130px)"}}>
+          {/* 사이드바 */}
+          <div style={{width:190,flexShrink:0,background:"var(--card)",borderRadius:10,boxShadow:"var(--sh)",padding:12,display:"flex",flexDirection:"column",gap:8,overflowY:"auto"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span style={{fontSize:13,fontWeight:800}}>마인드맵</span>
+              {canEdit&&<button className="btn-save" style={{fontSize:11,padding:"3px 9px"}} onClick={()=>{
+                const id=uid();
+                const root={id:uid(),x:380,y:260,text:"중심",color:"#0C66E4",root:true};
+                setMmId(id);setMmNodes([root]);setMmEdges([]);setMmSel(null);setMmEditId(null);setMmConnecting(null);
+                saveMm(id,[root],[],"새 마인드맵");
+              }}>+ 새로</button>}
+            </div>
+            {mindmaps.length===0&&<span className="hint" style={{fontSize:12}}>맵이 없습니다</span>}
+            {mindmaps.map((mm)=>(
+              <div key={mm.id} onClick={()=>loadMm(mm)}
+                style={{padding:"8px 10px",borderRadius:8,cursor:"pointer",background:mmId===mm.id?"#E9F2FF":"var(--bg)",border:mmId===mm.id?"1.5px solid #0C66E4":"1px solid var(--line)",fontSize:13}}>
+                <div style={{fontWeight:mmId===mm.id?700:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{mm.title||"제목 없음"}</div>
+                <div style={{fontSize:11,color:"var(--ink3)",marginTop:2}}>{(mm.nodes||[]).length}개 노드</div>
+                {canEdit&&<button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0,marginTop:4}}
+                  onClick={(e)=>{e.stopPropagation();if(window.confirm("삭제할까요?"))deleteMm(mm.id);}}>삭제</button>}
+              </div>
+            ))}
+          </div>
+          {/* 캔버스 */}
+          <div style={{flex:1,background:"var(--card)",borderRadius:10,boxShadow:"var(--sh)",position:"relative",overflow:"hidden",userSelect:"none"}}
+            onDoubleClick={(e)=>{
+              if(!canEdit||!mmId||e.target!==e.currentTarget)return;
+              const rect=e.currentTarget.getBoundingClientRect();
+              const newNode={id:uid(),x:e.clientX-rect.left,y:e.clientY-rect.top,text:"노드",color:"#2D8CFF"};
+              const next=[...mmNodes,newNode];
+              setMmNodes(next);setMmEditId(newNode.id);
+              saveMm(mmId,next,mmEdges);
+            }}
+            onMouseMove={(e)=>{
+              if(!mmDrag)return;
+              const rect=e.currentTarget.getBoundingClientRect();
+              const x=e.clientX-rect.left-mmDrag.ox;
+              const y=e.clientY-rect.top-mmDrag.oy;
+              setMmNodes((ns)=>ns.map((n)=>n.id===mmDrag.id?{...n,x,y}:n));
+            }}
+            onMouseUp={()=>{if(mmDrag){saveMm(mmId,mmNodes,mmEdges);setMmDrag(null);}}}
+            onClick={(e)=>{if(e.target===e.currentTarget){setMmSel(null);setMmConnecting(null);}}}
+          >
+            {/* 빈 상태 */}
+            {!mmId&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"var(--ink3)",fontSize:14,gap:8}}>
+              <span style={{fontSize:32}}>🧠</span>
+              <span>왼쪽에서 마인드맵을 선택하거나 새로 만드세요</span>
+              <span style={{fontSize:12}}>캔버스 더블클릭: 노드 추가 · 노드 클릭: 선택 · 드래그: 이동</span>
+            </div>}
+            {/* 툴바 */}
+            {mmId&&<div style={{position:"absolute",top:10,left:10,display:"flex",gap:6,zIndex:10,flexWrap:"wrap"}}>
+              <button className="riedit" onClick={()=>{const t=prompt("맵 이름",mindmaps.find((m)=>m.id===mmId)?.title||"");if(t)saveMm(mmId,mmNodes,mmEdges,t);}}>이름 변경</button>
+              {mmSel&&canEdit&&<button className="riedit" style={{color:"var(--danger)"}} onClick={()=>{
+                const next=mmNodes.filter((n)=>n.id!==mmSel);
+                const ne=mmEdges.filter((e)=>e.from!==mmSel&&e.to!==mmSel);
+                setMmNodes(next);setMmEdges(ne);setMmSel(null);saveMm(mmId,next,ne);
+              }}>노드 삭제</button>}
+              {mmSel&&canEdit&&!mmConnecting&&<button className="riedit" style={{color:"#0C66E4",borderColor:"#0C66E4"}} onClick={()=>setMmConnecting(mmSel)}>연결 시작</button>}
+              {mmConnecting&&<span style={{fontSize:12,color:"#0C66E4",fontWeight:700,padding:"4px 10px",background:"#E9F2FF",borderRadius:6}}>연결할 다른 노드를 클릭하세요 (ESC 취소)</span>}
+            </div>}
+            {mmId&&<div style={{position:"absolute",bottom:10,right:10,fontSize:11,color:"var(--ink3)"}}>더블클릭: 노드 추가 · 노드 더블클릭: 텍스트 편집</div>}
+            {/* 엣지(연결선) SVG */}
+            <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
+              {mmEdges.map((e,i)=>{
+                const from=mmNodes.find((n)=>n.id===e.from);
+                const to=mmNodes.find((n)=>n.id===e.to);
+                if(!from||!to)return null;
+                const mx=(from.x+to.x)/2,my=(from.y+to.y)/2-30;
+                return <path key={i} d={`M${from.x},${from.y} Q${mx},${my} ${to.x},${to.y}`} stroke="#CBD0D8" strokeWidth={2} fill="none" strokeDasharray={e.dash?"6,3":""}/>;
+              })}
+            </svg>
+            {/* 노드 */}
+            {mmNodes.map((n)=>(
+              <div key={n.id}
+                style={{position:"absolute",left:n.x-70,top:n.y-22,width:140,minHeight:44,background:n.root?"#0C66E4":n.color||"#2D8CFF",color:"#fff",borderRadius:n.root?14:8,display:"flex",alignItems:"center",justifyContent:"center",cursor:mmDrag?.id===n.id?"grabbing":"grab",fontSize:13,fontWeight:n.root?800:500,boxShadow:mmSel===n.id?"0 0 0 3px #FFD700,0 2px 10px rgba(0,0,0,.25)":"0 2px 8px rgba(0,0,0,.18)",border:mmConnecting===n.id?"3px dashed #FFD700":"2px solid transparent",padding:"6px 10px",textAlign:"center",wordBreak:"break-all",zIndex:mmSel===n.id?5:1,transition:"box-shadow .1s"}}
+                onMouseDown={(e)=>{e.stopPropagation();if(e.button!==0)return;const rect=e.currentTarget.parentElement.getBoundingClientRect();setMmDrag({id:n.id,ox:e.clientX-rect.left-n.x,oy:e.clientY-rect.top-n.y});}}
+                onClick={(e)=>{
+                  e.stopPropagation();
+                  if(mmConnecting&&mmConnecting!==n.id){
+                    const dup=mmEdges.find((ed)=>(ed.from===mmConnecting&&ed.to===n.id)||(ed.from===n.id&&ed.to===mmConnecting));
+                    if(!dup){const ne=[...mmEdges,{from:mmConnecting,to:n.id}];setMmEdges(ne);saveMm(mmId,mmNodes,ne);}
+                    setMmConnecting(null);return;
+                  }
+                  setMmSel(n.id);
+                }}
+                onDoubleClick={(e)=>{e.stopPropagation();setMmEditId(n.id);}}
+                onKeyDown={(e)=>{if(e.key==="Escape")setMmConnecting(null);}}
+              >
+                {mmEditId===n.id
+                  ?<input autoFocus defaultValue={n.text}
+                    style={{background:"transparent",border:"none",outline:"none",color:"#fff",fontSize:13,fontWeight:n.root?800:500,width:"100%",textAlign:"center"}}
+                    onBlur={(e)=>{const t=e.target.value.trim()||n.text;const next=mmNodes.map((x)=>x.id===n.id?{...x,text:t}:x);setMmNodes(next);setMmEditId(null);saveMm(mmId,next,mmEdges);}}
+                    onKeyDown={(e)=>{if(e.key==="Enter"||e.key==="Escape")e.target.blur();}}/>
+                  :<span style={{lineHeight:1.35}}>{n.text}</span>
+                }
+              </div>
+            ))}
           </div>
         </div>
       )}
