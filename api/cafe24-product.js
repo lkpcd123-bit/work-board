@@ -21,33 +21,48 @@ export default async function handler(req, res) {
       if (data.products && data.products.length > 0) {
         res.status(200).json({ product: data.products[0] });
       } else {
-        res.status(200).json({ product: null });
+        res.status(200).json({ product: null, raw: data });
       }
+
     } else if (action === 'update') {
-      // payload 정리 - soldout 제거하고 selling/display만 사용
-      const cleanPayload = {};
-      if (payload.selling !== undefined) cleanPayload.selling = payload.selling;
-      if (payload.display !== undefined) cleanPayload.display = payload.display;
+      const no = parseInt(productNo, 10);
+      if (!no || isNaN(no)) {
+        return res.status(400).json({ error: `Invalid productNo: ${productNo}` });
+      }
 
-      const body = JSON.stringify({
+      // 카페24 2026 API 공식 스펙: shop_no + product 객체
+      const body = {
         shop_no: 1,
-        product: cleanPayload
-      });
+        product: {
+          selling: payload.selling,
+          display: payload.display,
+        }
+      };
+      // undefined 키 제거
+      Object.keys(body.product).forEach(k => body.product[k] === undefined && delete body.product[k]);
 
-      console.log('Update payload:', body);
+      const reqUrl = `${baseUrl}/${no}`;
+      console.log('PUT URL:', reqUrl);
+      console.log('PUT body:', JSON.stringify(body));
 
-      const r = await fetch(`${baseUrl}/${productNo}`, {
+      const r = await fetch(reqUrl, {
         method: 'PUT',
         headers,
-        body,
+        body: JSON.stringify(body),
       });
-      const data = await r.json();
-      console.log('Update response:', JSON.stringify(data));
+      const text = await r.text();
+      console.log('Response status:', r.status);
+      console.log('Response body:', text);
+
+      let data;
+      try { data = JSON.parse(text); } catch(e) { data = { raw: text }; }
       res.status(r.status).json(data);
+
     } else {
-      res.status(400).json({ error: 'Invalid action' });
+      res.status(400).json({ error: `Invalid action: ${action}` });
     }
   } catch (e) {
+    console.error('Handler error:', e);
     res.status(500).json({ error: e.message });
   }
 }
