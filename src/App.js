@@ -1238,7 +1238,7 @@ function Board() {
       return updated;
     }));
     if(changed)c24SaveSchedules(next);
-  },[c24Schedules,c24Token,c24Expiry]);
+  },[c24Schedules,c24Token,c24Expiry]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
     const code=params.get('code');
