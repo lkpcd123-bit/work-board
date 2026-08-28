@@ -1172,17 +1172,7 @@ function Board() {
   const c24SaveSchedules=(list)=>{setC24Schedules(list);localStorage.setItem('c24_schedules',JSON.stringify(list));};
   const c24StartOAuth=()=>{
     const url=`https://${C24_MALL}.cafe24api.com/api/v2/oauth/authorize?response_type=code&client_id=${C24_CLIENT_ID}&redirect_uri=${encodeURIComponent(C24_REDIRECT)}&scope=mall.read_product%2Cmall.write_product`;
-    const popup=window.open(url,'cafe24_oauth','width=600,height=700,scrollbars=yes');
-    const timer=setInterval(()=>{
-      try{
-        if(popup.closed){clearInterval(timer);return;}
-        const popUrl=popup.location.href;
-        if(popUrl.startsWith(C24_REDIRECT)){
-          const code=new URL(popUrl).searchParams.get('code');
-          if(code){popup.close();clearInterval(timer);c24ExchangeCode(code);}
-        }
-      }catch(e){}
-    },500);
+    window.location.href=url;
   };
   const c24ExchangeCode=async(code)=>{
     c24AddLog('인증 코드 수신, 토큰 교환 중...');
