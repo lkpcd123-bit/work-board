@@ -565,7 +565,6 @@ function Board() {
   const [c24SearchResult, setC24SearchResult] = useState([]);
   const [c24SearchLoading, setC24SearchLoading] = useState(false);
   const [c24ProductNo, setC24ProductNo] = useState('');
-  const [c24ProductName, setC24ProductName] = useState('');
   const [c24OpenAt, setC24OpenAt] = useState('');
   const [c24CloseAt, setC24CloseAt] = useState('');
   const [c24OpenSelling, setC24OpenSelling] = useState('T');
@@ -1164,6 +1163,7 @@ function Board() {
   /* ── 카페24 상품 스케줄러 ── */
   const C24_MALL='slowrocket';
   const C24_CLIENT_ID='XUlWW7h7N9claZtHu37zhA';
+  const C24_SECRET='nlcR1GFrJpdiFVbUsmt2BD';
   const C24_REDIRECT='https://work-board-one.vercel.app';
   const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`];return next.slice(-100);});
   const c24TokenValid=()=>c24Token&&c24Expiry>Date.now();
@@ -1195,25 +1195,23 @@ function Board() {
   };
   const c24SearchProduct=async()=>{
     if(!c24TokenValid()){alert('먼저 카페24 인증을 완료해주세요.');return;}
+    if(!c24ProductNo.trim()){alert('상품번호를 입력해주세요.');return;}
     setC24SearchLoading(true);setC24SearchResult([]);
-    const params=new URLSearchParams();
-    if(c24ProductNo)params.set('product_no',c24ProductNo);
-    else if(c24ProductName){params.set('product_name',c24ProductName);params.set('limit','10');}
-    else{alert('상품번호 또는 상품명을 입력해주세요.');setC24SearchLoading(false);return;}
     try{
-      const res=await fetch(`/api/cafe24-product?${params.toString()}`,{headers:{'Authorization':`Bearer ${c24Token}`}});
+      const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'search',token:c24Token,productNo:c24ProductNo.trim()})});
       const data=await res.json();
-      const products=data.products||(data.product?[data.product]:[]);
-      setC24SearchResult(products);
-      c24AddLog(`🔍 ${products.length}개 상품 조회됨`);
+      const product=data.product;
+      if(product){setC24SearchResult([product]);c24AddLog(`🔍 상품 조회 완료: #${product.product_no} ${product.product_name}`);}
+      else{c24AddLog('❌ 상품을 찾을 수 없습니다: '+JSON.stringify(data));}
     }catch(e){c24AddLog('❌ 조회 오류: '+e.message);}
     setC24SearchLoading(false);
   };
   const c24UpdateProduct=async(productNo,payload)=>{
     try{
-      const res=await fetch('/api/cafe24-product',{method:'PUT',headers:{'Authorization':`Bearer ${c24Token}`,'Content-Type':'application/json'},body:JSON.stringify({productNo,payload})});
+      const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',token:c24Token,productNo,payload})});
       const data=await res.json();
-      return !!data.product;
+      if(data.product)return true;
+      c24AddLog('❌ API 오류: '+JSON.stringify(data));return false;
     }catch(e){c24AddLog('❌ API 오류: '+e.message);return false;}
   };
   const c24AddSchedule=()=>{
@@ -2402,9 +2400,8 @@ function Board() {
           {/* 상품 검색 */}
           <div className="panel">
             <h3 style={{marginBottom:12}}>🛍 상품 검색</h3>
-            <div className="r3" style={{marginBottom:10}}>
-              <div className="fld"><label>상품번호</label><input value={c24ProductNo} onChange={(e)=>setC24ProductNo(e.target.value)} placeholder="예: 123" onKeyDown={(e)=>{if(e.key==="Enter")c24SearchProduct();}} /></div>
-              <div className="fld"><label>상품명</label><input value={c24ProductName} onChange={(e)=>setC24ProductName(e.target.value)} placeholder="상품명 일부" onKeyDown={(e)=>{if(e.key==="Enter")c24SearchProduct();}} /></div>
+            <div style={{display:"flex",gap:10,marginBottom:10}}>
+              <div className="fld" style={{flex:1}}><label>상품번호</label><input value={c24ProductNo} onChange={(e)=>setC24ProductNo(e.target.value)} placeholder="예: 123" onKeyDown={(e)=>{if(e.key==="Enter")c24SearchProduct();}} /></div>
               <div className="fld" style={{justifyContent:"flex-end"}}><button className="btn-save" onClick={c24SearchProduct} disabled={c24SearchLoading}>{c24SearchLoading?"검색 중...":"🔍 검색"}</button></div>
             </div>
             {c24SearchResult.map((p)=>(
