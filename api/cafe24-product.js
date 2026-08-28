@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   const baseUrl = `https://${MALL_ID}.cafe24api.com/api/v2/admin/products`;
   const headers = {
     'Authorization': `Bearer ${token}`,
-    'X-Cafe24-Api-Version': '2024-03-01',
+    'X-Cafe24-Api-Version': '2026-03-01',
     'Content-Type': 'application/json',
   };
 
