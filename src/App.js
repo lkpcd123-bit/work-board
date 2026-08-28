@@ -1172,7 +1172,31 @@ function Board() {
   const c24SaveSchedules=(list)=>{setC24Schedules(list);localStorage.setItem('c24_schedules',JSON.stringify(list));};
   const c24StartOAuth=()=>{
     const url=`https://${C24_MALL}.cafe24api.com/api/v2/oauth/authorize?response_type=code&client_id=${C24_CLIENT_ID}&redirect_uri=${encodeURIComponent(C24_REDIRECT)}&scope=mall.read_product,mall.write_product`;
-    window.location.href=url;
+    const popup=window.open(url,'cafe24_oauth','width=600,height=700,scrollbars=yes');
+    const timer=setInterval(()=>{
+      try{
+        if(popup.closed){clearInterval(timer);return;}
+        const popUrl=popup.location.href;
+        if(popUrl.startsWith(C24_REDIRECT)){
+          const code=new URL(popUrl).searchParams.get('code');
+          if(code){popup.close();clearInterval(timer);c24ExchangeCode(code);}
+        }
+      }catch(e){}
+    },500);
+  };
+  const c24ExchangeCode=async(code)=>{
+    c24AddLog('인증 코드 수신, 토큰 교환 중...');
+    const creds=btoa(`${C24_CLIENT_ID}:${C24_SECRET}`);
+    try{
+      const res=await fetch(C24_PROXY+encodeURIComponent(`https://${C24_MALL}.cafe24api.com/api/v2/oauth/token`),{method:'POST',headers:{'Authorization':`Basic ${creds}`,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:C24_REDIRECT})});
+      const data=await res.json();
+      if(data.access_token){
+        const expiry=Date.now()+(data.expires_in||7200)*1000;
+        setC24Token(data.access_token);setC24Expiry(expiry);
+        localStorage.setItem('c24_token',data.access_token);localStorage.setItem('c24_expiry',expiry);
+        c24AddLog('✅ 인증 성공!');
+      }else{c24AddLog('❌ 토큰 교환 실패: '+JSON.stringify(data));}
+    }catch(e){c24AddLog('❌ 오류: '+e.message);}
   };
   const c24ManualToken=()=>{
     const t=prompt('Access Token 입력:');
@@ -1242,21 +1266,8 @@ function Board() {
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
     const code=params.get('code');
-    if(code){
-      c24AddLog('인증 코드 수신, 토큰 교환 중...');
-      const creds=btoa(`${C24_CLIENT_ID}:${C24_SECRET}`);
-      fetch(C24_PROXY+encodeURIComponent(`https://${C24_MALL}.cafe24api.com/api/v2/oauth/token`),{method:'POST',headers:{'Authorization':`Basic ${creds}`,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:C24_REDIRECT})})
-        .then((r)=>r.json()).then((data)=>{
-          if(data.access_token){
-            const expiry=Date.now()+(data.expires_in||7200)*1000;
-            setC24Token(data.access_token);setC24Expiry(expiry);
-            localStorage.setItem('c24_token',data.access_token);localStorage.setItem('c24_expiry',expiry);
-            c24AddLog('✅ 인증 성공!');
-          }else{c24AddLog('❌ 토큰 교환 실패: '+JSON.stringify(data));}
-        }).catch((e)=>c24AddLog('❌ 오류: '+e.message));
-      window.history.replaceState({},'',window.location.pathname);
-    }
-  },[]);
+    if(code){c24ExchangeCode(code);window.history.replaceState({},'',window.location.pathname);}
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{
     if(c24TimerRef.current)clearInterval(c24TimerRef.current);
     c24TimerRef.current=setInterval(c24CheckSchedules,30000);
