@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+﻿import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
@@ -1163,7 +1163,6 @@ function Board() {
   /* ── 카페24 상품 스케줄러 ── */
   const C24_MALL='slowrocket';
   const C24_CLIENT_ID='XUlWW7h7N9claZtHu37zhA';
-  const C24_SECRET='nlcR1GFrJpdiFVbUsmt2BD';
   const C24_REDIRECT='https://work-board-one.vercel.app';
   const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`];return next.slice(-100);});
   const c24TokenValid=()=>c24Token&&c24Expiry>Date.now();
