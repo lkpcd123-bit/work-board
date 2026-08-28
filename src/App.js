@@ -564,7 +564,6 @@ function Board() {
   const [c24SelProduct, setC24SelProduct] = useState(null);
   const [c24SearchResult, setC24SearchResult] = useState([]);
   const [c24SearchLoading, setC24SearchLoading] = useState(false);
-  const [c24ProductNo, setC24ProductNo] = useState('');
   const [c24ProductCode, setC24ProductCode] = useState('');
   const [c24OpenAt, setC24OpenAt] = useState('');
   const [c24CloseAt, setC24CloseAt] = useState('');
@@ -1203,7 +1202,7 @@ function Board() {
       const product=data.product;
       if(product){
         setC24SearchResult([product]);
-        setC24ProductNo(String(product.product_no));
+        setC24SelProduct({no:product.product_no,name:product.product_name,selling:product.selling,display:product.display});
         c24AddLog(`🔍 상품 조회 완료: #${product.product_no} ${product.product_name}`);
       }else{c24AddLog('❌ 상품을 찾을 수 없습니다: '+c24ProductCode);}
     }catch(e){c24AddLog('❌ 조회 오류: '+e.message);}
@@ -1225,7 +1224,7 @@ function Board() {
     const next=[...c24Schedules,s];
     c24SaveSchedules(next);
     c24AddLog(`✅ 스케줄 등록: #${s.productNo} ${s.productName} | 오픈:${s.openAt||'없음'} | 종료:${s.closeAt||'없음'}`);
-    setC24OpenAt('');setC24CloseAt('');setC24SelProduct(null);setC24SearchResult([]);setC24ProductNo('');setC24ProductCode('');
+    setC24OpenAt('');setC24CloseAt('');setC24SelProduct(null);setC24SearchResult([]);setC24ProductCode('');
   };
   const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.filter((s)=>s.id!==id));c24AddLog('🗑 스케줄 삭제');};
   const c24CheckSchedules=useCallback(async()=>{
