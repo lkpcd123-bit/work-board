@@ -21,7 +21,7 @@ export default async function handler(req, res) {
       if (data.products && data.products.length > 0) {
         res.status(200).json({ product: data.products[0] });
       } else {
-        res.status(200).json({ product: null, raw: data });
+        res.status(200).json({ product: null });
       }
 
     } else if (action === 'update') {
@@ -30,29 +30,26 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: `Invalid productNo: ${productNo}` });
       }
 
-      // 카페24 2026 API 공식 스펙: shop_no + product 객체
+      // 카페24 공식 문서 형식 - product_no를 body에도 포함
       const body = {
         shop_no: 1,
-        product: {
-          selling: payload.selling,
-          display: payload.display,
-        }
+        product_no: no,
+        product: {}
       };
-      // undefined 키 제거
-      Object.keys(body.product).forEach(k => body.product[k] === undefined && delete body.product[k]);
 
-      const reqUrl = `${baseUrl}/${no}`;
-      console.log('PUT URL:', reqUrl);
+      if (payload.selling !== undefined) body.product.selling = payload.selling;
+      if (payload.display !== undefined) body.product.display = payload.display;
+
+      console.log('PUT URL:', `${baseUrl}/${no}`);
       console.log('PUT body:', JSON.stringify(body));
 
-      const r = await fetch(reqUrl, {
+      const r = await fetch(`${baseUrl}/${no}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(body),
       });
       const text = await r.text();
-      console.log('Response status:', r.status);
-      console.log('Response body:', text);
+      console.log('Response:', r.status, text.slice(0, 200));
 
       let data;
       try { data = JSON.parse(text); } catch(e) { data = { raw: text }; }
@@ -62,7 +59,7 @@ export default async function handler(req, res) {
       res.status(400).json({ error: `Invalid action: ${action}` });
     }
   } catch (e) {
-    console.error('Handler error:', e);
+    console.error('Error:', e.message);
     res.status(500).json({ error: e.message });
   }
 }
