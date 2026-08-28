@@ -16,24 +16,33 @@ export default async function handler(req, res) {
 
   try {
     if (action === 'search') {
-      // 상품코드(P0000BBC)로 조회
-      const searchUrl = `${baseUrl}?product_code=${encodeURIComponent(productCode)}&limit=1`;
-      const r = await fetch(searchUrl, { headers });
+      const r = await fetch(`${baseUrl}?product_code=${encodeURIComponent(productCode)}&limit=1`, { headers });
       const data = await r.json();
-      // products 배열에서 첫 번째 항목 반환
       if (data.products && data.products.length > 0) {
         res.status(200).json({ product: data.products[0] });
       } else {
-        res.status(200).json({ product: null, message: '상품을 찾을 수 없습니다' });
+        res.status(200).json({ product: null });
       }
     } else if (action === 'update') {
-      // 수정은 상품번호(숫자)로 처리
+      // payload 정리 - soldout 제거하고 selling/display만 사용
+      const cleanPayload = {};
+      if (payload.selling !== undefined) cleanPayload.selling = payload.selling;
+      if (payload.display !== undefined) cleanPayload.display = payload.display;
+
+      const body = JSON.stringify({
+        shop_no: 1,
+        product: cleanPayload
+      });
+
+      console.log('Update payload:', body);
+
       const r = await fetch(`${baseUrl}/${productNo}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ shop_no: 1, product: payload }),
+        body,
       });
       const data = await r.json();
+      console.log('Update response:', JSON.stringify(data));
       res.status(r.status).json(data);
     } else {
       res.status(400).json({ error: 'Invalid action' });
