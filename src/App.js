@@ -1166,7 +1166,6 @@ function Board() {
   const C24_CLIENT_ID='XUlWW7h7N9claZtHu37zhA';
   const C24_SECRET='nlcR1GFrJpdiFVbUsmt2BD';
   const C24_REDIRECT='https://work-board-one.vercel.app';
-  const C24_PROXY='https://api.allorigins.win/raw?url=';
   const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`];return next.slice(-100);});
   const c24TokenValid=()=>c24Token&&c24Expiry>Date.now();
   const c24SaveSchedules=(list)=>{setC24Schedules(list);localStorage.setItem('c24_schedules',JSON.stringify(list));};
@@ -1176,20 +1175,15 @@ function Board() {
   };
   const c24ExchangeCode=async(code)=>{
     c24AddLog('🔄 인증 코드 수신, 토큰 교환 중...');
-    const creds=btoa(`${C24_CLIENT_ID}:${C24_SECRET}`);
-    const tokenUrl=`https://${C24_MALL}.cafe24api.com/api/v2/oauth/token`;
-    c24AddLog('📡 Token URL: '+tokenUrl.slice(0,50)+'...');
     try{
-      const res=await fetch(C24_PROXY+encodeURIComponent(tokenUrl),{method:'POST',headers:{'Authorization':`Basic ${creds}`,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:C24_REDIRECT})});
-      const text=await res.text();
-      c24AddLog('📨 응답: '+text.slice(0,100));
-      const data=JSON.parse(text);
+      const res=await fetch('/api/cafe24-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,grant_type:'authorization_code'})});
+      const data=await res.json();
       if(data.access_token){
         const expiry=Date.now()+(data.expires_in||7200)*1000;
         setC24Token(data.access_token);setC24Expiry(expiry);
         localStorage.setItem('c24_token',data.access_token);localStorage.setItem('c24_expiry',expiry);
         c24AddLog('✅ 인증 성공! 토큰 발급 완료');
-      }else{c24AddLog('❌ 토큰 교환 실패: '+text);}
+      }else{c24AddLog('❌ 토큰 교환 실패: '+JSON.stringify(data));}
     }catch(e){c24AddLog('❌ 오류: '+e.message);}
   };
   const c24ManualToken=()=>{
@@ -1203,12 +1197,12 @@ function Board() {
   const c24SearchProduct=async()=>{
     if(!c24TokenValid()){alert('먼저 카페24 인증을 완료해주세요.');return;}
     setC24SearchLoading(true);setC24SearchResult([]);
-    let url=`https://${C24_MALL}.cafe24api.com/api/v2/admin/products?`;
-    if(c24ProductNo)url+=`product_no=${c24ProductNo}&`;
-    else if(c24ProductName)url+=`product_name=${encodeURIComponent(c24ProductName)}&limit=10&`;
+    const params=new URLSearchParams();
+    if(c24ProductNo)params.set('product_no',c24ProductNo);
+    else if(c24ProductName){params.set('product_name',c24ProductName);params.set('limit','10');}
     else{alert('상품번호 또는 상품명을 입력해주세요.');setC24SearchLoading(false);return;}
     try{
-      const res=await fetch(C24_PROXY+encodeURIComponent(url),{headers:{'Authorization':`Bearer ${c24Token}`,'X-Cafe24-Api-Version':'2024-03-01'}});
+      const res=await fetch(`/api/cafe24-product?${params.toString()}`,{headers:{'Authorization':`Bearer ${c24Token}`}});
       const data=await res.json();
       const products=data.products||(data.product?[data.product]:[]);
       setC24SearchResult(products);
@@ -1218,8 +1212,7 @@ function Board() {
   };
   const c24UpdateProduct=async(productNo,payload)=>{
     try{
-      const url=C24_PROXY+encodeURIComponent(`https://${C24_MALL}.cafe24api.com/api/v2/admin/products/${productNo}`);
-      const res=await fetch(url,{method:'PUT',headers:{'Authorization':`Bearer ${c24Token}`,'Content-Type':'application/json','X-Cafe24-Api-Version':'2024-03-01'},body:JSON.stringify({shop_no:1,product:payload})});
+      const res=await fetch('/api/cafe24-product',{method:'PUT',headers:{'Authorization':`Bearer ${c24Token}`,'Content-Type':'application/json'},body:JSON.stringify({productNo,payload})});
       const data=await res.json();
       return !!data.product;
     }catch(e){c24AddLog('❌ API 오류: '+e.message);return false;}
