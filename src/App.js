@@ -1222,7 +1222,7 @@ function Board() {
     const next=[...c24Schedules,s];
     c24SaveSchedules(next);
     c24AddLog(`✅ 스케줄 등록: #${s.productNo} ${s.productName} | 오픈:${s.openAt||'없음'} | 종료:${s.closeAt||'없음'}`);
-    setC24OpenAt('');setC24CloseAt('');setC24SelProduct(null);setC24SearchResult([]);setC24ProductNo('');setC24ProductName('');
+    setC24OpenAt('');setC24CloseAt('');setC24SelProduct(null);setC24SearchResult([]);setC24ProductNo('');
   };
   const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.filter((s)=>s.id!==id));c24AddLog('🗑 스케줄 삭제');};
   const c24CheckSchedules=useCallback(async()=>{
