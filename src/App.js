@@ -558,6 +558,21 @@ function Board() {
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const [notifBoxOpen, setNotifBoxOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
+  const [c24Token, setC24Token] = useState(()=>localStorage.getItem('c24_token')||'');
+  const [c24Expiry, setC24Expiry] = useState(()=>parseInt(localStorage.getItem('c24_expiry')||'0'));
+  const [c24Schedules, setC24Schedules] = useState(()=>{try{return JSON.parse(localStorage.getItem('c24_schedules')||'[]');}catch(e){return[];}});
+  const [c24SelProduct, setC24SelProduct] = useState(null);
+  const [c24SearchResult, setC24SearchResult] = useState([]);
+  const [c24SearchLoading, setC24SearchLoading] = useState(false);
+  const [c24ProductNo, setC24ProductNo] = useState('');
+  const [c24ProductName, setC24ProductName] = useState('');
+  const [c24OpenAt, setC24OpenAt] = useState('');
+  const [c24CloseAt, setC24CloseAt] = useState('');
+  const [c24OpenSelling, setC24OpenSelling] = useState('T');
+  const [c24OpenDisplay, setC24OpenDisplay] = useState('T');
+  const [c24CloseAction, setC24CloseAction] = useState('soldout');
+  const [c24Log, setC24Log] = useState(['⏱ 스케줄러 준비 중...']);
+  const c24TimerRef = useRef(null);
   const [mmId, setMmId] = useState(null);
   const [mmTree, setMmTree] = useState(null);
   const [mmSel, setMmSel] = useState(null);
@@ -1146,6 +1161,108 @@ function Board() {
     return {...tree,children:(tree.children||[]).filter((c)=>c.id!==targetId).map((c)=>mmDeleteNode(c,targetId))};
   };
 
+  /* ── 카페24 상품 스케줄러 ── */
+  const C24_MALL='slowrocket';
+  const C24_CLIENT_ID='XUlWW7h7N9c1aZtHu37JhA';
+  const C24_SECRET='nlcR1GFrJpdiFVbUsmt2BD';
+  const C24_REDIRECT='https://work-board-one.vercel.app';
+  const C24_PROXY='https://corsproxy.io/?';
+  const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`];return next.slice(-100);});
+  const c24TokenValid=()=>c24Token&&c24Expiry>Date.now();
+  const c24SaveSchedules=(list)=>{setC24Schedules(list);localStorage.setItem('c24_schedules',JSON.stringify(list));};
+  const c24StartOAuth=()=>{
+    const url=`https://${C24_MALL}.cafe24api.com/api/v2/oauth/authorize?response_type=code&client_id=${C24_CLIENT_ID}&redirect_uri=${encodeURIComponent(C24_REDIRECT)}&scope=mall.read_product,mall.write_product`;
+    window.location.href=url;
+  };
+  const c24ManualToken=()=>{
+    const t=prompt('Access Token 입력:');
+    if(!t)return;
+    const expiry=Date.now()+7200000;
+    setC24Token(t.trim());setC24Expiry(expiry);
+    localStorage.setItem('c24_token',t.trim());localStorage.setItem('c24_expiry',expiry);
+    c24AddLog('✅ 토큰 수동 입력 완료');
+  };
+  const c24SearchProduct=async()=>{
+    if(!c24TokenValid()){alert('먼저 카페24 인증을 완료해주세요.');return;}
+    setC24SearchLoading(true);setC24SearchResult([]);
+    let url=`https://${C24_MALL}.cafe24api.com/api/v2/admin/products?`;
+    if(c24ProductNo)url+=`product_no=${c24ProductNo}&`;
+    else if(c24ProductName)url+=`product_name=${encodeURIComponent(c24ProductName)}&limit=10&`;
+    else{alert('상품번호 또는 상품명을 입력해주세요.');setC24SearchLoading(false);return;}
+    try{
+      const res=await fetch(C24_PROXY+encodeURIComponent(url),{headers:{'Authorization':`Bearer ${c24Token}`,'X-Cafe24-Api-Version':'2024-03-01'}});
+      const data=await res.json();
+      const products=data.products||(data.product?[data.product]:[]);
+      setC24SearchResult(products);
+      c24AddLog(`🔍 ${products.length}개 상품 조회됨`);
+    }catch(e){c24AddLog('❌ 조회 오류: '+e.message);}
+    setC24SearchLoading(false);
+  };
+  const c24UpdateProduct=async(productNo,payload)=>{
+    try{
+      const url=C24_PROXY+encodeURIComponent(`https://${C24_MALL}.cafe24api.com/api/v2/admin/products/${productNo}`);
+      const res=await fetch(url,{method:'PUT',headers:{'Authorization':`Bearer ${c24Token}`,'Content-Type':'application/json','X-Cafe24-Api-Version':'2024-03-01'},body:JSON.stringify({shop_no:1,product:payload})});
+      const data=await res.json();
+      return !!data.product;
+    }catch(e){c24AddLog('❌ API 오류: '+e.message);return false;}
+  };
+  const c24AddSchedule=()=>{
+    if(!c24SelProduct){alert('상품을 먼저 선택해주세요.');return;}
+    if(!c24OpenAt&&!c24CloseAt){alert('오픈 또는 종료 일시를 입력해주세요.');return;}
+    if(c24OpenAt&&c24CloseAt&&new Date(c24OpenAt)>=new Date(c24CloseAt)){alert('오픈 일시가 종료 일시보다 앞이어야 합니다.');return;}
+    const s={id:Date.now().toString(36),productNo:c24SelProduct.no,productName:c24SelProduct.name,openAt:c24OpenAt||null,closeAt:c24CloseAt||null,openSelling:c24OpenSelling,openDisplay:c24OpenDisplay,closeAction:c24CloseAction,openDone:false,closeDone:false};
+    const next=[...c24Schedules,s];
+    c24SaveSchedules(next);
+    c24AddLog(`✅ 스케줄 등록: #${s.productNo} ${s.productName} | 오픈:${s.openAt||'없음'} | 종료:${s.closeAt||'없음'}`);
+    setC24OpenAt('');setC24CloseAt('');setC24SelProduct(null);setC24SearchResult([]);setC24ProductNo('');setC24ProductName('');
+  };
+  const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.filter((s)=>s.id!==id));c24AddLog('🗑 스케줄 삭제');};
+  const c24CheckSchedules=useCallback(async()=>{
+    if(!c24TokenValid())return;
+    const now=new Date();let changed=false;
+    const next=await Promise.all(c24Schedules.map(async(s)=>{
+      let updated={...s};
+      if(s.openAt&&!s.openDone&&new Date(s.openAt)<=now){
+        c24AddLog(`🟢 오픈 실행: #${s.productNo}`);
+        const ok=await c24UpdateProduct(s.productNo,{display:s.openDisplay,selling:s.openSelling});
+        if(ok){updated.openDone=true;c24AddLog(`✅ 오픈 완료: #${s.productNo}`);changed=true;}
+        else{updated.error='오픈 실패';changed=true;}
+      }
+      if(s.closeAt&&!s.closeDone&&new Date(s.closeAt)<=now){
+        c24AddLog(`🔴 종료 실행: #${s.productNo}`);
+        const payload=s.closeAction==='soldout'?{selling:'F',soldout:'T'}:s.closeAction==='hide'?{display:'F',selling:'F'}:{selling:'F'};
+        const ok=await c24UpdateProduct(s.productNo,payload);
+        if(ok){updated.closeDone=true;c24AddLog(`✅ 종료 완료: #${s.productNo}`);changed=true;}
+        else{updated.error='종료 실패';changed=true;}
+      }
+      return updated;
+    }));
+    if(changed)c24SaveSchedules(next);
+  },[c24Schedules,c24Token,c24Expiry]);
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    const code=params.get('code');
+    if(code){
+      c24AddLog('인증 코드 수신, 토큰 교환 중...');
+      const creds=btoa(`${C24_CLIENT_ID}:${C24_SECRET}`);
+      fetch(C24_PROXY+encodeURIComponent(`https://${C24_MALL}.cafe24api.com/api/v2/oauth/token`),{method:'POST',headers:{'Authorization':`Basic ${creds}`,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:C24_REDIRECT})})
+        .then((r)=>r.json()).then((data)=>{
+          if(data.access_token){
+            const expiry=Date.now()+(data.expires_in||7200)*1000;
+            setC24Token(data.access_token);setC24Expiry(expiry);
+            localStorage.setItem('c24_token',data.access_token);localStorage.setItem('c24_expiry',expiry);
+            c24AddLog('✅ 인증 성공!');
+          }else{c24AddLog('❌ 토큰 교환 실패: '+JSON.stringify(data));}
+        }).catch((e)=>c24AddLog('❌ 오류: '+e.message));
+      window.history.replaceState({},'',window.location.pathname);
+    }
+  },[]);
+  useEffect(()=>{
+    if(c24TimerRef.current)clearInterval(c24TimerRef.current);
+    c24TimerRef.current=setInterval(c24CheckSchedules,30000);
+    return()=>clearInterval(c24TimerRef.current);
+  },[c24CheckSchedules]);
+
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
@@ -1335,7 +1452,7 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"mindmap",label:"마인드맵",n:null},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"mindmap",label:"마인드맵",n:null},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"cafe24",label:"상품스케줄",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -2255,6 +2372,110 @@ function Board() {
         <div><div className="panel"><h3>변경 이력</h3><p className="sub">최근 {LOG_CAP}건까지 남습니다.</p></div>
           {(data.log||[]).length===0&&<div className="empty">기록이 없습니다</div>}
           {(data.log||[]).map((e)=><div key={e.id} className="logrow"><span className="t">{fmtTs(e.ts)}</span><span className="w">{e.who}</span><span><b style={{fontWeight:600}}>{e.action}</b>{e.taskTitle&&<span style={{color:"#565C64"}}> · {e.taskTitle}</span>}{e.detail&&<span style={{fontSize:10.5,color:"#8F959C"}}> — {e.detail}</span>}</span></div>)}
+        </div>
+      )}
+
+      {view==="cafe24"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {/* 인증 */}
+          <div className="panel">
+            <h3 style={{marginBottom:12}}>🔐 카페24 인증</h3>
+            {c24TokenValid()
+              ?<div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{color:"var(--ok)",fontWeight:700,fontSize:13}}>✅ 인증됨 · {Math.round((c24Expiry-Date.now())/60000)}분 후 만료</span>
+                  <button className="btn ghost" onClick={()=>{setC24Token('');setC24Expiry(0);localStorage.removeItem('c24_token');localStorage.removeItem('c24_expiry');c24AddLog('🔓 로그아웃');}}>로그아웃</button>
+                </div>
+              :<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <button className="btn-save" onClick={c24StartOAuth}>카페24 로그인 &amp; 권한 허용</button>
+                  <button className="btn ghost" onClick={c24ManualToken}>토큰 직접 입력</button>
+                  <span style={{fontSize:12,color:"var(--ink3)",alignSelf:"center"}}>* slowrocket.cafe24.com 관리자 계정 필요</span>
+                </div>}
+          </div>
+          {/* 상품 검색 */}
+          <div className="panel">
+            <h3 style={{marginBottom:12}}>🛍 상품 검색</h3>
+            <div className="r3" style={{marginBottom:10}}>
+              <div className="fld"><label>상품번호</label><input value={c24ProductNo} onChange={(e)=>setC24ProductNo(e.target.value)} placeholder="예: 123" onKeyDown={(e)=>{if(e.key==="Enter")c24SearchProduct();}} /></div>
+              <div className="fld"><label>상품명</label><input value={c24ProductName} onChange={(e)=>setC24ProductName(e.target.value)} placeholder="상품명 일부" onKeyDown={(e)=>{if(e.key==="Enter")c24SearchProduct();}} /></div>
+              <div className="fld" style={{justifyContent:"flex-end"}}><button className="btn-save" onClick={c24SearchProduct} disabled={c24SearchLoading}>{c24SearchLoading?"검색 중...":"🔍 검색"}</button></div>
+            </div>
+            {c24SearchResult.map((p)=>(
+              <div key={p.product_no} onClick={()=>{setC24SelProduct({no:p.product_no,name:p.product_name,selling:p.selling,display:p.display});c24AddLog(`📦 선택: #${p.product_no} ${p.product_name}`);}}
+                style={{border:`1.5px solid ${c24SelProduct?.no===p.product_no?"#0C66E4":"var(--line)"}`,borderRadius:8,padding:"10px 14px",marginBottom:8,cursor:"pointer",background:c24SelProduct?.no===p.product_no?"#E9F2FF":"var(--bg)",display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:13}}>
+                <div>
+                  <b>#{p.product_no}</b> · {p.product_name}
+                  <span style={{marginLeft:8,fontSize:11,fontWeight:700,color:p.selling==="T"?"var(--ok)":"var(--danger)"}}>{p.selling==="T"?"판매중":"판매중지"}</span>
+                  <span style={{marginLeft:6,fontSize:11,color:"var(--ink3)"}}>{p.display==="T"?"진열중":"미진열"}</span>
+                </div>
+                {c24SelProduct?.no===p.product_no&&<span style={{fontSize:12,color:"#0C66E4",fontWeight:700}}>✔ 선택됨</span>}
+              </div>
+            ))}
+          </div>
+          {/* 스케줄 등록 */}
+          <div className="panel">
+            <h3 style={{marginBottom:12}}>📅 스케줄 등록
+              {c24SelProduct&&<span style={{fontSize:12,fontWeight:400,color:"#0C66E4",marginLeft:8}}>#{c24SelProduct.no} {c24SelProduct.name}</span>}
+            </h3>
+            <div className="r3" style={{marginBottom:10}}>
+              <div className="fld"><label>오픈 일시</label><input type="datetime-local" value={c24OpenAt} onChange={(e)=>setC24OpenAt(e.target.value)} /></div>
+              <div className="fld"><label>종료 일시</label><input type="datetime-local" value={c24CloseAt} onChange={(e)=>setC24CloseAt(e.target.value)} /></div>
+              <div className="fld"><label>종료 시 처리</label>
+                <select value={c24CloseAction} onChange={(e)=>setC24CloseAction(e.target.value)}>
+                  <option value="soldout">품절처리 (판매중지)</option>
+                  <option value="hide">진열+판매 중지</option>
+                  <option value="selling_off">판매만 중지</option>
+                </select>
+              </div>
+            </div>
+            <div className="r3" style={{marginBottom:14}}>
+              <div className="fld"><label>오픈 시 판매상태</label>
+                <select value={c24OpenSelling} onChange={(e)=>setC24OpenSelling(e.target.value)}>
+                  <option value="T">판매함</option>
+                  <option value="F">판매안함</option>
+                </select>
+              </div>
+              <div className="fld"><label>오픈 시 진열상태</label>
+                <select value={c24OpenDisplay} onChange={(e)=>setC24OpenDisplay(e.target.value)}>
+                  <option value="T">진열함</option>
+                  <option value="F">진열안함</option>
+                </select>
+              </div>
+              <div className="fld" style={{justifyContent:"flex-end"}}>
+                <button className="btn-save" onClick={c24AddSchedule}>+ 스케줄 등록</button>
+              </div>
+            </div>
+          </div>
+          {/* 스케줄 목록 */}
+          <div className="panel">
+            <h3 style={{marginBottom:12}}>📋 등록된 스케줄 <span style={{fontSize:12,color:"var(--ink3)",fontWeight:400}}>({c24Schedules.length}건 · 30초마다 체크)</span></h3>
+            {c24Schedules.length===0&&<div className="hint">등록된 스케줄이 없습니다</div>}
+            {c24Schedules.map((s)=>{
+              const statusColor=s.error?"var(--danger)":s.openDone&&s.closeDone?"var(--ok)":s.openDone?"#0C66E4":"var(--ink3)";
+              const statusLabel=s.error?"오류":s.openDone&&s.closeDone?"완료":s.openDone?"오픈됨":"대기";
+              const actionLabel={soldout:"품절처리",hide:"진열+판매중지",selling_off:"판매중지"};
+              return(
+              <div key={s.id} style={{border:"1.5px solid var(--line)",borderRadius:9,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13.5,fontWeight:700}}>#{s.productNo} · {s.productName}</div>
+                  <div style={{fontSize:11.5,color:"var(--ink3)",marginTop:4,display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {s.openAt&&<span style={{background:"#DCFFF1",color:"#1F845A",padding:"2px 8px",borderRadius:12,fontWeight:700}}>오픈 {new Date(s.openAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>}
+                    {s.closeAt&&<span style={{background:"#FFECEB",color:"#CA3521",padding:"2px 8px",borderRadius:12,fontWeight:700}}>종료 {new Date(s.closeAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})} · {actionLabel[s.closeAction]}</span>}
+                  </div>
+                  {s.error&&<div style={{fontSize:11,color:"var(--danger)",marginTop:4}}>⚠ {s.error}</div>}
+                </div>
+                <span style={{fontSize:12,fontWeight:700,color:statusColor,padding:"3px 10px",borderRadius:20,background:s.error?"#FFECEB":s.openDone&&s.closeDone?"#DCFFF1":s.openDone?"#E9F2FF":"#F4F5F7"}}>{statusLabel}</span>
+                <button className="riedit" style={{color:"var(--danger)"}} onClick={()=>c24DeleteSchedule(s.id)}>삭제</button>
+              </div>);
+            })}
+          </div>
+          {/* 로그 */}
+          <div className="panel">
+            <h3 style={{marginBottom:10}}>📟 실행 로그</h3>
+            <div style={{background:"#1a1a2e",color:"#a8ff78",borderRadius:8,padding:12,fontSize:12,fontFamily:"monospace",maxHeight:200,overflowY:"auto",lineHeight:1.7}}>
+              {c24Log.map((l,i)=><div key={i}>{l}</div>)}
+            </div>
+            <button className="btn ghost" style={{marginTop:8,fontSize:12}} onClick={()=>setC24Log(['🗑 로그 초기화'])}>로그 지우기</button>
+          </div>
         </div>
       )}
 
