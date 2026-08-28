@@ -564,6 +564,7 @@ function Board() {
   const [c24SelProduct, setC24SelProduct] = useState(null);
   const [c24SearchResult, setC24SearchResult] = useState([]);
   const [c24SearchLoading, setC24SearchLoading] = useState(false);
+  const [c24ProductNo, setC24ProductNo] = useState('');
   const [c24ProductCode, setC24ProductCode] = useState('');
   const [c24OpenAt, setC24OpenAt] = useState('');
   const [c24CloseAt, setC24CloseAt] = useState('');
@@ -572,6 +573,7 @@ function Board() {
   const [c24CloseAction, setC24CloseAction] = useState('soldout');
   const [c24Log, setC24Log] = useState(['⏱ 스케줄러 준비 중...']);
   const c24TimerRef = useRef(null);
+  const c24TokenRef = useRef('');
   const [mmId, setMmId] = useState(null);
   const [mmTree, setMmTree] = useState(null);
   const [mmSel, setMmSel] = useState(null);
@@ -1165,7 +1167,9 @@ function Board() {
   const C24_CLIENT_ID='XUlWW7h7N9claZtHu37zhA';
   const C24_REDIRECT='https://work-board-one.vercel.app';
   const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`];return next.slice(-100);});
-  const c24TokenValid=()=>c24Token&&c24Expiry>Date.now();
+  const c24TokenValid=()=>c24TokenRef.current&&c24Expiry>Date.now();
+  // 토큰 state가 바뀔 때 ref도 동기화
+  useEffect(()=>{c24TokenRef.current=c24Token;},[c24Token]);
   const c24SaveSchedules=(list)=>{setC24Schedules(list);localStorage.setItem('c24_schedules',JSON.stringify(list));};
   const c24StartOAuth=()=>{
     const url=`https://${C24_MALL}.cafe24api.com/api/v2/oauth/authorize?response_type=code&client_id=${C24_CLIENT_ID}&redirect_uri=${encodeURIComponent(C24_REDIRECT)}&scope=mall.read_product%2Cmall.write_product`;
@@ -1202,7 +1206,7 @@ function Board() {
       const product=data.product;
       if(product){
         setC24SearchResult([product]);
-        setC24SelProduct({no:product.product_no,name:product.product_name,selling:product.selling,display:product.display});
+        setC24ProductNo(String(product.product_no));
         c24AddLog(`🔍 상품 조회 완료: #${product.product_no} ${product.product_name}`);
       }else{c24AddLog('❌ 상품을 찾을 수 없습니다: '+c24ProductCode);}
     }catch(e){c24AddLog('❌ 조회 오류: '+e.message);}
@@ -1210,7 +1214,7 @@ function Board() {
   };
   const c24UpdateProduct=async(productNo,payload)=>{
     try{
-      const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',token:c24Token,productNo,payload})});
+      const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',token:c24TokenRef.current,productNo,payload})});
       const data=await res.json();
       if(data.product)return true;
       c24AddLog('❌ API 오류: '+JSON.stringify(data));return false;
@@ -1224,7 +1228,7 @@ function Board() {
     const next=[...c24Schedules,s];
     c24SaveSchedules(next);
     c24AddLog(`✅ 스케줄 등록: #${s.productNo} ${s.productName} | 오픈:${s.openAt||'없음'} | 종료:${s.closeAt||'없음'}`);
-    setC24OpenAt('');setC24CloseAt('');setC24SelProduct(null);setC24SearchResult([]);setC24ProductCode('');
+    setC24OpenAt('');setC24CloseAt('');setC24SelProduct(null);setC24SearchResult([]);setC24ProductNo('');setC24ProductCode('');
   };
   const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.filter((s)=>s.id!==id));c24AddLog('🗑 스케줄 삭제');};
   const c24CheckSchedules=useCallback(async()=>{
