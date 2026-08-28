@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
-  const { action, token, productNo, payload } = req.body || {};
+  const { action, token, productCode, productNo, payload } = req.body || {};
   const MALL_ID = 'slowrocket';
   const baseUrl = `https://${MALL_ID}.cafe24api.com/api/v2/admin/products`;
   const headers = {
@@ -16,10 +16,18 @@ export default async function handler(req, res) {
 
   try {
     if (action === 'search') {
-      const r = await fetch(`${baseUrl}/${productNo}`, { headers });
+      // 상품코드(P0000BBC)로 조회
+      const searchUrl = `${baseUrl}?product_code=${encodeURIComponent(productCode)}&limit=1`;
+      const r = await fetch(searchUrl, { headers });
       const data = await r.json();
-      res.status(r.status).json(data);
+      // products 배열에서 첫 번째 항목 반환
+      if (data.products && data.products.length > 0) {
+        res.status(200).json({ product: data.products[0] });
+      } else {
+        res.status(200).json({ product: null, message: '상품을 찾을 수 없습니다' });
+      }
     } else if (action === 'update') {
+      // 수정은 상품번호(숫자)로 처리
       const r = await fetch(`${baseUrl}/${productNo}`, {
         method: 'PUT',
         headers,

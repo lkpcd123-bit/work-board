@@ -565,6 +565,7 @@ function Board() {
   const [c24SearchResult, setC24SearchResult] = useState([]);
   const [c24SearchLoading, setC24SearchLoading] = useState(false);
   const [c24ProductNo, setC24ProductNo] = useState('');
+  const [c24ProductCode, setC24ProductCode] = useState('');
   const [c24OpenAt, setC24OpenAt] = useState('');
   const [c24CloseAt, setC24CloseAt] = useState('');
   const [c24OpenSelling, setC24OpenSelling] = useState('T');
@@ -1194,14 +1195,17 @@ function Board() {
   };
   const c24SearchProduct=async()=>{
     if(!c24TokenValid()){alert('먼저 카페24 인증을 완료해주세요.');return;}
-    if(!c24ProductNo.trim()){alert('상품번호를 입력해주세요.');return;}
+    if(!c24ProductCode.trim()){alert('상품코드를 입력해주세요. (예: P0000BBC)');return;}
     setC24SearchLoading(true);setC24SearchResult([]);
     try{
-      const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'search',token:c24Token,productNo:c24ProductNo.trim()})});
+      const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'search',token:c24Token,productCode:c24ProductCode.trim().toUpperCase()})});
       const data=await res.json();
       const product=data.product;
-      if(product){setC24SearchResult([product]);c24AddLog(`🔍 상품 조회 완료: #${product.product_no} ${product.product_name}`);}
-      else{c24AddLog('❌ 상품을 찾을 수 없습니다: '+JSON.stringify(data));}
+      if(product){
+        setC24SearchResult([product]);
+        setC24ProductNo(String(product.product_no));
+        c24AddLog(`🔍 상품 조회 완료: #${product.product_no} ${product.product_name}`);
+      }else{c24AddLog('❌ 상품을 찾을 수 없습니다: '+c24ProductCode);}
     }catch(e){c24AddLog('❌ 조회 오류: '+e.message);}
     setC24SearchLoading(false);
   };
@@ -1221,7 +1225,7 @@ function Board() {
     const next=[...c24Schedules,s];
     c24SaveSchedules(next);
     c24AddLog(`✅ 스케줄 등록: #${s.productNo} ${s.productName} | 오픈:${s.openAt||'없음'} | 종료:${s.closeAt||'없음'}`);
-    setC24OpenAt('');setC24CloseAt('');setC24SelProduct(null);setC24SearchResult([]);setC24ProductNo('');
+    setC24OpenAt('');setC24CloseAt('');setC24SelProduct(null);setC24SearchResult([]);setC24ProductNo('');setC24ProductCode('');
   };
   const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.filter((s)=>s.id!==id));c24AddLog('🗑 스케줄 삭제');};
   const c24CheckSchedules=useCallback(async()=>{
@@ -2400,7 +2404,7 @@ function Board() {
           <div className="panel">
             <h3 style={{marginBottom:12}}>🛍 상품 검색</h3>
             <div style={{display:"flex",gap:10,marginBottom:10}}>
-              <div className="fld" style={{flex:1}}><label>상품번호</label><input value={c24ProductNo} onChange={(e)=>setC24ProductNo(e.target.value)} placeholder="예: 123" onKeyDown={(e)=>{if(e.key==="Enter")c24SearchProduct();}} /></div>
+              <div className="fld" style={{flex:1}}><label>상품코드</label><input value={c24ProductCode} onChange={(e)=>setC24ProductCode(e.target.value)} placeholder="예: P0000BBC" onKeyDown={(e)=>{if(e.key==="Enter")c24SearchProduct();}} /></div>
               <div className="fld" style={{justifyContent:"flex-end"}}><button className="btn-save" onClick={c24SearchProduct} disabled={c24SearchLoading}>{c24SearchLoading?"검색 중...":"🔍 검색"}</button></div>
             </div>
             {c24SearchResult.map((p)=>(
