@@ -560,6 +560,7 @@ function Board() {
   const [lightbox, setLightbox] = useState(null);
   const [c24Token, setC24Token] = useState(()=>localStorage.getItem('c24_token')||'');
   const [c24Expiry, setC24Expiry] = useState(()=>parseInt(localStorage.getItem('c24_expiry')||'0'));
+  const [c24RefreshToken, setC24RefreshToken] = useState(()=>localStorage.getItem('c24_refresh_token')||'');
   const [c24Schedules, setC24Schedules] = useState(()=>{try{return JSON.parse(localStorage.getItem('c24_schedules')||'[]');}catch(e){return[];}});
   const [c24SelProduct, setC24SelProduct] = useState(null);
   const [c24SearchResult, setC24SearchResult] = useState([]);
@@ -1174,6 +1175,12 @@ function Board() {
     const url=`https://${C24_MALL}.cafe24api.com/api/v2/oauth/authorize?response_type=code&client_id=${C24_CLIENT_ID}&redirect_uri=${encodeURIComponent(C24_REDIRECT)}&scope=mall.read_product%2Cmall.write_product`;
     window.location.href=url;
   };
+  const c24SaveToken=(access,expiry,refresh)=>{
+    setC24Token(access);setC24Expiry(expiry);
+    localStorage.setItem('c24_token',access);
+    localStorage.setItem('c24_expiry',expiry);
+    if(refresh){setC24RefreshToken(refresh);localStorage.setItem('c24_refresh_token',refresh);}
+  };
   const c24ExchangeCode=async(code)=>{
     c24AddLog('🔄 인증 코드 수신, 토큰 교환 중...');
     try{
@@ -1181,11 +1188,25 @@ function Board() {
       const data=await res.json();
       if(data.access_token){
         const expiry=Date.now()+(data.expires_in||7200)*1000;
-        setC24Token(data.access_token);setC24Expiry(expiry);
-        localStorage.setItem('c24_token',data.access_token);localStorage.setItem('c24_expiry',expiry);
-        c24AddLog('✅ 인증 성공! 토큰 발급 완료');
+        c24SaveToken(data.access_token,expiry,data.refresh_token);
+        c24AddLog('✅ 인증 성공! 토큰 발급 완료 (만료: '+Math.round((expiry-Date.now())/60000)+'분 후)');
       }else{c24AddLog('❌ 토큰 교환 실패: '+JSON.stringify(data));}
     }catch(e){c24AddLog('❌ 오류: '+e.message);}
+  };
+  const c24RefreshAccessToken=async()=>{
+    const refresh=localStorage.getItem('c24_refresh_token');
+    if(!refresh){c24AddLog('⚠ Refresh Token 없음 - 재로그인 필요');return false;}
+    c24AddLog('🔄 토큰 자동 갱신 중...');
+    try{
+      const res=await fetch('/api/cafe24-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({grant_type:'refresh_token',refresh_token:refresh})});
+      const data=await res.json();
+      if(data.access_token){
+        const expiry=Date.now()+(data.expires_in||7200)*1000;
+        c24SaveToken(data.access_token,expiry,data.refresh_token||refresh);
+        c24AddLog('✅ 토큰 자동 갱신 완료 (만료: '+Math.round((expiry-Date.now())/60000)+'분 후)');
+        return true;
+      }else{c24AddLog('❌ 토큰 갱신 실패 - 재로그인 필요: '+JSON.stringify(data));return false;}
+    }catch(e){c24AddLog('❌ 갱신 오류: '+e.message);return false;}
   };
   const c24ManualToken=()=>{
     const t=prompt('Access Token 입력:');
@@ -1229,6 +1250,10 @@ function Board() {
   };
   const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.filter((s)=>s.id!==id));c24AddLog('🗑 스케줄 삭제');};
   const c24CheckSchedules=useCallback(async()=>{
+    // 토큰 만료 10분 전이면 자동 갱신
+    if(c24Expiry&&c24Expiry-Date.now()<600000&&c24Expiry>Date.now()){
+      await c24RefreshAccessToken();
+    }
     if(!c24TokenValid())return;
     const now=new Date();let changed=false;
     const next=await Promise.all(c24Schedules.map(async(s)=>{
@@ -1249,7 +1274,7 @@ function Board() {
       return updated;
     }));
     if(changed)c24SaveSchedules(next);
-  },[c24Schedules,c24Token,c24Expiry]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[c24Schedules,c24Token,c24Expiry,c24RefreshToken]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
     const code=params.get('code');
@@ -2390,9 +2415,9 @@ function Board() {
           <div className="panel">
             <h3 style={{marginBottom:12}}>🔐 카페24 인증</h3>
             {c24TokenValid()
-              ?<div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <span style={{color:"var(--ok)",fontWeight:700,fontSize:13}}>✅ 인증됨 · {Math.round((c24Expiry-Date.now())/60000)}분 후 만료</span>
-                  <button className="btn ghost" onClick={()=>{setC24Token('');setC24Expiry(0);localStorage.removeItem('c24_token');localStorage.removeItem('c24_expiry');c24AddLog('🔓 로그아웃');}}>로그아웃</button>
+              ?<div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                  <span style={{color:"var(--ok)",fontWeight:700,fontSize:13}}>✅ 인증됨 · {Math.round((c24Expiry-Date.now())/60000)}분 후 만료 (자동 갱신됨)</span>
+                  <button className="btn ghost" onClick={()=>{setC24Token('');setC24Expiry(0);setC24RefreshToken('');localStorage.removeItem('c24_token');localStorage.removeItem('c24_expiry');localStorage.removeItem('c24_refresh_token');c24AddLog('🔓 로그아웃');}}>로그아웃</button>
                 </div>
               :<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                   <button className="btn-save" onClick={c24StartOAuth}>카페24 로그인 &amp; 권한 허용</button>
