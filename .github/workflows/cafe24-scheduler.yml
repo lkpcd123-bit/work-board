@@ -1,0 +1,180 @@
+name: 카페24 상품 스케줄러
+
+on:
+  schedule:
+    - cron: '* * * * *'  # 매분 실행
+  workflow_dispatch:      # 수동 실행 버튼
+
+jobs:
+  run-scheduler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: 카페24 상품 스케줄 실행
+        uses: actions/github-script@v7
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          C24_CLIENT_ID: ${{ secrets.C24_CLIENT_ID }}
+          C24_CLIENT_SECRET: ${{ secrets.C24_CLIENT_SECRET }}
+          C24_MALL_ID: ${{ secrets.C24_MALL_ID }}
+          C24_REDIRECT_URI: ${{ secrets.C24_REDIRECT_URI }}
+        with:
+          script: |
+            const FIREBASE_URL = `https://firestore.googleapis.com/v1/projects/${process.env.FIREBASE_PROJECT_ID}/databases/(default)/documents/board/main`;
+            const MALL_ID = process.env.C24_MALL_ID;
+            const CLIENT_ID = process.env.C24_CLIENT_ID;
+            const CLIENT_SECRET = process.env.C24_CLIENT_SECRET;
+
+            // ── Firestore REST API 헬퍼 ──────────────────────────────
+            async function firestoreGet() {
+              const res = await fetch(`${FIREBASE_URL}?key=${process.env.FIREBASE_API_KEY}`);
+              if (!res.ok) throw new Error(`Firestore GET 실패: ${res.status}`);
+              return res.json();
+            }
+
+            async function firestoreUpdate(fields) {
+              const mask = Object.keys(fields).map(f => `updateMask.fieldPaths=${f}`).join('&');
+              const res = await fetch(`${FIREBASE_URL}?key=${process.env.FIREBASE_API_KEY}&${mask}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fields }),
+              });
+              if (!res.ok) throw new Error(`Firestore PATCH 실패: ${res.status}`);
+              return res.json();
+            }
+
+            // Firestore 값 파싱
+            function parseValue(v) {
+              if (!v) return null;
+              if (v.stringValue !== undefined) return v.stringValue;
+              if (v.integerValue !== undefined) return parseInt(v.integerValue);
+              if (v.booleanValue !== undefined) return v.booleanValue;
+              if (v.doubleValue !== undefined) return v.doubleValue;
+              if (v.nullValue !== undefined) return null;
+              if (v.arrayValue) return (v.arrayValue.values || []).map(parseValue);
+              if (v.mapValue) {
+                const obj = {};
+                for (const [k, val] of Object.entries(v.mapValue.fields || {})) obj[k] = parseValue(val);
+                return obj;
+              }
+              return null;
+            }
+
+            // JS 값 → Firestore 값
+            function toFirestoreValue(v) {
+              if (v === null || v === undefined) return { nullValue: null };
+              if (typeof v === 'boolean') return { booleanValue: v };
+              if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+              if (typeof v === 'string') return { stringValue: v };
+              if (Array.isArray(v)) return { arrayValue: { values: v.map(toFirestoreValue) } };
+              if (typeof v === 'object') {
+                const fields = {};
+                for (const [k, val] of Object.entries(v)) fields[k] = toFirestoreValue(val);
+                return { mapValue: { fields } };
+              }
+              return { stringValue: String(v) };
+            }
+
+            // ── 토큰 갱신 ──────────────────────────────────────────
+            async function refreshToken(refreshToken) {
+              const creds = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+              const res = await fetch(`https://${MALL_ID}.cafe24api.com/api/v2/oauth/token`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Basic ${creds}`,
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+              });
+              const data = await res.json();
+              if (!data.access_token) throw new Error('토큰 갱신 실패: ' + JSON.stringify(data));
+              return data;
+            }
+
+            // ── 상품 수정 ──────────────────────────────────────────
+            async function updateProduct(token, productNo, payload) {
+              const url = `https://${MALL_ID}.cafe24api.com/api/v2/admin/products/${productNo}`;
+              const res = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'X-Cafe24-Api-Version': '2026-03-01',
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ shop_no: 1, request: payload }),
+              });
+              const data = await res.json();
+              console.log(`상품 ${productNo} 수정 응답:`, JSON.stringify(data));
+              return !!data.product;
+            }
+
+            // ── 메인 로직 ──────────────────────────────────────────
+            const now = new Date();
+            console.log(`[${now.toISOString()}] 스케줄 체크 시작`);
+
+            const doc = await firestoreGet();
+            const fields = doc.fields || {};
+            const schedules = parseValue(fields.cafe24_schedules) || [];
+            const tokenData = parseValue(fields.cafe24_token_data) || {};
+
+            if (!tokenData.refresh_token) {
+              console.log('Refresh Token 없음 - 업무보드에서 먼저 로그인 필요');
+              return;
+            }
+
+            // 토큰 만료 10분 전이면 갱신
+            let accessToken = tokenData.access_token;
+            let expiry = tokenData.expiry || 0;
+
+            if (!accessToken || expiry - Date.now() < 600000) {
+              console.log('토큰 갱신 중...');
+              const newToken = await refreshToken(tokenData.refresh_token);
+              accessToken = newToken.access_token;
+              expiry = Date.now() + (newToken.expires_in || 7200) * 1000;
+              const newTokenData = {
+                ...tokenData,
+                access_token: accessToken,
+                expiry,
+                refresh_token: newToken.refresh_token || tokenData.refresh_token,
+              };
+              await firestoreUpdate({ cafe24_token_data: toFirestoreValue(newTokenData) });
+              console.log('토큰 갱신 완료');
+            }
+
+            // 스케줄 실행
+            let changed = false;
+            const updated = await Promise.all(schedules.map(async (s) => {
+              if (!s || typeof s !== 'object') return s;
+              const item = { ...s };
+
+              // 오픈 처리
+              if (item.openAt && !item.openDone && new Date(item.openAt) <= now) {
+                console.log(`🟢 오픈 실행: #${item.productNo} ${item.productName}`);
+                const payload = { selling: item.openSelling || 'T', display: item.openDisplay || 'T' };
+                const ok = await updateProduct(accessToken, item.productNo, payload);
+                if (ok) { item.openDone = true; changed = true; console.log(`✅ 오픈 완료`); }
+                else { item.error = '오픈 실패'; changed = true; }
+              }
+
+              // 종료 처리
+              if (item.closeAt && !item.closeDone && new Date(item.closeAt) <= now) {
+                console.log(`🔴 종료 실행: #${item.productNo} ${item.productName}`);
+                const payload = item.closeAction === 'hide'
+                  ? { selling: 'F', display: 'F' }
+                  : { selling: 'F' };
+                const ok = await updateProduct(accessToken, item.productNo, payload);
+                if (ok) { item.closeDone = true; changed = true; console.log(`✅ 종료 완료`); }
+                else { item.error = '종료 실패'; changed = true; }
+              }
+
+              return item;
+            }));
+
+            if (changed) {
+              await firestoreUpdate({ cafe24_schedules: toFirestoreValue(updated) });
+              console.log('스케줄 업데이트 완료');
+            } else {
+              console.log('실행할 스케줄 없음');
+            }

@@ -1170,7 +1170,12 @@ function Board() {
   const c24TokenValid=()=>c24TokenRef.current&&c24Expiry>Date.now();
   // 토큰 state가 바뀔 때 ref도 동기화
   useEffect(()=>{c24TokenRef.current=c24Token;},[c24Token]);
-  const c24SaveSchedules=(list)=>{setC24Schedules(list);localStorage.setItem('c24_schedules',JSON.stringify(list));};
+  const c24SaveSchedules=(list)=>{
+    setC24Schedules(list);
+    localStorage.setItem('c24_schedules',JSON.stringify(list));
+    // Firebase에 동기화 (GitHub Actions에서 사용)
+    commit((d)=>({...d,cafe24_schedules:list,updatedAt:Date.now()}),[]);
+  };
   const c24StartOAuth=()=>{
     const url=`https://${C24_MALL}.cafe24api.com/api/v2/oauth/authorize?response_type=code&client_id=${C24_CLIENT_ID}&redirect_uri=${encodeURIComponent(C24_REDIRECT)}&scope=mall.read_product%2Cmall.write_product`;
     window.location.href=url;
@@ -1180,6 +1185,8 @@ function Board() {
     localStorage.setItem('c24_token',access);
     localStorage.setItem('c24_expiry',expiry);
     if(refresh){setC24RefreshToken(refresh);localStorage.setItem('c24_refresh_token',refresh);}
+    // Firebase에 토큰 동기화 (GitHub Actions에서 사용)
+    commit((d)=>({...d,cafe24_token_data:{access_token:access,expiry,refresh_token:refresh||localStorage.getItem('c24_refresh_token')||''},updatedAt:Date.now()}),[]);
   };
   const c24ExchangeCode=async(code)=>{
     c24AddLog('🔄 인증 코드 수신, 토큰 교환 중...');
