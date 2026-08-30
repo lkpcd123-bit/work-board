@@ -30,26 +30,24 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: `Invalid productNo: ${productNo}` });
       }
 
-      // 카페24 공식 문서 형식 - product_no를 body에도 포함
-      const body = {
+      // 카페24 공식 형식: request 래퍼 사용
+      const requestBody = {
         shop_no: 1,
-        product_no: no,
-        product: {}
+        request: {}
       };
-
-      if (payload.selling !== undefined) body.product.selling = payload.selling;
-      if (payload.display !== undefined) body.product.display = payload.display;
+      if (payload.selling !== undefined) requestBody.request.selling = payload.selling;
+      if (payload.display !== undefined) requestBody.request.display = payload.display;
 
       console.log('PUT URL:', `${baseUrl}/${no}`);
-      console.log('PUT body:', JSON.stringify(body));
+      console.log('PUT body:', JSON.stringify(requestBody));
 
       const r = await fetch(`${baseUrl}/${no}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(body),
+        body: JSON.stringify(requestBody),
       });
       const text = await r.text();
-      console.log('Response:', r.status, text.slice(0, 200));
+      console.log('Response:', r.status, text.slice(0, 300));
 
       let data;
       try { data = JSON.parse(text); } catch(e) { data = { raw: text }; }
