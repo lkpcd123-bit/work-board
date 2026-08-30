@@ -2485,28 +2485,102 @@ function Board() {
               </div>
             </div>
           </div>
-          {/* 스케줄 목록 */}
+          {/* 스케줄 대시보드 */}
           <div className="panel">
-            <h3 style={{marginBottom:12}}>📋 등록된 스케줄 <span style={{fontSize:12,color:"var(--ink3)",fontWeight:400}}>({c24Schedules.length}건 · 30초마다 체크)</span></h3>
-            {c24Schedules.length===0&&<div className="hint">등록된 스케줄이 없습니다</div>}
-            {c24Schedules.map((s)=>{
-              const statusColor=s.error?"var(--danger)":s.openDone&&s.closeDone?"var(--ok)":s.openDone?"#0C66E4":"var(--ink3)";
-              const statusLabel=s.error?"오류":s.openDone&&s.closeDone?"완료":s.openDone?"오픈됨":"대기";
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+              <h3>📋 스케줄 현황 <span style={{fontSize:12,color:"var(--ink3)",fontWeight:400}}>({c24Schedules.length}건)</span></h3>
+              <div style={{display:"flex",gap:8,fontSize:12}}>
+                <span style={{background:"#F4F5F7",padding:"3px 10px",borderRadius:20,color:"var(--ink3)",fontWeight:700}}>⏳ 대기 {c24Schedules.filter((s)=>!s.openDone&&!s.error).length}</span>
+                <span style={{background:"#E9F2FF",padding:"3px 10px",borderRadius:20,color:"#0C66E4",fontWeight:700}}>🟢 진행중 {c24Schedules.filter((s)=>s.openDone&&!s.closeDone&&!s.error).length}</span>
+                <span style={{background:"#DCFFF1",padding:"3px 10px",borderRadius:20,color:"#1F845A",fontWeight:700}}>✅ 완료 {c24Schedules.filter((s)=>s.openDone&&s.closeDone).length}</span>
+                {c24Schedules.filter((s)=>s.error).length>0&&<span style={{background:"#FFECEB",padding:"3px 10px",borderRadius:20,color:"#CA3521",fontWeight:700}}>❌ 오류 {c24Schedules.filter((s)=>s.error).length}</span>}
+              </div>
+            </div>
+            {c24Schedules.length===0&&<div className="hint" style={{textAlign:"center",padding:32}}>등록된 스케줄이 없습니다</div>}
+            {c24Schedules.length>0&&(()=>{
+              const now=new Date();
               const actionLabel={soldout:"품절처리",hide:"진열+판매중지",selling_off:"판매중지"};
-              return(
-              <div key={s.id} style={{border:"1.5px solid var(--line)",borderRadius:9,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13.5,fontWeight:700}}>#{s.productNo} · {s.productName}</div>
-                  <div style={{fontSize:11.5,color:"var(--ink3)",marginTop:4,display:"flex",gap:8,flexWrap:"wrap"}}>
-                    {s.openAt&&<span style={{background:"#DCFFF1",color:"#1F845A",padding:"2px 8px",borderRadius:12,fontWeight:700}}>오픈 {new Date(s.openAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>}
-                    {s.closeAt&&<span style={{background:"#FFECEB",color:"#CA3521",padding:"2px 8px",borderRadius:12,fontWeight:700}}>종료 {new Date(s.closeAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})} · {actionLabel[s.closeAction]}</span>}
+              const fmtDt=(dt)=>dt?new Date(dt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",weekday:"short",hour:"2-digit",minute:"2-digit"}):"";
+              const getPhase=(s)=>{
+                if(s.error)return"error";
+                if(s.openDone&&s.closeDone)return"done";
+                if(s.openDone&&!s.closeDone)return"running";
+                if(s.openAt&&new Date(s.openAt)>now)return"waiting";
+                return"waiting";
+              };
+              const phaseStyle={
+                waiting:{border:"1.5px solid #DFE1E6",bg:"var(--bg)",badge:"#F4F5F7",badgeColor:"#42526E",label:"대기중",icon:"⏳"},
+                running:{border:"1.5px solid #0C66E4",bg:"#E9F2FF",badge:"#0C66E4",badgeColor:"#fff",label:"진행중",icon:"🟢"},
+                done:{border:"1.5px solid #1F845A",bg:"#DCFFF1",badge:"#1F845A",badgeColor:"#fff",label:"완료",icon:"✅"},
+                error:{border:"1.5px solid #CA3521",bg:"#FFECEB",badge:"#CA3521",badgeColor:"#fff",label:"오류",icon:"❌"},
+              };
+              return c24Schedules.map((s)=>{
+                const phase=getPhase(s);
+                const ps=phaseStyle[phase];
+                // 타임라인 진행률 계산
+                const openTs=s.openAt?new Date(s.openAt).getTime():null;
+                const closeTs=s.closeAt?new Date(s.closeAt).getTime():null;
+                const nowTs=now.getTime();
+                let progress=0;
+                if(openTs&&closeTs){
+                  if(phase==="done")progress=100;
+                  else if(phase==="running")progress=Math.min(99,Math.round((nowTs-openTs)/(closeTs-openTs)*100));
+                  else progress=0;
+                }
+                const hasTimeline=openTs&&closeTs;
+                return(
+                <div key={s.id} style={{border:ps.border,borderRadius:12,padding:"16px 18px",marginBottom:12,background:ps.bg,transition:"all .2s"}}>
+                  {/* 헤더 */}
+                  <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:12}}>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:800,marginBottom:4}}>
+                        <span style={{color:"#0C66E4",marginRight:6}}>#{s.productNo}</span>
+                        {s.productName}
+                      </div>
+                      <div style={{fontSize:11,color:"var(--ink3)"}}>
+                        종료 시 처리: <b>{actionLabel[s.closeAction]||s.closeAction}</b>
+                        {s.openSelling==="T"&&s.openDisplay==="T"&&<span style={{marginLeft:6}}>· 오픈 시 판매+진열</span>}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                      <span style={{background:ps.badge,color:ps.badgeColor,borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:800}}>{ps.icon} {ps.label}</span>
+                      <button className="riedit" style={{color:"var(--danger)"}} onClick={()=>c24DeleteSchedule(s.id)}>삭제</button>
+                    </div>
                   </div>
-                  {s.error&&<div style={{fontSize:11,color:"var(--danger)",marginTop:4}}>⚠ {s.error}</div>}
-                </div>
-                <span style={{fontSize:12,fontWeight:700,color:statusColor,padding:"3px 10px",borderRadius:20,background:s.error?"#FFECEB":s.openDone&&s.closeDone?"#DCFFF1":s.openDone?"#E9F2FF":"#F4F5F7"}}>{statusLabel}</span>
-                <button className="riedit" style={{color:"var(--danger)"}} onClick={()=>c24DeleteSchedule(s.id)}>삭제</button>
-              </div>);
-            })}
+                  {/* 타임라인 */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",gap:8,marginBottom:hasTimeline?12:0}}>
+                    {/* 오픈 */}
+                    <div style={{background:s.openDone?"#0C66E4":"rgba(0,0,0,.05)",borderRadius:8,padding:"10px 14px"}}>
+                      <div style={{fontSize:10,fontWeight:700,color:s.openDone?"#fff":"var(--ink3)",marginBottom:3}}>🟢 오픈</div>
+                      <div style={{fontSize:13,fontWeight:700,color:s.openDone?"#fff":"var(--ink1)"}}>{s.openAt?fmtDt(s.openAt):"없음"}</div>
+                      {s.openDone&&<div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>✔ 완료됨</div>}
+                    </div>
+                    {/* 화살표 + 진행률 */}
+                    <div style={{textAlign:"center",color:"var(--ink3)",fontSize:18}}>→</div>
+                    {/* 종료 */}
+                    <div style={{background:s.closeDone?"#1F845A":s.closeAt?"rgba(0,0,0,.05)":"transparent",borderRadius:8,padding:"10px 14px"}}>
+                      <div style={{fontSize:10,fontWeight:700,color:s.closeDone?"#fff":"var(--ink3)",marginBottom:3}}>🔴 종료</div>
+                      <div style={{fontSize:13,fontWeight:700,color:s.closeDone?"#fff":"var(--ink1)"}}>{s.closeAt?fmtDt(s.closeAt):"없음"}</div>
+                      {s.closeDone&&<div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>✔ 완료됨</div>}
+                    </div>
+                  </div>
+                  {/* 진행 바 */}
+                  {hasTimeline&&(
+                    <div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--ink3)",marginBottom:4}}>
+                        <span>{phase==="waiting"?"판매 시작 전":phase==="running"?"판매 진행 중":phase==="done"?"판매 종료됨":"오류 발생"}</span>
+                        {phase==="running"&&<span>{progress}%</span>}
+                      </div>
+                      <div style={{height:6,background:"rgba(0,0,0,.08)",borderRadius:4,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:progress+"%",background:phase==="done"?"#1F845A":phase==="running"?"#0C66E4":"#DFE1E6",borderRadius:4,transition:"width .5s"}} />
+                      </div>
+                    </div>
+                  )}
+                  {/* 오류 메시지 */}
+                  {s.error&&<div style={{marginTop:10,fontSize:12,color:"#CA3521",background:"rgba(202,53,33,.08)",borderRadius:6,padding:"6px 10px"}}>⚠ {s.error}</div>}
+                </div>);
+              });
+            })()}
           </div>
           {/* 로그 */}
           <div className="panel">
