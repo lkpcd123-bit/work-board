@@ -45,7 +45,7 @@ const DEFAULT_CHANNELS = [
   { id: "11번가", color: "#DE7A1C" },
 ];
 const TYPES = ["상품기획","채널운영","마케팅","상세페이지","공급사","인플루언서","데이터분석","기타"];
-const PRIORITIES = [{ id:"high",label:"높음",rank:0 },{ id:"mid",label:"보통",rank:1 },{ id:"low",label:"낮음",rank:2 }];
+const PRIORITIES = [{ id:"urgent",label:"가장 먼저",rank:0 },{ id:"high",label:"높음",rank:1 },{ id:"mid",label:"보통",rank:2 },{ id:"low",label:"낮음",rank:3 }];
 const REPEATS = [{ id:"none",label:"반복 없음" },{ id:"daily",label:"매일" },{ id:"weekly",label:"매주" },{ id:"biweekly",label:"격주" },{ id:"monthly",label:"매월" }];
 const ROLES = [{ id:"admin",label:"관리자" },{ id:"member",label:"멤버" },{ id:"viewer",label:"뷰어" }];
 
@@ -203,6 +203,11 @@ const CSS = `
 .due.soon{background:#FFF7D6;color:var(--warn);}
 .pri{font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;background:#EBECF0;color:var(--ink2);}
 .pri.high{background:#FFECEB;color:var(--danger);}
+.pri.urgent{background:#CA3521;color:#fff;animation:urgentPulse 1.8s ease-in-out infinite;}
+@keyframes urgentPulse{0%,100%{opacity:1;}50%{opacity:.7;}}
+.card.urgent{border:2px solid #CA3521;box-shadow:0 0 0 2px rgba(202,53,33,.18),var(--sh);}
+.card.high{border-left:3px solid #CA3521;}
+.card.low{opacity:.85;}
 .icons{display:inline-flex;gap:8px;color:var(--ink3);font-size:11.5px;font-weight:600;}
 .empty{border:2px dashed var(--line2);border-radius:8px;padding:16px 10px;text-align:center;font-size:13px;color:var(--ink3);font-weight:500;}
 .addbtn{width:100%;background:transparent;color:var(--ink2);padding:8px;font-size:13.5px;font-weight:600;border-radius:6px;text-align:left;}
@@ -517,7 +522,7 @@ function Board() {
   const [fTag, setFTag] = useState("전체");
   const [onlyMine, setOnlyMine] = useState(false);
   const [onlyLate, setOnlyLate] = useState(false);
-  const [sortBy, setSortBy] = useState("due");
+  const [sortBy, setSortBy] = useState("pri");
   const [draft, setDraft] = useState(null);
   const [dragId, setDragId] = useState(null);
   const [overCol, setOverCol] = useState(null);
@@ -688,7 +693,7 @@ function Board() {
     });
   },[q,fCh,fOwner,fTag,onlyMine,onlyLate,me,inChannel,dateFrom,dateTo]);
 
-  const sortFn=useCallback((a,b)=>{ if(sortBy==="due"){if(!a.due&&!b.due)return 0;if(!a.due)return 1;if(!b.due)return -1;return a.due<b.due?-1:1;} if(sortBy==="pri"){const r=(t)=>PRIORITIES.find((p)=>p.id===t.priority)?.rank??1;return r(a)-r(b);} return(b.updatedAt||0)-(a.updatedAt||0); },[sortBy]);
+  const sortFn=useCallback((a,b)=>{ if(sortBy==="due"){if(!a.due&&!b.due)return 0;if(!a.due)return 1;if(!b.due)return -1;return a.due<b.due?-1:1;} if(sortBy==="pri"){const r=(t)=>PRIORITIES.find((p)=>p.id===t.priority)?.rank??2;const rd=r(a)-r(b);if(rd!==0)return rd;if(!a.due&&!b.due)return 0;if(!a.due)return 1;if(!b.due)return -1;return a.due<b.due?-1:1;} return(b.updatedAt||0)-(a.updatedAt||0); },[sortBy]);
   const visible=useMemo(()=>applyFilters(live).slice().sort(sortFn),[live,applyFilters,sortFn]);
   const stats=useMemo(()=>{const o=live.filter((t)=>t.status!=="done");return{total:live.length,doing:live.filter((t)=>t.status==="doing").length,tomorrow:o.filter((t)=>dayDiff(t.due)===1).length,late:o.filter((t)=>{const d=dayDiff(t.due);return d!==null&&d<0;}).length,open:o.length};},[live]);
 
@@ -1390,7 +1395,7 @@ function Board() {
     const d=dayDiff(t.due),late=d!==null&&d<0&&t.status!=="done",soon=d!==null&&d>=0&&d<=2&&t.status!=="done";
     const ck=t.checklist||[],ckDone=ck.filter((c)=>c.done).length;
     return(
-      <div key={t.id} className={"card"+(late?" late":"")+(t.status==="done"?" done":"")+(dragId===t.id?" drag":"")} style={{"--ch":chColor(t.channel)}}
+      <div key={t.id} className={"card"+(late?" late":"")+(t.status==="done"?" done":"")+(dragId===t.id?" drag":"")+(t.priority==="urgent"?" urgent":t.priority==="high"?" high":t.priority==="low"?" low":"")} style={{"--ch":chColor(t.channel)}}
         draggable={canEdit} onDragStart={(e)=>{setDragId(t.id);e.dataTransfer.effectAllowed="move";}} onDragEnd={()=>{setDragId(null);setOverCol(null);}} onClick={()=>openTask(t)}>
         <div className="cmeta"><span className="ch">{t.channel}</span><span>·</span><span>{t.type}</span>{t.repeat&&t.repeat!=="none"&&<><span>·</span><span>↻{REPEATS.find((r)=>r.id===t.repeat)?.label}</span></>}</div>
         <p className="ctitle">{t.title}</p>
@@ -1407,7 +1412,7 @@ function Board() {
           </span>
           <span style={{display:"flex",gap:6,alignItems:"center"}}>
             <span className="icons">{ck.length>0&&<span>☑{ckDone}/{ck.length}</span>}{!!(t.comments||[]).length&&<span>💬{t.comments.length}</span>}{!!(t.links||[]).length&&<span>🔗{t.links.length}</span>}</span>
-            <span className={"pri"+(t.priority==="high"?" high":"")}>{PRIORITIES.find((p)=>p.id===t.priority)?.label}</span>
+            <span className={"pri"+(t.priority==="urgent"?" urgent":t.priority==="high"?" high":"")}>{PRIORITIES.find((p)=>p.id===t.priority)?.label}</span>
           </span>
         </div>
       </div>
