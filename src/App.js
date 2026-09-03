@@ -3141,10 +3141,19 @@ function Board() {
             </div>
             <div className="pticks"><span>0</span><span>50</span><span>100</span></div>
           </div>
-          <div className="fld"><label>메모</label><textarea disabled={!canEdit} value={draft.memo} onChange={(e)=>setDraft({...draft,memo:e.target.value})} placeholder="진행 상황, 공급사 회신, 참고 수치" /></div>
-          <div className="sect" style={{paddingTop:10}}>
+          <div className="sect" style={{paddingTop:10}}
+            onPaste={async(e)=>{
+              const items=Array.from(e.clipboardData.items||[]);
+              const imgItem=items.find((i)=>i.type.startsWith("image/"));
+              if(!imgItem||!canEdit)return;
+              e.preventDefault();
+              const file=imgItem.getAsFile();
+              const b64=await resizeImage(file);
+              const newImg={id:uid(),src:b64,ts:Date.now(),by:me||"익명"};
+              setDraft({...draft,images:[...(draft.images||[]),newImg]});
+            }}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-              <h4 style={{margin:0}}>이미지</h4>
+              <h4 style={{margin:0}}>이미지 <span style={{fontSize:11,color:"var(--ink3)",fontWeight:400}}>(Ctrl+V 붙여넣기 가능)</span></h4>
               {canEdit&&<label style={{cursor:"pointer",fontSize:12,color:"#0C66E4",fontWeight:700,border:"1px solid #0C66E4",borderRadius:6,padding:"4px 10px"}}>
                 + 이미지 추가
                 <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={async(e)=>{
@@ -3202,10 +3211,6 @@ function Board() {
                 setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:"",image:b64,ts:Date.now()}]});
               }}
               onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();const v=e.target.value.trim();if(!v)return;setDraft({...draft,history:[...(draft.history||[]),{id:uid(),author:me||"익명",text:v,ts:Date.now()}]});e.target.value="";}} /></div>}
-          </div>
-          <div className="sect"><h4>태그</h4>
-            <div className="ctags">{(draft.tags||[]).map((g)=><span key={g} className="tag">{g}{canEdit&&<button className="x" style={{fontSize:11,marginLeft:3,border:"none",cursor:"pointer",background:"none"}} onClick={()=>setDraft({...draft,tags:draft.tags.filter((x)=>x!==g)})}>x</button>}</span>)}{!(draft.tags||[]).length&&<span className="hint">없음</span>}</div>
-            {canEdit&&<div className="addrow"><input placeholder="태그 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v&&!(draft.tags||[]).includes(v)){setDraft({...draft,tags:[...(draft.tags||[]),v]});e.target.value="";}}} /></div>}
           </div>
           <div className="sect"><h4>세부 단계{(draft.checklist||[]).length>0&&` (${draft.checklist.filter((c)=>c.done).length}/${draft.checklist.length})`}</h4>
             {(draft.checklist||[]).map((c)=>(
