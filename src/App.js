@@ -441,7 +441,7 @@ const CSS = `
 .btn-save{background:#0C66E4!important;color:#fff!important;padding:8px 16px;font-size:14px;font-weight:700;border-radius:6px;}
 .btn-save:hover{background:#0055CC!important;}
 .issbtn:hover{border-color:var(--ink3);}
-.fcitem{display:flex;align-items:center;gap:9px;padding:5px 0;}
+.fcitem{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);margin-bottom:6px;background:var(--bg);}
 .fcitem.dragging{opacity:.4;}
 .fccheck{width:21px;height:21px;border:2px solid #A9B0A6;border-radius:5px;background:#fff;font-size:11px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;}
 .fccheck:hover{border-color:var(--ok);background:#F5FBF7;}
@@ -3641,9 +3641,9 @@ function Board() {
                             onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,editing:true}:x)})}>{s.text}</span>}
                       <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15,marginTop:2,flexShrink:0}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.filter((x)=>x.id!==s.id)})}>×</button>
                     </div>
-                    <div style={{marginLeft:32,marginTop:2,marginBottom:6}}>
+                    <div style={{marginLeft:28,marginTop:4,marginBottom:4,paddingLeft:12,borderLeft:"2px solid var(--line2)"}}>
                       {(s.subsubs||[]).map((ss)=>(
-                        <div key={ss.id} style={{display:"flex",alignItems:"flex-start",gap:7,padding:"3px 0"}}>
+                        <div key={ss.id} style={{display:"flex",alignItems:"flex-start",gap:7,padding:"6px 8px",borderRadius:6,border:"1px solid var(--line)",background:"var(--card)",marginBottom:4}}>
                           <button className={"fccheck"+(ss.done?" on":"")} style={{marginTop:3,flexShrink:0,width:18,height:18,fontSize:10}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,subsubs:(x.subsubs||[]).map((y)=>y.id===ss.id?{...y,done:!y.done}:y)}:x)})}>{ss.done?"✓":""}</button>
                           {ss.editing
                             ?<textarea defaultValue={ss.text} autoFocus
