@@ -2739,7 +2739,7 @@ function Board() {
           <div className="panel" style={{marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:activeInbounds.length>0?12:0}}>
               <h3 style={{margin:0}}>📦 입고 예정 {activeInbounds.length>0&&<span style={{fontSize:12,color:"#0C66E4",fontWeight:400}}>({activeInbounds.length}건 진행중)</span>}</h3>
-              {canEdit&&<button className="btn-save" style={{fontSize:13,padding:"8px 20px"}} onClick={()=>{setInboundDraft({productName:"",sku:"",channel:"naver",expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고 등록</button>}
+              {canEdit&&<button className="btn-save" style={{fontSize:13,padding:"8px 24px"}} onClick={()=>{setInboundDraft({productName:"",sku:"",channel:"naver",expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고 등록</button>}
             </div>
             {activeInbounds.length===0&&<div style={{fontSize:13,color:"var(--ink3)"}}>진행 중인 입고 예정이 없습니다</div>}
             {activeInbounds.map((p)=>{
@@ -2762,7 +2762,6 @@ function Board() {
                     {canEdit&&<button className="riedit" style={{color:"var(--danger)"}} onClick={()=>{if(window.confirm("삭제할까요?"))deleteInboundPlan(p.id);}}>삭제</button>}
                   </div>
                 </div>
-                {/* 상태 단계 버튼 */}
                 <div className="inbound-step">
                   {INBOUND_STEPS.map((step,i)=>(
                     <button key={step} className={"inbound-step-btn"+(i<stepIdx?" done":i===stepIdx?" on":"")}
@@ -2771,7 +2770,6 @@ function Board() {
                     </button>
                   ))}
                 </div>
-                {/* 이슈 목록 */}
                 {(p.issues||[]).filter((i)=>!i.resolved).map((iss)=>(
                   <div key={iss.id} style={{background:"#FFECEB",border:"1px solid #CA3521",borderRadius:7,padding:"8px 12px",marginTop:8,fontSize:12}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
@@ -2791,11 +2789,13 @@ function Board() {
                     )}
                   </div>
                 ))}
-                {/* 이슈 입력 */}
                 {canEdit&&<IssueInput planId={p.id} onAdd={addInboundIssue} />}
               </div>);
             })}
           </div>
+
+          {/* 입고 요청 패널 */}
+          {reorderRequests.length>0&&(
             <div className="panel" style={{marginBottom:14,borderLeft:"4px solid #CA3521"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                 <h3 style={{color:"#CA3521",margin:0}}>🚨 입고 요청 ({reorderRequests.length}건)</h3>
@@ -2834,8 +2834,6 @@ function Board() {
                 </button>
               ))}
             </div>
-
-            {/* 엑셀 업로드 */}
             <div style={{marginBottom:14}}>
               <label className="stock-upload-zone" style={{display:"block"}}>
                 <div style={{fontSize:24,marginBottom:6}}>📊</div>
@@ -2845,8 +2843,6 @@ function Board() {
                   onChange={async(e)=>{const f=e.target.files?.[0];if(f){await parseStockExcel(f,stockTab);e.target.value="";}}} />
               </label>
             </div>
-
-            {/* 재고 테이블 */}
             {stockItems.length===0
               ?<div style={{textAlign:"center",padding:40,color:"var(--ink3)"}}>
                   <div style={{fontSize:32,marginBottom:8}}>📦</div>
@@ -2936,10 +2932,10 @@ function Board() {
       {/* 입고 예정 등록/수정 모달 */}
       {inboundModal&&inboundDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setInboundModal(null)}>
-          <div className="modal" style={{maxWidth:480}} onClick={(e)=>e.stopPropagation()}>
+          <div className="modal" style={{maxWidth:520}} onClick={(e)=>e.stopPropagation()}>
             <div className="modal-head"><h3>{inboundModal==="add"?"입고 예정 등록":"입고 예정 수정"}</h3><button className="x" onClick={()=>setInboundModal(null)}>×</button></div>
-            <div className="modal-body">
-              <div className="r3" style={{marginBottom:10}}>
+            <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:18}}>
+              <div className="r3">
                 <div className="fld"><label>상품명</label><input value={inboundDraft.productName||""} onChange={(e)=>setInboundDraft({...inboundDraft,productName:e.target.value})} placeholder="상품명" /></div>
                 <div className="fld"><label>SKU/상품코드</label><input value={inboundDraft.sku||""} onChange={(e)=>setInboundDraft({...inboundDraft,sku:e.target.value})} placeholder="P0000BBC" /></div>
                 <div className="fld"><label>채널</label>
@@ -2949,7 +2945,7 @@ function Board() {
                   </select>
                 </div>
               </div>
-              <div className="r3" style={{marginBottom:10}}>
+              <div className="r3">
                 <div className="fld"><label>입고 예정일</label><input type="date" value={inboundDraft.expectedDate||""} onChange={(e)=>setInboundDraft({...inboundDraft,expectedDate:e.target.value})} /></div>
                 <div className="fld"><label>입고 수량</label><input type="number" value={inboundDraft.qty||""} onChange={(e)=>setInboundDraft({...inboundDraft,qty:e.target.value})} placeholder="0" /></div>
                 <div className="fld"><label>현재 상태</label>
@@ -2959,13 +2955,13 @@ function Board() {
                 </div>
               </div>
               <div className="fld"><label>메모</label>
-                <textarea value={inboundDraft.memo||""} onChange={(e)=>setInboundDraft({...inboundDraft,memo:e.target.value})} placeholder="공급사 정보, 특이사항 등..." style={{height:70}} />
+                <textarea value={inboundDraft.memo||""} onChange={(e)=>setInboundDraft({...inboundDraft,memo:e.target.value})} placeholder="공급사 정보, 특이사항 등..." style={{height:90,resize:"vertical"}} />
               </div>
             </div>
-            <div className="modal-foot">
+            <div className="modal-foot" style={{padding:"16px 24px"}}>
               <span className="spacer" />
               <button className="btn ghost" onClick={()=>setInboundModal(null)}>취소</button>
-              <button className="btn-save" onClick={()=>{
+              <button className="btn-save" style={{padding:"9px 24px"}} onClick={()=>{
                 if(inboundModal==="add")addInboundPlan(inboundDraft);
                 else updateInboundPlan(inboundDraft.id,inboundDraft);
                 setInboundModal(null);setInboundDraft(null);
