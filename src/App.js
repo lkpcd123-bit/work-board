@@ -3262,7 +3262,13 @@ function Board() {
 
       {draft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setDraft(null)}><div className="modal">
-          <h2>{draft._new?"새 업무":"업무 상세"}</h2>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+            <h2 style={{margin:0}}>{draft._new?"새 업무":"업무 상세"}</h2>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              {canEdit&&!draft._new&&<button className="btn-save" style={{fontSize:12,padding:"5px 14px",background:"#1F845A"}} onClick={saveDraft}>💾 중간 저장</button>}
+              <button style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"var(--ink3)",lineHeight:1}} onClick={()=>setDraft(null)}>×</button>
+            </div>
+          </div>
           <div className="modal-body">
           <div className="fld"><label>업무명</label><input autoFocus disabled={!canEdit} value={draft.title} onChange={(e)=>setDraft({...draft,title:e.target.value})} placeholder="예) 쿠팡 락토컷 상세페이지 개편" /></div>
           <div className="r3">
@@ -3396,10 +3402,10 @@ function Board() {
                 <div className="item">
                   <input type="checkbox" checked={c.done} disabled={!canEdit} style={{width:"auto"}} onChange={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,done:!x.done}:x)})} />
                   {c.editing
-                    ? <input defaultValue={c.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"5px 8px",fontSize:13.5}}
-                        onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,editing:false}:x)});}}
+                    ? <textarea defaultValue={c.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"5px 8px",fontSize:13.5,resize:"vertical",minHeight:36,fontFamily:"inherit"}}
+                        onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();const v=e.target.value.trim();if(v)setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,editing:false}:x)});}}
                         onBlur={(e)=>{const v=e.target.value.trim();if(v)setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,text:v,editing:false}:x)});}} />
-                    : <span style={{flex:1,textDecoration:c.done?"line-through":"none",color:c.done?"#8F959C":"inherit",cursor:canEdit?"pointer":"default"}} onClick={()=>canEdit&&setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,editing:true}:x)})}>{c.text}</span>}
+                    : <span style={{flex:1,textDecoration:c.done?"line-through":"none",color:c.done?"#8F959C":"inherit",cursor:canEdit?"pointer":"default",whiteSpace:"pre-wrap",wordBreak:"break-word"}} onClick={()=>canEdit&&setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,editing:true}:x)})}>{c.text}</span>}
                   {canEdit&&!c.editing&&<button style={{background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",fontSize:11,padding:"0 4px"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.map((x)=>x.id===c.id?{...x,expand:!x.expand}:x)})}>{(c.subs||[]).length>0?`하위 ${(c.subs||[]).filter((s)=>s.done).length}/${(c.subs||[]).length}`:"+하위"}</button>}
                   {canEdit&&<button style={{background:"none",border:"none",cursor:"pointer",color:"#8F959C"}} onClick={()=>setDraft({...draft,checklist:draft.checklist.filter((x)=>x.id!==c.id)})}>×</button>}
                 </div>
@@ -3422,7 +3428,7 @@ function Board() {
               </div>
             ))}
             {!(draft.checklist||[]).length&&<span className="hint">없음</span>}
-            {canEdit&&<div className="addrow"><input placeholder="단계 입력 후 Enter" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;const v=e.target.value.trim();if(e.key==="Enter"&&v){setDraft({...draft,checklist:[...(draft.checklist||[]),{id:uid(),text:v,done:false,subs:[]}]});e.target.value="";}}} /></div>}
+            {canEdit&&<div className="addrow"><textarea className="hinput" placeholder="단계 입력 (Enter 추가, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();const v=e.target.value.trim();if(v){setDraft({...draft,checklist:[...(draft.checklist||[]),{id:uid(),text:v,done:false,subs:[]}]});e.target.value="";}}}}/></div>}
           </div>
           <div className="sect"><h4>이슈</h4>
             {(draft.issues||[]).length===0&&<span className="hint">없음</span>}
