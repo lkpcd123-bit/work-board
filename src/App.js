@@ -2739,7 +2739,7 @@ function Board() {
           <div className="panel" style={{marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:activeInbounds.length>0?12:0}}>
               <h3 style={{margin:0}}>📦 입고 예정 {activeInbounds.length>0&&<span style={{fontSize:12,color:"#0C66E4",fontWeight:400}}>({activeInbounds.length}건 진행중)</span>}</h3>
-              {canEdit&&<button className="btn-save" style={{fontSize:12,padding:"5px 14px"}} onClick={()=>{setInboundDraft({productName:"",sku:"",channel:"naver",expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고 등록</button>}
+              {canEdit&&<button className="btn-save" style={{fontSize:13,padding:"8px 20px"}} onClick={()=>{setInboundDraft({productName:"",sku:"",channel:"naver",expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고 등록</button>}
             </div>
             {activeInbounds.length===0&&<div style={{fontSize:13,color:"var(--ink3)"}}>진행 중인 입고 예정이 없습니다</div>}
             {activeInbounds.map((p)=>{
