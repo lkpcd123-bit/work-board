@@ -590,6 +590,7 @@ function Board() {
   const [c24OpenDisplay, setC24OpenDisplay] = useState('T');
   const [c24CloseAction, setC24CloseAction] = useState('soldout');
   const [c24Log, setC24Log] = useState(['⏱ 스케줄러 준비 중...']);
+  const [c24EditSchedule, setC24EditSchedule] = useState(null);
   const c24TimerRef = useRef(null);
   const c24TokenRef = useRef('');
   const [mmId, setMmId] = useState(null);
@@ -1274,6 +1275,11 @@ function Board() {
     c24AddLog(`✅ 스케줄 등록: #${s.productNo} ${s.productName} | 오픈:${s.openAt||'없음'} | 종료:${s.closeAt||'없음'}`);
   };
   const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.filter((s)=>s.id!==id));c24AddLog('🗑 스케줄 삭제');};
+  const c24UpdateSchedule=(updated)=>{
+    c24SaveSchedules(c24Schedules.map((s)=>s.id===updated.id?{...updated,openDone:false,closeDone:false,error:null}:s));
+    c24AddLog(`✏ 스케줄 수정: #${updated.productNo} ${updated.productName}`);
+    setC24EditSchedule(null);
+  };
   const c24CheckSchedules=useCallback(async()=>{
     // 토큰 만료 10분 전이면 자동 갱신
     if(c24Expiry&&c24Expiry-Date.now()<600000&&c24Expiry>Date.now()){
@@ -2683,7 +2689,21 @@ function Board() {
             {c24Schedules.length>0&&(()=>{
               const now=new Date();
               const actionLabel={soldout:"품절처리",hide:"진열+판매중지",selling_off:"판매중지"};
-              const fmtDt=(dt)=>dt?new Date(dt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",weekday:"short",hour:"2-digit",minute:"2-digit"}):"";
+              const fmtDt=(dt)=>{
+                if(!dt)return"없음";
+                const d=new Date(dt);
+                return d.toLocaleString("ko-KR",{month:"numeric",day:"numeric",weekday:"short",hour:"2-digit",minute:"2-digit"});
+              };
+              const timeLeft=(dt)=>{
+                if(!dt)return null;
+                const diff=new Date(dt)-now;
+                if(diff<0)return null;
+                const h=Math.floor(diff/3600000);
+                const m=Math.floor((diff%3600000)/60000);
+                if(h>24)return `${Math.floor(h/24)}일 후`;
+                if(h>0)return `${h}시간 ${m}분 후`;
+                return `${m}분 후`;
+              };
               const getPhase=(s)=>{
                 if(s.error)return"error";
                 if(s.openDone&&s.closeDone)return"done";
@@ -2727,6 +2747,7 @@ function Board() {
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                       <span style={{background:ps.badge,color:ps.badgeColor,borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:800}}>{ps.icon} {ps.label}</span>
+                      {canEdit&&<button className="riedit" style={{color:"#0C66E4",borderColor:"#0C66E4"}} onClick={()=>setC24EditSchedule({...s})}>수정</button>}
                       <button className="riedit" style={{color:"var(--danger)"}} onClick={()=>c24DeleteSchedule(s.id)}>삭제</button>
                     </div>
                   </div>
@@ -2735,16 +2756,18 @@ function Board() {
                     {/* 오픈 */}
                     <div style={{background:s.openDone?"#0C66E4":"rgba(0,0,0,.05)",borderRadius:8,padding:"10px 14px"}}>
                       <div style={{fontSize:10,fontWeight:700,color:s.openDone?"#fff":"var(--ink3)",marginBottom:3}}>🟢 오픈</div>
-                      <div style={{fontSize:13,fontWeight:700,color:s.openDone?"#fff":"var(--ink1)"}}>{s.openAt?fmtDt(s.openAt):"없음"}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:s.openDone?"#fff":"var(--ink1)"}}>{fmtDt(s.openAt)}</div>
                       {s.openDone&&<div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>✔ 완료됨</div>}
+                      {!s.openDone&&s.openAt&&timeLeft(s.openAt)&&<div style={{fontSize:11,color:"#0C66E4",fontWeight:700,marginTop:3}}>{timeLeft(s.openAt)}</div>}
                     </div>
-                    {/* 화살표 + 진행률 */}
+                    {/* 화살표 */}
                     <div style={{textAlign:"center",color:"var(--ink3)",fontSize:18}}>→</div>
                     {/* 종료 */}
                     <div style={{background:s.closeDone?"#1F845A":s.closeAt?"rgba(0,0,0,.05)":"transparent",borderRadius:8,padding:"10px 14px"}}>
                       <div style={{fontSize:10,fontWeight:700,color:s.closeDone?"#fff":"var(--ink3)",marginBottom:3}}>🔴 종료</div>
-                      <div style={{fontSize:13,fontWeight:700,color:s.closeDone?"#fff":"var(--ink1)"}}>{s.closeAt?fmtDt(s.closeAt):"없음"}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:s.closeDone?"#fff":"var(--ink1)"}}>{fmtDt(s.closeAt)}</div>
                       {s.closeDone&&<div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>✔ 완료됨</div>}
+                      {!s.closeDone&&s.closeAt&&timeLeft(s.closeAt)&&<div style={{fontSize:11,color:"#1F845A",fontWeight:700,marginTop:3}}>{timeLeft(s.closeAt)}</div>}
                     </div>
                   </div>
                   {/* 진행 바 */}
@@ -2765,6 +2788,52 @@ function Board() {
               });
             })()}
           </div>
+          {/* 수정 모달 */}
+          {c24EditSchedule&&(
+            <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setC24EditSchedule(null)}>
+              <div className="modal" style={{maxWidth:480}} onClick={(e)=>e.stopPropagation()}>
+                <div className="modal-head"><h3>스케줄 수정</h3><button className="x" onClick={()=>setC24EditSchedule(null)}>×</button></div>
+                <div className="modal-body">
+                  <div style={{fontSize:13,fontWeight:700,color:"#0C66E4",marginBottom:14}}>#{c24EditSchedule.productNo} · {c24EditSchedule.productName}</div>
+                  <div className="r3" style={{marginBottom:12}}>
+                    <div className="fld"><label>오픈 일시</label><input type="datetime-local" value={c24EditSchedule.openAt||""} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,openAt:e.target.value||null})} /></div>
+                    <div className="fld"><label>종료 일시</label><input type="datetime-local" value={c24EditSchedule.closeAt||""} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAt:e.target.value||null})} /></div>
+                    <div className="fld"><label>종료 시 처리</label>
+                      <select value={c24EditSchedule.closeAction} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAction:e.target.value})}>
+                        <option value="soldout">품절처리 (판매중지)</option>
+                        <option value="hide">진열+판매 중지</option>
+                        <option value="selling_off">판매만 중지</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="r3">
+                    <div className="fld"><label>오픈 시 판매상태</label>
+                      <select value={c24EditSchedule.openSelling} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,openSelling:e.target.value})}>
+                        <option value="T">판매함</option>
+                        <option value="F">판매안함</option>
+                      </select>
+                    </div>
+                    <div className="fld"><label>오픈 시 진열상태</label>
+                      <select value={c24EditSchedule.openDisplay} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,openDisplay:e.target.value})}>
+                        <option value="T">진열함</option>
+                        <option value="F">진열안함</option>
+                      </select>
+                    </div>
+                    <div className="fld" />
+                  </div>
+                  <div style={{marginTop:12,padding:"10px 12px",background:"#FFF8E1",borderRadius:8,fontSize:12,color:"#7A5F00"}}>
+                    ⚠ 수정하면 오픈·종료 완료 상태가 초기화되어 다시 실행됩니다.
+                  </div>
+                </div>
+                <div className="modal-foot">
+                  <span className="spacer" />
+                  <button className="btn ghost" onClick={()=>setC24EditSchedule(null)}>취소</button>
+                  <button className="btn-save" onClick={()=>c24UpdateSchedule(c24EditSchedule)}>저장</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 로그 */}
           <div className="panel">
             <h3 style={{marginBottom:10}}>📟 실행 로그</h3>
