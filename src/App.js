@@ -50,6 +50,36 @@ const REPEATS = [{ id:"none",label:"반복 없음" },{ id:"daily",label:"매일"
 const ROLES = [{ id:"admin",label:"관리자" },{ id:"member",label:"멤버" },{ id:"viewer",label:"뷰어" }];
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+function IssueInput({planId,onAdd}){
+  const [text,setText]=React.useState("");
+  const [images,setImages]=React.useState([]);
+  const [open,setOpen]=React.useState(false);
+  const addImg=async(file)=>{const b64=await resizeImage(file,800,800,0.8);setImages((p)=>[...p,b64]);};
+  if(!open)return<button style={{marginTop:6,background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setOpen(true)}>+ 이슈 등록</button>;
+  return(
+    <div style={{marginTop:8,background:"#FFF8E1",border:"1px solid #F7B731",borderRadius:8,padding:"10px 12px"}}>
+      <div style={{fontSize:12,fontWeight:700,color:"#7A5F00",marginBottom:6}}>⚠ 이슈 내용</div>
+      <textarea value={text} onChange={(e)=>setText(e.target.value)} placeholder={"이슈 내용 입력\n(Shift+Enter 줄바꿈)"}
+        style={{width:"100%",minHeight:72,border:"1px solid var(--line2)",borderRadius:6,padding:"7px 10px",fontSize:13,resize:"vertical",fontFamily:"inherit"}}
+        onPaste={async(e)=>{const items=Array.from(e.clipboardData.items||[]);const img=items.find((i)=>i.type.startsWith("image/"));if(!img)return;e.preventDefault();await addImg(img.getAsFile());}} />
+      {images.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>{images.map((src,i)=>(
+        <div key={i} style={{position:"relative"}}><img src={src} alt="" style={{width:72,height:54,objectFit:"cover",borderRadius:5}} />
+          <button onClick={()=>setImages((p)=>p.filter((_,j)=>j!==i))} style={{position:"absolute",top:1,right:1,background:"rgba(0,0,0,.6)",color:"#fff",border:"none",borderRadius:"50%",width:16,height:16,cursor:"pointer",fontSize:10,padding:0}}>×</button>
+        </div>
+      ))}</div>}
+      <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
+        <label style={{fontSize:12,color:"#0C66E4",fontWeight:700,cursor:"pointer",border:"1px solid #0C66E4",borderRadius:6,padding:"4px 10px"}}>
+          📎 이미지 추가<input type="file" accept="image/*" multiple style={{display:"none"}} onChange={async(e)=>{for(const f of Array.from(e.target.files))await addImg(f);e.target.value="";}} />
+        </label>
+        <span style={{fontSize:11,color:"var(--ink3)"}}>Ctrl+V 붙여넣기 가능</span>
+        <span style={{flex:1}} />
+        <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer"}} onClick={()=>{setOpen(false);setText("");setImages([]);}}>취소</button>
+        <button className="btn-save" style={{fontSize:12,padding:"4px 14px"}} onClick={()=>{if(!text.trim()&&!images.length)return;onAdd(planId,text,images);setText("");setImages([]);setOpen(false);}}>등록</button>
+      </div>
+    </div>
+  );
+}
 const resizeImage=(file,maxW=800,maxH=800,quality=0.75)=>new Promise((resolve)=>{
   const reader=new FileReader();
   reader.onload=(e)=>{
@@ -71,7 +101,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -494,6 +524,34 @@ const CSS = `
 .riedit{background:#EBECF0;border:none;color:var(--ink2);font-size:11.5px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:6px;}
 .riedit:hover{background:#DFE1E6;}
 
+/* ══ 재고관리 ══ */
+.stock-tabs{display:flex;gap:0;border-bottom:2px solid var(--line);margin-bottom:16px;}
+.stock-tab{padding:8px 22px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;color:var(--ink3);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;}
+.stock-tab.on{color:#0C66E4;border-bottom-color:#0C66E4;}
+.stock-table{width:100%;border-collapse:collapse;font-size:13px;}
+.stock-table th{background:#F4F5F7;font-weight:700;padding:10px 12px;text-align:left;border-bottom:2px solid var(--line);white-space:nowrap;}
+.stock-table td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle;}
+.stock-table tr:hover td{background:#F8F9FC;}
+.stock-row-alert td:first-child{border-left:4px solid #CA3521;}
+.stock-row-alert{background:#FFFBF9;}
+.stock-badge-alert{background:#FFECEB;color:#CA3521;border:1px solid #CA3521;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:800;white-space:nowrap;}
+.stock-badge-ok{background:#DCFFF1;color:#1F845A;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;}
+.stock-safe-input{width:70px;border:1px solid var(--line2);border-radius:6px;padding:4px 7px;font-size:12px;text-align:right;}
+.stock-safe-input:focus{border-color:#0C66E4;outline:none;}
+.stock-upload-zone{border:2.5px dashed var(--line2);border-radius:10px;padding:32px;text-align:center;cursor:pointer;color:var(--ink3);transition:all .15s;}
+.stock-upload-zone:hover{border-color:#0C66E4;background:#E9F2FF;color:#0C66E4;}
+.stock-delta-up{color:#CA3521;font-weight:700;}
+.stock-delta-down{color:#1F845A;font-weight:700;}
+.stock-delta-zero{color:var(--ink3);}
+.reorder-card{border:1.5px solid #CA3521;background:#FFECEB;border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.inbound-card{border-radius:10px;padding:14px 16px;margin-bottom:10px;border:1.5px solid var(--line);}
+.inbound-step{display:flex;align-items:center;gap:0;margin-bottom:10px;}
+.inbound-step-btn{padding:5px 14px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink3);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;}
+.inbound-step-btn:first-child{border-radius:7px 0 0 7px;}
+.inbound-step-btn:last-child{border-radius:0 7px 7px 0;}
+.inbound-step-btn.on{background:#0C66E4;color:#fff;border-color:#0C66E4;}
+.inbound-step-btn.done{background:#1F845A;color:#fff;border-color:#1F845A;}
+.inbound-step-btn.issue{background:#CA3521;color:#fff;border-color:#CA3521;}
 /* ══ 래퍼런스 ══ */
 .refgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
 .refcard{background:var(--card);border-radius:10px;box-shadow:var(--sh);overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s;position:relative;}
@@ -672,7 +730,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -1356,6 +1414,76 @@ function Board() {
     imgs.forEach((src)=>setRefDraft((d)=>({...d,images:[...(d?.images||[]),{id:uid(),src}]})));
   };
 
+  /* ── 재고관리 ── */
+  const [stockTab, setStockTab] = useState("naver");
+  const [stockSafeEdit, setStockSafeEdit] = useState({});
+  const [inboundModal, setInboundModal] = useState(null); // 입고 예정 등록/수정 모달
+  const [inboundDraft, setInboundDraft] = useState(null);
+  const INBOUND_STEPS=["입고 준비 중","입고중","재고 확인 중","입고 완료"];
+  const stockItems=useMemo(()=>(data.stockData||{})[stockTab]||[],[data.stockData,stockTab]);
+  const stockSafe=useMemo(()=>data.stockSafe||{},[data.stockSafe]);
+  const reorderRequests=useMemo(()=>(data.reorderRequests||[]).filter((r)=>!r.done),[data.reorderRequests]);
+  const inboundPlans=useMemo(()=>(data.inboundPlans||[]).filter((p)=>!p.deleted),[data.inboundPlans]);
+  const activeInbounds=useMemo(()=>inboundPlans.filter((p)=>p.status!=="입고 완료"),[inboundPlans]);
+  const addInboundPlan=(plan)=>{commit((d)=>({...d,inboundPlans:[...(d.inboundPlans||[]),{...plan,id:uid(),createdAt:Date.now(),createdBy:me||"익명",logs:[{ts:Date.now(),text:"입고 예정 등록",by:me||"익명"}]}],updatedAt:Date.now()}),[]);};
+  const updateInboundPlan=(id,patch)=>{commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,...patch,updatedAt:Date.now()}:p),updatedAt:Date.now()}),[]);};
+  const deleteInboundPlan=(id)=>{commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,deleted:true}:p),updatedAt:Date.now()}),[]);};
+  const changeInboundStatus=(id,status)=>{
+    commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,status,logs:[...(p.logs||[]),{ts:Date.now(),text:`상태 변경: ${status}`,by:me||"익명"}],updatedAt:Date.now()}:p),updatedAt:Date.now()}),[]);
+  };
+  const addInboundIssue=(id,text,images=[])=>{
+    const issue={id:uid(),text,images,ts:Date.now(),by:me||"익명",resolved:false};
+    commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,issues:[...(p.issues||[]),issue],updatedAt:Date.now()}:p),updatedAt:Date.now()}),[]);
+  };
+  // 평일 기준 일별 소진율 계산 (주말 제외)
+  const calcDailyRate=(rows)=>{
+    if(rows.length<2)return null;
+    const sorted=[...rows].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    const latest=sorted[sorted.length-1];const prev=sorted[sorted.length-2];
+    const d1=new Date(prev.date);const d2=new Date(latest.date);
+    let weekdays=0;let cur=new Date(d1);
+    while(cur<=d2){const dow=cur.getDay();if(dow!==0&&dow!==6)weekdays++;cur.setDate(cur.getDate()+1);}
+    if(weekdays<1)weekdays=1;
+    return Math.round((prev.stock-latest.stock)/weekdays);
+  };
+  const parseStockExcel=async(file,channel)=>{
+    const XLSX=await import('xlsx');
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{defval:""});
+    // ── 파일 받으면 여기서 컬럼명 맞춤 ──
+    const today=todayStr();
+    const items=rows.map((r)=>({
+      id:r['상품코드']||r['SKU']||r['product_code']||String(Math.random()),
+      name:r['상품명']||r['name']||r['상품 이름']||"",
+      sku:r['상품코드']||r['SKU']||"",
+      stock:parseInt(r['현재고']||r['재고수량']||r['stock']||0,10),
+      date:today,
+    }));
+    // 기존 히스토리에 오늘 데이터 병합
+    const existing=(data.stockData||{})[channel]||[];
+    const merged=[...existing.filter((r)=>r.date!==today),...items.map((item)=>{
+      const hist=existing.filter((r)=>r.id===item.id);
+      return {...item,history:[...hist.map((h)=>({date:h.date,stock:h.stock})),{date:today,stock:item.stock}].slice(-30)};
+    })];
+    commit((d)=>({...d,stockData:{...(d.stockData||{}),naver:channel==="naver"?merged:(d.stockData||{}).naver||[],coupang:channel==="coupang"?merged:(d.stockData||{}).coupang||[]},updatedAt:Date.now()}),[]);
+    // 안전재고 미달 항목 자동 입고요청 생성
+    const alerts=items.filter((item)=>{
+      const safe=stockSafe[`${channel}_${item.id}`];
+      return safe&&item.stock<safe;
+    });
+    if(alerts.length){
+      const newRequests=alerts.map((item)=>({id:uid(),channel,productName:item.name,sku:item.sku,currentStock:item.stock,safeStock:stockSafe[`${channel}_${item.id}`],createdAt:Date.now(),done:false}));
+      commit((d)=>({...d,reorderRequests:[...(d.reorderRequests||[]).filter((r)=>!alerts.some((a)=>r.sku===a.sku&&r.channel===channel)),...newRequests],updatedAt:Date.now()}),[]);
+    }
+  };
+  const saveSafeStock=(channel,itemId,val)=>{
+    const key=`${channel}_${itemId}`;
+    commit((d)=>({...d,stockSafe:{...(d.stockSafe||{}),[key]:parseInt(val,10)||0},updatedAt:Date.now()}),[]);
+  };
+  const doneReorder=(id)=>{commit((d)=>({...d,reorderRequests:(d.reorderRequests||[]).map((r)=>r.id===id?{...r,done:true}:r),updatedAt:Date.now()}),[]);};
+
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
@@ -1545,7 +1673,7 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"mindmap",label:"마인드맵",n:null},{id:"ref",label:"래퍼런스",n:null},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"cafe24",label:"상품스케줄",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"mindmap",label:"마인드맵",n:null},{id:"ref",label:"래퍼런스",n:null},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"cafe24",label:"상품스케줄",n:null},{id:"stock",label:"재고관리",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -2602,6 +2730,248 @@ function Board() {
         <div><div className="panel"><h3>변경 이력</h3><p className="sub">최근 {LOG_CAP}건까지 남습니다.</p></div>
           {(data.log||[]).length===0&&<div className="empty">기록이 없습니다</div>}
           {(data.log||[]).map((e)=><div key={e.id} className="logrow"><span className="t">{fmtTs(e.ts)}</span><span className="w">{e.who}</span><span><b style={{fontWeight:600}}>{e.action}</b>{e.taskTitle&&<span style={{color:"#565C64"}}> · {e.taskTitle}</span>}{e.detail&&<span style={{fontSize:10.5,color:"#8F959C"}}> — {e.detail}</span>}</span></div>)}
+        </div>
+      )}
+
+      {view==="stock"&&(
+        <div>
+          {/* 입고 예정 패널 */}
+          <div className="panel" style={{marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:activeInbounds.length>0?12:0}}>
+              <h3 style={{margin:0}}>📦 입고 예정 {activeInbounds.length>0&&<span style={{fontSize:12,color:"#0C66E4",fontWeight:400}}>({activeInbounds.length}건 진행중)</span>}</h3>
+              {canEdit&&<button className="btn-save" style={{fontSize:12,padding:"5px 14px"}} onClick={()=>{setInboundDraft({productName:"",sku:"",channel:"naver",expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고 등록</button>}
+            </div>
+            {activeInbounds.length===0&&<div style={{fontSize:13,color:"var(--ink3)"}}>진행 중인 입고 예정이 없습니다</div>}
+            {activeInbounds.map((p)=>{
+              const stepIdx=INBOUND_STEPS.indexOf(p.status);
+              const hasIssue=(p.issues||[]).some((i)=>!i.resolved);
+              return(
+              <div key={p.id} className="inbound-card" style={{borderColor:hasIssue?"#CA3521":stepIdx===3?"#1F845A":"var(--line)",background:hasIssue?"#FFFBF9":stepIdx===3?"#F0FFF8":"var(--bg)"}}>
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
+                  <div>
+                    <div style={{fontWeight:800,fontSize:14}}>{p.productName}</div>
+                    <div style={{fontSize:12,color:"var(--ink3)",marginTop:3,display:"flex",gap:12}}>
+                      <span>{p.channel==="naver"?"🟢 네이버":"🔵 쿠팡"}</span>
+                      {p.sku&&<span>SKU: {p.sku}</span>}
+                      {p.qty&&<span>수량: <b>{p.qty}</b>개</span>}
+                      {p.expectedDate&&<span>예정일: <b>{p.expectedDate}</b></span>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    {canEdit&&<button className="riedit" onClick={()=>{setInboundDraft({...p});setInboundModal("edit");}}>수정</button>}
+                    {canEdit&&<button className="riedit" style={{color:"var(--danger)"}} onClick={()=>{if(window.confirm("삭제할까요?"))deleteInboundPlan(p.id);}}>삭제</button>}
+                  </div>
+                </div>
+                {/* 상태 단계 버튼 */}
+                <div className="inbound-step">
+                  {INBOUND_STEPS.map((step,i)=>(
+                    <button key={step} className={"inbound-step-btn"+(i<stepIdx?" done":i===stepIdx?" on":"")}
+                      onClick={()=>canEdit&&changeInboundStatus(p.id,step)}>
+                      {i<stepIdx?"✔ ":""}{step}
+                    </button>
+                  ))}
+                </div>
+                {/* 이슈 목록 */}
+                {(p.issues||[]).filter((i)=>!i.resolved).map((iss)=>(
+                  <div key={iss.id} style={{background:"#FFECEB",border:"1px solid #CA3521",borderRadius:7,padding:"8px 12px",marginTop:8,fontSize:12}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{fontWeight:700,color:"#CA3521"}}>⚠ 이슈</span>
+                      <div style={{display:"flex",gap:8,color:"var(--ink3)"}}>
+                        <span>{new Date(iss.ts).toLocaleDateString("ko-KR")} · {iss.by}</span>
+                        {canEdit&&<button style={{background:"none",border:"none",color:"#1F845A",fontSize:11,cursor:"pointer",fontWeight:700}} onClick={()=>updateInboundPlan(p.id,{issues:(p.issues||[]).map((x)=>x.id===iss.id?{...x,resolved:true}:x)})}>해결</button>}
+                      </div>
+                    </div>
+                    <div style={{whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{iss.text}</div>
+                    {(iss.images||[]).length>0&&(
+                      <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+                        {iss.images.map((img,idx)=>(
+                          <img key={idx} src={img} alt="" style={{width:80,height:60,objectFit:"cover",borderRadius:5,cursor:"pointer"}} onClick={()=>setLightbox(img)} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {/* 이슈 입력 */}
+                {canEdit&&<IssueInput planId={p.id} onAdd={addInboundIssue} />}
+              </div>);
+            })}
+          </div>
+            <div className="panel" style={{marginBottom:14,borderLeft:"4px solid #CA3521"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <h3 style={{color:"#CA3521",margin:0}}>🚨 입고 요청 ({reorderRequests.length}건)</h3>
+              </div>
+              {reorderRequests.map((r)=>(
+                <div key={r.id} className="reorder-card">
+                  <div>
+                    <div style={{fontWeight:800,fontSize:13}}>{r.productName}</div>
+                    <div style={{fontSize:11.5,color:"var(--ink3)",marginTop:3}}>
+                      <span style={{marginRight:10}}>{r.channel==="naver"?"네이버":"쿠팡"}</span>
+                      <span style={{marginRight:10}}>SKU: {r.sku}</span>
+                      현재고 <b style={{color:"#CA3521"}}>{r.currentStock.toLocaleString()}</b> / 안전재고 <b>{r.safeStock.toLocaleString()}</b>
+                    </div>
+                  </div>
+                  <button className="btn ghost" style={{fontSize:12,flexShrink:0}} onClick={()=>doneReorder(r.id)}>✔ 처리완료</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {reorderRequests.length===0&&(
+            <div className="panel" style={{marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:20}}>✅</span>
+              <span style={{fontSize:13,color:"var(--ok)",fontWeight:700}}>입고 요청 없음 — 모든 상품이 안전재고 이상입니다</span>
+            </div>
+          )}
+
+          {/* 채널 탭 */}
+          <div className="panel">
+            <div className="stock-tabs">
+              {["naver","coupang"].map((ch)=>(
+                <button key={ch} className={"stock-tab"+(stockTab===ch?" on":"")} onClick={()=>setStockTab(ch)}>
+                  {ch==="naver"?"🟢 네이버":"🔵 쿠팡"}
+                  <span style={{marginLeft:6,fontSize:11,fontWeight:400,color:"var(--ink3)"}}>
+                    {((data.stockData||{})[ch]||[]).length>0&&`${((data.stockData||{})[ch]||[]).length}개 상품`}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* 엑셀 업로드 */}
+            <div style={{marginBottom:14}}>
+              <label className="stock-upload-zone" style={{display:"block"}}>
+                <div style={{fontSize:24,marginBottom:6}}>📊</div>
+                <div style={{fontWeight:700,marginBottom:4}}>{stockTab==="naver"?"네이버":"쿠팡"} 재고 엑셀 업로드</div>
+                <div style={{fontSize:12}}>엑셀 파일(.xlsx, .xls)을 업로드하면 자동으로 파싱됩니다</div>
+                <input type="file" accept=".xlsx,.xls" style={{display:"none"}}
+                  onChange={async(e)=>{const f=e.target.files?.[0];if(f){await parseStockExcel(f,stockTab);e.target.value="";}}} />
+              </label>
+            </div>
+
+            {/* 재고 테이블 */}
+            {stockItems.length===0
+              ?<div style={{textAlign:"center",padding:40,color:"var(--ink3)"}}>
+                  <div style={{fontSize:32,marginBottom:8}}>📦</div>
+                  <div>엑셀 파일을 업로드하면 재고가 표시됩니다</div>
+                </div>
+              :<div style={{overflowX:"auto"}}>
+                <table className="stock-table">
+                  <thead>
+                    <tr>
+                      <th>상품명</th>
+                      <th>SKU</th>
+                      <th style={{textAlign:"right"}}>현재고</th>
+                      <th style={{textAlign:"right"}}>전일대비</th>
+                      <th style={{textAlign:"right"}}>일평균소진</th>
+                      <th style={{textAlign:"right"}}>예상소진일</th>
+                      <th style={{textAlign:"right"}}>안전재고</th>
+                      <th style={{textAlign:"center"}}>입고 예정일</th>
+                      <th style={{textAlign:"center"}}>상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stockItems.map((item)=>{
+                      const safeKey=`${stockTab}_${item.id}`;
+                      const safe=stockSafe[safeKey]||0;
+                      const isAlert=safe>0&&item.stock<safe;
+                      const hist=item.history||[{date:item.date,stock:item.stock}];
+                      const sorted=[...hist].sort((a,b)=>new Date(a.date)-new Date(b.date));
+                      const prev=sorted.length>=2?sorted[sorted.length-2]:null;
+                      const delta=prev?item.stock-prev.stock:null;
+                      const dailyRate=calcDailyRate(sorted);
+                      const daysLeft=dailyRate&&dailyRate>0?Math.floor(item.stock/dailyRate):null;
+                      return(
+                        <tr key={item.id} className={isAlert?"stock-row-alert":""}>
+                          <td style={{fontWeight:600}}>{item.name}</td>
+                          <td style={{color:"var(--ink3)",fontSize:12}}>{item.sku}</td>
+                          <td style={{textAlign:"right",fontWeight:700,fontSize:14}}>{item.stock.toLocaleString()}</td>
+                          <td style={{textAlign:"right"}}>
+                            {delta===null?<span style={{color:"var(--ink3)"}}>-</span>
+                              :delta>0?<span className="stock-delta-up">▲{Math.abs(delta).toLocaleString()}</span>
+                              :delta<0?<span className="stock-delta-down">▼{Math.abs(delta).toLocaleString()}</span>
+                              :<span className="stock-delta-zero">-</span>}
+                          </td>
+                          <td style={{textAlign:"right",color:"var(--ink3)"}}>
+                            {dailyRate!==null?`${dailyRate.toLocaleString()}개/일`:"-"}
+                          </td>
+                          <td style={{textAlign:"right"}}>
+                            {daysLeft!==null
+                              ?<span style={{fontWeight:700,color:daysLeft<=7?"#CA3521":daysLeft<=14?"#F7B731":"var(--ink1)"}}>
+                                  {daysLeft}일
+                                </span>
+                              :"-"}
+                          </td>
+                          <td style={{textAlign:"right"}}>
+                            <input className="stock-safe-input"
+                              value={stockSafeEdit[safeKey]??safe}
+                              onChange={(e)=>setStockSafeEdit({...stockSafeEdit,[safeKey]:e.target.value})}
+                              onBlur={(e)=>{saveSafeStock(stockTab,item.id,e.target.value);setStockSafeEdit((prev)=>{const n={...prev};delete n[safeKey];return n;});}}
+                              onKeyDown={(e)=>{if(e.key==="Enter")e.target.blur();}}
+                            />
+                          </td>
+                          <td style={{textAlign:"center"}}>
+                            {(()=>{
+                              const plan=inboundPlans.find((p)=>p.sku===item.sku&&p.channel===stockTab&&p.status!=="입고 완료");
+                              if(plan)return<span style={{fontSize:12,color:"#0C66E4",fontWeight:700}}>{plan.expectedDate||"날짜 미정"}<br/><span style={{fontSize:10,color:"var(--ink3)",fontWeight:400}}>{plan.status}</span></span>;
+                              return canEdit?<button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer"}} onClick={()=>{setInboundDraft({productName:item.name,sku:item.sku,channel:stockTab,expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고등록</button>:"-";
+                            })()}
+                          </td>
+                          <td style={{textAlign:"center"}}>
+                            {isAlert
+                              ?<span className="stock-badge-alert">⚠ 입고 요청</span>
+                              :<span className="stock-badge-ok">정상</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div style={{fontSize:11,color:"var(--ink3)",marginTop:8,textAlign:"right"}}>
+                  마지막 업로드: {stockItems[0]?.date||"-"} · 평일 기준 일평균 소진량 계산
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      )}
+
+      {/* 입고 예정 등록/수정 모달 */}
+      {inboundModal&&inboundDraft&&(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setInboundModal(null)}>
+          <div className="modal" style={{maxWidth:480}} onClick={(e)=>e.stopPropagation()}>
+            <div className="modal-head"><h3>{inboundModal==="add"?"입고 예정 등록":"입고 예정 수정"}</h3><button className="x" onClick={()=>setInboundModal(null)}>×</button></div>
+            <div className="modal-body">
+              <div className="r3" style={{marginBottom:10}}>
+                <div className="fld"><label>상품명</label><input value={inboundDraft.productName||""} onChange={(e)=>setInboundDraft({...inboundDraft,productName:e.target.value})} placeholder="상품명" /></div>
+                <div className="fld"><label>SKU/상품코드</label><input value={inboundDraft.sku||""} onChange={(e)=>setInboundDraft({...inboundDraft,sku:e.target.value})} placeholder="P0000BBC" /></div>
+                <div className="fld"><label>채널</label>
+                  <select value={inboundDraft.channel||"naver"} onChange={(e)=>setInboundDraft({...inboundDraft,channel:e.target.value})}>
+                    <option value="naver">네이버</option>
+                    <option value="coupang">쿠팡</option>
+                  </select>
+                </div>
+              </div>
+              <div className="r3" style={{marginBottom:10}}>
+                <div className="fld"><label>입고 예정일</label><input type="date" value={inboundDraft.expectedDate||""} onChange={(e)=>setInboundDraft({...inboundDraft,expectedDate:e.target.value})} /></div>
+                <div className="fld"><label>입고 수량</label><input type="number" value={inboundDraft.qty||""} onChange={(e)=>setInboundDraft({...inboundDraft,qty:e.target.value})} placeholder="0" /></div>
+                <div className="fld"><label>현재 상태</label>
+                  <select value={inboundDraft.status||"입고 준비 중"} onChange={(e)=>setInboundDraft({...inboundDraft,status:e.target.value})}>
+                    {INBOUND_STEPS.map((s)=><option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="fld"><label>메모</label>
+                <textarea value={inboundDraft.memo||""} onChange={(e)=>setInboundDraft({...inboundDraft,memo:e.target.value})} placeholder="공급사 정보, 특이사항 등..." style={{height:70}} />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <span className="spacer" />
+              <button className="btn ghost" onClick={()=>setInboundModal(null)}>취소</button>
+              <button className="btn-save" onClick={()=>{
+                if(inboundModal==="add")addInboundPlan(inboundDraft);
+                else updateInboundPlan(inboundDraft.id,inboundDraft);
+                setInboundModal(null);setInboundDraft(null);
+              }}>저장</button>
+            </div>
+          </div>
         </div>
       )}
 
