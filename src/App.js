@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import * as XLSX from "xlsx";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDvdroHh6ppTDpwC1LdFadgSaKRcz6zudE",
@@ -1447,7 +1448,6 @@ function Board() {
     return Math.round((prev.stock-latest.stock)/weekdays);
   };
   const parseStockExcel=async(file,channel)=>{
-    const XLSX=await import('xlsx');
     const buf=await file.arrayBuffer();
     const wb=XLSX.read(buf,{type:'array'});
     const ws=wb.Sheets[wb.SheetNames[0]];
