@@ -71,7 +71,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -494,6 +494,19 @@ const CSS = `
 .riedit{background:#EBECF0;border:none;color:var(--ink2);font-size:11.5px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:6px;}
 .riedit:hover{background:#DFE1E6;}
 
+/* ══ 래퍼런스 ══ */
+.refgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+.refcard{background:var(--card);border-radius:10px;box-shadow:var(--sh);overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s;position:relative;}
+.refcard:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.13);}
+.refcard.fav{box-shadow:0 0 0 2px #F7B731,0 2px 8px rgba(0,0,0,.1);}
+.refcard img{width:100%;height:140px;object-fit:cover;display:block;}
+.refcard .refbody{padding:10px 12px;}
+.refcard .refcat{font-size:10px;font-weight:800;color:#0C66E4;margin-bottom:4px;text-transform:uppercase;}
+.refcard .reftitle{font-size:13px;font-weight:700;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.refcard .refmemo{font-size:11.5px;color:var(--ink3);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.refcard .reffoot{display:flex;align-items:center;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--ink3);}
+.refpaste{border:2.5px dashed var(--line2);border-radius:10px;padding:28px;text-align:center;color:var(--ink3);font-size:13px;cursor:pointer;transition:border-color .15s,background .15s;}
+.refpaste:hover,.refpaste.active{border-color:#0C66E4;background:#E9F2FF;color:#0C66E4;}
 /* ══ 메모 ══ */
 .memocard{background:var(--card);border-radius:10px;box-shadow:var(--sh);padding:13px 16px;}
 .memocard[draggable=true]{cursor:grab;}
@@ -658,7 +671,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -1309,6 +1322,34 @@ function Board() {
     return()=>clearInterval(c24TimerRef.current);
   },[c24CheckSchedules]);
 
+  /* ── 래퍼런스 ── */
+  const refs=useMemo(()=>(data.refs||[]).filter((r)=>!r.deleted),[data.refs]);
+  const refCats=useMemo(()=>data.refCats||["디자인","마케팅","경쟁사","콘텐츠"],[data.refCats]);
+  const [refCatFilter, setRefCatFilter] = useState("전체");
+  const [refQuery, setRefQuery] = useState("");
+  const [refAddOpen, setRefAddOpen] = useState(false);
+  const [refDraft, setRefDraft] = useState(null);
+  const [refPasteActive, setRefPasteActive] = useState(false);
+  const [refCatEdit, setRefCatEdit] = useState(false);
+  const [refNewCat, setRefNewCat] = useState("");
+  const refFiltered=useMemo(()=>{
+    let list=refs;
+    if(refCatFilter==="즐겨찾기")list=list.filter((r)=>r.fav);
+    else if(refCatFilter!=="전체")list=list.filter((r)=>r.cat===refCatFilter);
+    const q=refQuery.trim().toLowerCase();
+    if(q)list=list.filter((r)=>`${r.title||""} ${r.memo||""} ${r.cat||""}`.toLowerCase().includes(q));
+    return list;
+  },[refs,refCatFilter,refQuery]);
+  const addRef=(item)=>{commit((d)=>({...d,refs:[{...item,id:uid(),createdAt:Date.now(),createdBy:me||"익명"},...(d.refs||[])],updatedAt:Date.now()}),[]);};
+  const updateRef=(id,patch)=>{commit((d)=>({...d,refs:(d.refs||[]).map((r)=>r.id===id?{...r,...patch,updatedAt:Date.now()}:r),updatedAt:Date.now()}),[]);};
+  const deleteRef=(id)=>{commit((d)=>({...d,refs:(d.refs||[]).map((r)=>r.id===id?{...r,deleted:true}:r),updatedAt:Date.now()}),[]);};
+  const addRefCat=(name)=>{const t=name.trim();if(!t||refCats.includes(t))return;commit((d)=>({...d,refCats:[...(d.refCats||[]),t],updatedAt:Date.now()}),[]);};
+  const deleteRefCat=(name)=>{commit((d)=>({...d,refCats:(d.refCats||[]).filter((c)=>c!==name),updatedAt:Date.now()}),[]);};
+  const handleRefImages=async(files)=>{
+    const imgs=await Promise.all(Array.from(files).map((f)=>resizeImage(f,1200,1200,0.85)));
+    imgs.forEach((src)=>setRefDraft((d)=>({...d,images:[...(d?.images||[]),{id:uid(),src}]})));
+  };
+
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
 
@@ -1498,7 +1539,7 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"mindmap",label:"마인드맵",n:null},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"cafe24",label:"상품스케줄",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
+        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"mindmap",label:"마인드맵",n:null},{id:"ref",label:"래퍼런스",n:null},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"cafe24",label:"상품스케줄",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
           <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
         ))}
       </div>
@@ -2129,6 +2170,143 @@ function Board() {
         </div>
         );
       })()}
+
+      {view==="ref"&&(
+        <div>
+          {/* 툴바 */}
+          <div className="panel" style={{marginBottom:12,padding:"12px 16px"}}>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+              <input className="inp" style={{flex:1,minWidth:160}} placeholder="검색..." value={refQuery} onChange={(e)=>setRefQuery(e.target.value)} />
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {["전체","즐겨찾기",...refCats].map((c)=>(
+                  <button key={c} onClick={()=>setRefCatFilter(c)}
+                    style={{padding:"5px 12px",borderRadius:20,border:"1.5px solid",fontSize:12,fontWeight:700,cursor:"pointer",
+                      borderColor:refCatFilter===c?"#0C66E4":"var(--line)",
+                      background:refCatFilter===c?"#0C66E4":"var(--bg)",
+                      color:refCatFilter===c?"#fff":"var(--ink2)"}}>
+                    {c==="즐겨찾기"?"⭐ "+c:c}
+                  </button>
+                ))}
+                <button onClick={()=>setRefCatEdit(!refCatEdit)} style={{padding:"5px 10px",borderRadius:20,border:"1.5px solid var(--line)",fontSize:12,background:"var(--bg)",cursor:"pointer"}}>⚙ 분류</button>
+              </div>
+              {canEdit&&<button className="btn-save" onClick={()=>{setRefDraft({title:"",cat:refCats[0]||"",memo:"",images:[],fav:false});setRefAddOpen(true);}}>+ 추가</button>}
+            </div>
+            {/* 분류 관리 */}
+            {refCatEdit&&(
+              <div style={{marginTop:12,padding:12,background:"var(--bg)",borderRadius:8,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                {refCats.map((c)=>(
+                  <span key={c} style={{display:"inline-flex",alignItems:"center",gap:4,background:"var(--card)",border:"1px solid var(--line)",borderRadius:16,padding:"3px 10px",fontSize:12}}>
+                    {c}
+                    {canEdit&&<button onClick={()=>deleteRefCat(c)} style={{background:"none",border:"none",color:"var(--danger)",cursor:"pointer",fontSize:13,padding:0,lineHeight:1}}>×</button>}
+                  </span>
+                ))}
+                {canEdit&&<div style={{display:"flex",gap:6}}>
+                  <input className="inp" style={{width:100,padding:"4px 8px",fontSize:12}} placeholder="새 분류" value={refNewCat} onChange={(e)=>setRefNewCat(e.target.value)}
+                    onKeyDown={(e)=>{if(e.key==="Enter"&&refNewCat.trim()){addRefCat(refNewCat);setRefNewCat("");}}} />
+                  <button className="btn ghost" style={{fontSize:12,padding:"4px 10px"}} onClick={()=>{addRefCat(refNewCat);setRefNewCat("");}}>추가</button>
+                </div>}
+              </div>
+            )}
+          </div>
+          {/* 붙여넣기 존 */}
+          {canEdit&&(
+            <div className={"refpaste"+(refPasteActive?" active":"")} style={{marginBottom:14}}
+              tabIndex={0}
+              onPaste={async(e)=>{
+                const items=Array.from(e.clipboardData.items||[]);
+                const imgItem=items.find((i)=>i.type.startsWith("image/"));
+                if(!imgItem)return;e.preventDefault();
+                const src=await resizeImage(imgItem.getAsFile(),1200,1200,0.85);
+                setRefDraft({title:"",cat:refCats[0]||"",memo:"",images:[{id:uid(),src}],fav:false});
+                setRefAddOpen(true);
+              }}
+              onDragOver={(e)=>{e.preventDefault();setRefPasteActive(true);}}
+              onDragLeave={()=>setRefPasteActive(false)}
+              onDrop={async(e)=>{e.preventDefault();setRefPasteActive(false);const files=Array.from(e.dataTransfer.files).filter((f)=>f.type.startsWith("image/"));if(!files.length)return;const src=await resizeImage(files[0],1200,1200,0.85);setRefDraft({title:"",cat:refCats[0]||"",memo:"",images:[{id:uid(),src}],fav:false});setRefAddOpen(true);}}>
+              📋 여기에 이미지를 <b>Ctrl+V</b> 붙여넣거나 <b>드래그</b>해서 바로 추가하세요
+            </div>
+          )}
+          {/* 그리드 */}
+          <div className="refgrid">
+            {refFiltered.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",padding:40,color:"var(--ink3)"}}>래퍼런스가 없습니다</div>}
+            {refFiltered.map((r)=>(
+              <div key={r.id} className={"refcard"+(r.fav?" fav":"")} onClick={()=>r.images?.[0]&&setLightbox(r.images[0].src)}>
+                {r.images?.[0]
+                  ?<img src={r.images[0].src} alt={r.title} />
+                  :<div style={{height:140,background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🖼</div>}
+                <div className="refbody">
+                  {r.cat&&<div className="refcat">{r.cat}</div>}
+                  <div className="reftitle">{r.title||"제목 없음"}</div>
+                  {r.memo&&<div className="refmemo">{r.memo}</div>}
+                  <div className="reffoot">
+                    <span>{new Date(r.createdAt).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})}</span>
+                    <div style={{display:"flex",gap:8}} onClick={(e)=>e.stopPropagation()}>
+                      <button style={{background:"none",border:"none",cursor:"pointer",fontSize:16}} onClick={()=>updateRef(r.id,{fav:!r.fav})} title="즐겨찾기">{r.fav?"⭐":"☆"}</button>
+                      {canEdit&&<button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"#0C66E4"}} onClick={()=>{setRefDraft({...r,images:[...(r.images||[])]});setRefAddOpen(true);}}>수정</button>}
+                      {canEdit&&<button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--danger)"}} onClick={()=>{if(window.confirm("삭제할까요?"))deleteRef(r.id);}}>삭제</button>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 추가/수정 모달 */}
+          {refAddOpen&&refDraft&&(
+            <div className="modal-bg" onClick={()=>setRefAddOpen(false)}>
+              <div className="modal" style={{maxWidth:520}} onClick={(e)=>e.stopPropagation()}>
+                <div className="modal-head"><h3>{refDraft.id?"래퍼런스 수정":"래퍼런스 추가"}</h3><button className="x" onClick={()=>setRefAddOpen(false)}>×</button></div>
+                <div className="modal-body">
+                  {/* 이미지 업로드 */}
+                  <div style={{marginBottom:14}}>
+                    <label style={{fontSize:12,fontWeight:700,color:"var(--ink3)",display:"block",marginBottom:6}}>이미지</label>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:8}}>
+                      {(refDraft.images||[]).map((img)=>(
+                        <div key={img.id} style={{position:"relative"}}>
+                          <img src={img.src} alt="" style={{width:90,height:70,objectFit:"cover",borderRadius:7,cursor:"pointer",border:"1px solid var(--line)"}} onClick={()=>setLightbox(img.src)} />
+                          <button onClick={()=>setRefDraft({...refDraft,images:refDraft.images.filter((x)=>x.id!==img.id)})}
+                            style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.6)",color:"#fff",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",fontSize:11,padding:0}}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <label style={{cursor:"pointer",fontSize:12,color:"#0C66E4",fontWeight:700,border:"1px solid #0C66E4",borderRadius:6,padding:"5px 12px"}}>
+                        📁 파일 업로드
+                        <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={(e)=>handleRefImages(e.target.files)} />
+                      </label>
+                      <div className="refpaste" style={{flex:1,padding:"8px 12px",fontSize:12}}
+                        tabIndex={0}
+                        onPaste={async(e)=>{const items=Array.from(e.clipboardData.items||[]);const imgItem=items.find((i)=>i.type.startsWith("image/"));if(!imgItem)return;e.preventDefault();const src=await resizeImage(imgItem.getAsFile(),1200,1200,0.85);setRefDraft((d)=>({...d,images:[...(d.images||[]),{id:uid(),src}]}));}}
+                        >Ctrl+V 붙여넣기</div>
+                    </div>
+                  </div>
+                  <div className="fld" style={{marginBottom:10}}><label>제목</label><input value={refDraft.title||""} onChange={(e)=>setRefDraft({...refDraft,title:e.target.value})} placeholder="래퍼런스 제목" /></div>
+                  <div className="fld" style={{marginBottom:10}}><label>분류</label>
+                    <select value={refDraft.cat||""} onChange={(e)=>setRefDraft({...refDraft,cat:e.target.value})}>
+                      <option value="">분류 없음</option>
+                      {refCats.map((c)=><option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="fld" style={{marginBottom:10}}><label>메모</label><textarea value={refDraft.memo||""} onChange={(e)=>setRefDraft({...refDraft,memo:e.target.value})} placeholder="출처, 참고사항, 활용 아이디어..." style={{height:80}} /></div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <input type="checkbox" id="refFav" checked={!!refDraft.fav} onChange={(e)=>setRefDraft({...refDraft,fav:e.target.checked})} style={{width:"auto"}} />
+                    <label htmlFor="refFav" style={{fontSize:13,cursor:"pointer"}}>⭐ 즐겨찾기</label>
+                  </div>
+                </div>
+                <div className="modal-foot">
+                  <span className="spacer" />
+                  <button className="btn ghost" onClick={()=>setRefAddOpen(false)}>취소</button>
+                  <button className="btn-save" onClick={()=>{
+                    if(refDraft.id){updateRef(refDraft.id,refDraft);}
+                    else{addRef(refDraft);}
+                    setRefAddOpen(false);setRefDraft(null);
+                  }}>저장</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {view==="memo"&&(
         <div>
