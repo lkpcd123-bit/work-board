@@ -3614,36 +3614,65 @@ function Board() {
                 </div>
                 {(ckDraft.subs||[]).length===0&&<span className="hint">하위 체크 항목이 없습니다</span>}
                 {(ckDraft.subs||[]).map((s)=>(
-                  <div key={s.id} draggable
-                    onDragStart={()=>setCkSubDrag(s.id)}
-                    onDragOver={(e)=>e.preventDefault()}
-                    onDrop={()=>{
-                      if(!ckSubDrag||ckSubDrag===s.id)return;
-                      const arr=[...ckDraft.subs];
-                      const fi=arr.findIndex((x)=>x.id===ckSubDrag);
-                      const ti=arr.findIndex((x)=>x.id===s.id);
-                      if(fi<0||ti<0)return;
-                      const [moved]=arr.splice(fi,1);
-                      arr.splice(ti,0,moved);
-                      setCkDraft({...ckDraft,subs:arr});
-                      setCkSubDrag(null);
-                    }}
-                    onDragEnd={()=>setCkSubDrag(null)}
-                    className={"fcitem"+(ckSubDrag===s.id?" dragging":"")} style={{cursor:"grab"}}>
-                    <button className={"fccheck"+(s.done?" on":"")} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"✓":""}</button>
-                    {s.editing
-                      ? <input defaultValue={s.text} autoFocus style={{flex:1,fontSize:13,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 7px"}}
-                          onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"){const v=e.target.value.trim();if(v)setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,editing:false}:x)});}}
-                          onBlur={(e)=>{const v=e.target.value.trim();if(v)setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}} />
-                      : <span style={{flex:1,fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",cursor:"pointer"}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,editing:true}:x)})}>{s.text}</span>}
-                    <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.filter((x)=>x.id!==s.id)})}>×</button>
+                  <div key={s.id}>
+                    <div draggable
+                      onDragStart={()=>setCkSubDrag(s.id)}
+                      onDragOver={(e)=>e.preventDefault()}
+                      onDrop={()=>{
+                        if(!ckSubDrag||ckSubDrag===s.id)return;
+                        const arr=[...ckDraft.subs];
+                        const fi=arr.findIndex((x)=>x.id===ckSubDrag);
+                        const ti=arr.findIndex((x)=>x.id===s.id);
+                        if(fi<0||ti<0)return;
+                        const [moved]=arr.splice(fi,1);
+                        arr.splice(ti,0,moved);
+                        setCkDraft({...ckDraft,subs:arr});
+                        setCkSubDrag(null);
+                      }}
+                      onDragEnd={()=>setCkSubDrag(null)}
+                      className={"fcitem"+(ckSubDrag===s.id?" dragging":"")} style={{cursor:"grab",alignItems:"flex-start"}}>
+                      <button className={"fccheck"+(s.done?" on":"")} style={{marginTop:4,flexShrink:0}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,done:!x.done}:x)})}>{s.done?"✓":""}</button>
+                      {s.editing
+                        ?<textarea defaultValue={s.text} autoFocus
+                            style={{flex:1,fontSize:13,border:"1px solid var(--line2)",borderRadius:6,padding:"5px 8px",resize:"vertical",minHeight:36,fontFamily:"inherit"}}
+                            onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();const v=e.target.value.trim();if(v)setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}if(e.key==="Escape")setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,editing:false}:x)});}}
+                            onBlur={(e)=>{const v=e.target.value.trim();if(v)setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,text:v,editing:false}:x)});}} />
+                        :<span style={{flex:1,fontSize:13,textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit",cursor:"pointer",whiteSpace:"pre-wrap",wordBreak:"break-word",paddingTop:4}}
+                            onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,editing:true}:x)})}>{s.text}</span>}
+                      <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:15,marginTop:2,flexShrink:0}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.filter((x)=>x.id!==s.id)})}>×</button>
+                    </div>
+                    <div style={{marginLeft:32,marginTop:2,marginBottom:6}}>
+                      {(s.subsubs||[]).map((ss)=>(
+                        <div key={ss.id} style={{display:"flex",alignItems:"flex-start",gap:7,padding:"3px 0"}}>
+                          <button className={"fccheck"+(ss.done?" on":"")} style={{marginTop:3,flexShrink:0,width:18,height:18,fontSize:10}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,subsubs:(x.subsubs||[]).map((y)=>y.id===ss.id?{...y,done:!y.done}:y)}:x)})}>{ss.done?"✓":""}</button>
+                          {ss.editing
+                            ?<textarea defaultValue={ss.text} autoFocus
+                                style={{flex:1,fontSize:12,border:"1px solid var(--line2)",borderRadius:5,padding:"3px 7px",resize:"vertical",minHeight:28,fontFamily:"inherit"}}
+                                onKeyDown={(e)=>{if(e.nativeEvent.isComposing)return;if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();const v=e.target.value.trim();if(v){setCkDraft((d)=>({...d,subs:d.subs.map((x)=>x.id===s.id?{...x,subsubs:(x.subsubs||[]).map((y)=>y.id===ss.id?{...y,text:v,editing:false}:y)}:x)})  );}}if(e.key==="Escape"){setCkDraft((d)=>({...d,subs:d.subs.map((x)=>x.id===s.id?{...x,subsubs:(x.subsubs||[]).map((y)=>y.id===ss.id?{...y,editing:false}:y)}:x)}));}}}
+                                onBlur={(e)=>{const v=e.target.value.trim();if(v)setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,subsubs:(x.subsubs||[]).map((y)=>y.id===ss.id?{...y,text:v,editing:false}:y)}:x)});}}/>
+                            :<span style={{flex:1,fontSize:12,textDecoration:ss.done?"line-through":"none",color:ss.done?"var(--ink3)":"inherit",cursor:"pointer",whiteSpace:"pre-wrap",wordBreak:"break-word",paddingTop:3}}
+                                onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,subsubs:(x.subsubs||[]).map((y)=>y.id===ss.id?{...y,editing:true}:y)}:x)})}>{ss.text}</span>}
+                          <button style={{background:"none",border:"none",color:"var(--ink3)",cursor:"pointer",fontSize:13,marginTop:2,flexShrink:0}} onClick={()=>setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,subsubs:(x.subsubs||[]).filter((y)=>y.id!==ss.id)}:x)})}>×</button>
+                        </div>
+                      ))}
+                      <textarea className="hinput" style={{fontSize:12,minHeight:28}}
+                        placeholder="하위 항목 추가 (Enter, Shift+Enter 줄바꿈)"
+                        onKeyDown={(e)=>{
+                          if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;
+                          e.preventDefault();
+                          const v=e.target.value.trim();if(!v)return;
+                          setCkDraft({...ckDraft,subs:ckDraft.subs.map((x)=>x.id===s.id?{...x,subsubs:[...(x.subsubs||[]),{id:uid(),text:v,done:false}]}:x)});
+                          e.target.value="";
+                        }} />
+                    </div>
                   </div>
                 ))}
                 <div className="addrow">
-                  <input placeholder="체크 항목 입력 후 Enter" onKeyDown={(e)=>{
-                    if(e.nativeEvent.isComposing||e.key!=="Enter")return;
+                  <textarea className="hinput" placeholder="체크 항목 입력 (Enter 추가, Shift+Enter 줄바꿈)" onKeyDown={(e)=>{
+                    if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;
+                    e.preventDefault();
                     const v=e.target.value.trim();if(!v)return;
-                    setCkDraft({...ckDraft,subs:[...(ckDraft.subs||[]),{id:uid(),text:v,done:false}]});e.target.value="";
+                    setCkDraft({...ckDraft,subs:[...(ckDraft.subs||[]),{id:uid(),text:v,done:false,subsubs:[]}]});e.target.value="";
                   }} />
                 </div>
               </div>
