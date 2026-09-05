@@ -321,7 +321,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -915,27 +915,16 @@ function Board() {
   const [c24EditSchedule, setC24EditSchedule] = useState(null);
   const [c24SubTab, setC24SubTab] = useState('schedule');
   // 상품 편집기
-  const [edProduct, setEdProduct] = useState(null);
-  const [edCode, setEdCode] = useState('');
-  const [edDraft, setEdDraft] = useState(null);
+  const [edCat, setEdCat] = useState('보틀'); // 현재 선택 분류
+  const [edSelCode, setEdSelCode] = useState(null); // 선택된 상품코드
+  const [edProduct, setEdProduct] = useState(null); // 불러온 상품 상세
+  const [edDraft, setEdDraft] = useState(null); // 편집 중인 draft
   const [edLoading, setEdLoading] = useState(false);
   const [edMsg, setEdMsg] = useState('');
-  // 이벤트 관리
-  const [evProduct, setEvProduct] = useState(null);
-  const [evCode, setEvCode] = useState('');
-  const [evImage, setEvImage] = useState(null); // {base64, name, preview}
-  const [evBackup, setEvBackup] = useState(null); // {productNo, originalDesc}
-  const [evLoading, setEvLoading] = useState(false);
-  const [evMsg, setEvMsg] = useState('');
-  // 유튜브 관리
-  const [ytProduct, setYtProduct] = useState(null);
-  const [ytCode, setYtCode] = useState('');
-  const [ytUrl, setYtUrl] = useState('');
-  const [ytTitle, setYtTitle] = useState('');
-  const [ytDate, setYtDate] = useState('');
-  const [ytBackup, setYtBackup] = useState(null);
-  const [ytLoading, setYtLoading] = useState(false);
-  const [ytMsg, setYtMsg] = useState('');
+  const [edDescView, setEdDescView] = useState('html'); // 'html' | 'preview'
+  const [edAddCode, setEdAddCode] = useState('');
+  const [edAddName, setEdAddName] = useState('');
+  const ED_CATS = ['보틀','대용량','파우치'];
   const c24TimerRef = useRef(null);
   const c24TokenRef = useRef('');
   const [mmId, setMmId] = useState(null);
@@ -1017,7 +1006,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]}}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -3410,7 +3399,7 @@ function Board() {
 
           {/* 서브탭 */}
           <div style={{display:"flex",gap:0,borderBottom:"2px solid var(--line)",marginBottom:0}}>
-            {[{id:"schedule",label:"📅 스케줄"},{id:"editor",label:"✏️ 상품 편집기"},{id:"event",label:"🎉 이벤트 관리"},{id:"youtube",label:"📹 유튜브 관리"}].map((t)=>(
+            {[{id:"schedule",label:"📅 스케줄"},{id:"editor",label:"✏️ 상품 편집기"}].map((t)=>(
               <button key={t.id} onClick={()=>setC24SubTab(t.id)}
                 style={{padding:"10px 18px",border:"none",cursor:"pointer",fontSize:13,fontWeight:c24SubTab===t.id?800:500,
                   background:"none",color:c24SubTab===t.id?"#0C66E4":"var(--ink3)",
@@ -3648,180 +3637,121 @@ function Board() {
 
         {/* ── 상품 편집기 ─────────────────────────────── */}
         {c24SubTab==="editor"&&(
-          <div className="panel">
-            <h3 style={{marginBottom:14}}>✏️ 상품 편집기</h3>
-            {edMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:edMsg.startsWith("✅")?"#DCFFF1":"#FFECEB",color:edMsg.startsWith("✅")?"#1F845A":"#CA3521",fontSize:13,marginBottom:12}}>{edMsg}</div>}
-            {/* 검색 */}
-            <div style={{display:"flex",gap:8,marginBottom:14}}>
-              <input className="inp" style={{flex:1}} placeholder="상품코드 입력 (예: P0000BBC)" value={edCode} onChange={(e)=>setEdCode(e.target.value)}
-                onKeyDown={(e)=>{if(e.key==="Enter")document.getElementById("edSearchBtn").click();}} />
-              <button id="edSearchBtn" className="btn-save" disabled={edLoading} onClick={async()=>{
-                if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
-                setEdLoading(true);setEdMsg('');
-                const p=await c24SearchByCode(edCode.trim());
-                if(p){
-                  const detail=await c24GetProduct(p.product_no);
-                  setEdProduct(detail||p);
-                  setEdDraft({product_name:detail?.product_name||p.product_name,price:detail?.price||p.price,selling:detail?.selling||p.selling,display:detail?.display||p.display,description:detail?.description||''});
-                  setEdMsg('');
-                }else setEdMsg("❌ 상품을 찾을 수 없습니다");
-                setEdLoading(false);
-              }}>{edLoading?"검색중...":"검색"}</button>
+          <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+            {/* 왼쪽: 분류+상품 목록 */}
+            <div style={{width:240,flexShrink:0}}>
+              {/* 분류 탭 */}
+              <div style={{display:"flex",gap:0,marginBottom:12,borderBottom:"2px solid var(--line)"}}>
+                {ED_CATS.map((cat)=>(
+                  <button key={cat} onClick={()=>{setEdCat(cat);setEdSelCode(null);setEdProduct(null);setEdDraft(null);setEdMsg('');}}
+                    style={{flex:1,padding:"8px 0",border:"none",cursor:"pointer",fontSize:12,fontWeight:edCat===cat?800:500,
+                      background:"none",color:edCat===cat?"#0C66E4":"var(--ink3)",
+                      borderBottom:edCat===cat?"3px solid #0C66E4":"3px solid transparent",marginBottom:-2}}>
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              {/* 상품 목록 */}
+              <div style={{marginBottom:10}}>
+                {((data.edProducts||{})[edCat]||[]).map((p)=>(
+                  <div key={p.code} onClick={async()=>{
+                    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
+                    setEdSelCode(p.code);setEdProduct(null);setEdDraft(null);setEdMsg('불러오는 중...');setEdLoading(true);
+                    const found=await c24SearchByCode(p.code);
+                    if(found){
+                      const detail=await c24GetProduct(found.product_no);
+                      const prod=detail||found;
+                      setEdProduct(prod);
+                      setEdDraft({product_name:prod.product_name||'',summary_description:prod.summary_description||'',simple_description:prod.simple_description||'',description:prod.description||''});
+                      setEdMsg('');
+                    }else setEdMsg("❌ "+p.code+" 조회 실패");
+                    setEdLoading(false);
+                  }}
+                    style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:8,cursor:"pointer",marginBottom:4,
+                      border:"1.5px solid",borderColor:edSelCode===p.code?"#0C66E4":"var(--line)",
+                      background:edSelCode===p.code?"#E9F2FF":"var(--card)"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:edSelCode===p.code?"#0C66E4":"var(--ink1)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name||p.code}</div>
+                      <div style={{fontSize:10,color:"var(--ink3)"}}>{p.code}</div>
+                    </div>
+                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:13,cursor:"pointer",flexShrink:0}} onClick={(e)=>{e.stopPropagation();
+                      const next={...(data.edProducts||{}),[edCat]:((data.edProducts||{})[edCat]||[]).filter((x)=>x.code!==p.code)};
+                      commit((d)=>({...d,edProducts:next,updatedAt:Date.now()}),[]);
+                      if(edSelCode===p.code){setEdSelCode(null);setEdProduct(null);setEdDraft(null);}
+                    }}>×</button>
+                  </div>
+                ))}
+                {!((data.edProducts||{})[edCat]||[]).length&&<div style={{fontSize:12,color:"var(--ink3)",padding:"8px 4px"}}>상품이 없습니다</div>}
+              </div>
+              {/* 상품 추가 */}
+              <div style={{borderTop:"1px solid var(--line)",paddingTop:10}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:6}}>상품 추가</div>
+                <input className="inp" style={{marginBottom:6,fontSize:12}} placeholder="상품코드" value={edAddCode} onChange={(e)=>setEdAddCode(e.target.value)} />
+                <input className="inp" style={{marginBottom:6,fontSize:12}} placeholder="상품명 (선택)" value={edAddName} onChange={(e)=>setEdAddName(e.target.value)} />
+                <button className="btn-save" style={{width:"100%",fontSize:12,padding:"6px"}} onClick={()=>{
+                  const code=edAddCode.trim();if(!code)return;
+                  const cur=(data.edProducts||{})[edCat]||[];
+                  if(cur.some((x)=>x.code===code))return;
+                  const next={...(data.edProducts||{}),[edCat]:[...cur,{code,name:edAddName.trim()||code}]};
+                  commit((d)=>({...d,edProducts:next,updatedAt:Date.now()}),[]);
+                  setEdAddCode('');setEdAddName('');
+                }}>+ 추가</button>
+              </div>
             </div>
-            {edProduct&&edDraft&&<>
-              <div style={{fontSize:13,fontWeight:700,color:"#0C66E4",marginBottom:12}}>#{edProduct.product_no} {edProduct.product_name}</div>
-              <div className="r3" style={{marginBottom:12}}>
-                <div className="fld"><label>상품명</label><input value={edDraft.product_name||""} onChange={(e)=>setEdDraft({...edDraft,product_name:e.target.value})} /></div>
-                <div className="fld"><label>가격</label><input type="number" value={edDraft.price||""} onChange={(e)=>setEdDraft({...edDraft,price:e.target.value})} /></div>
-                <div className="fld"><label>판매상태</label>
-                  <select value={edDraft.selling||"T"} onChange={(e)=>setEdDraft({...edDraft,selling:e.target.value})}>
-                    <option value="T">판매함</option><option value="F">판매안함</option>
-                  </select>
+            {/* 오른쪽: 상품 상세 편집 */}
+            <div style={{flex:1,minWidth:0}}>
+              {edMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:edMsg.startsWith("✅")?"#DCFFF1":edMsg==="불러오는 중..."?"#E9F2FF":"#FFECEB",color:edMsg.startsWith("✅")?"#1F845A":edMsg==="불러오는 중..."?"#0C66E4":"#CA3521",fontSize:13,marginBottom:12}}>{edMsg}</div>}
+              {!edProduct&&!edLoading&&<div style={{padding:40,textAlign:"center",color:"var(--ink3)",fontSize:13}}>왼쪽에서 상품을 선택하세요</div>}
+              {edProduct&&edDraft&&(
+                <div className="panel" style={{padding:20}}>
+                  <div style={{fontSize:14,fontWeight:800,color:"#0C66E4",marginBottom:16}}>#{edProduct.product_no} {edProduct.product_name}</div>
+                  {/* 상품명 */}
+                  <div className="fld" style={{marginBottom:12}}>
+                    <label>상품명</label>
+                    <input value={edDraft.product_name} onChange={(e)=>setEdDraft({...edDraft,product_name:e.target.value})} />
+                  </div>
+                  {/* 요약설명 */}
+                  <div className="fld" style={{marginBottom:12}}>
+                    <label>상품 요약설명</label>
+                    <textarea value={edDraft.summary_description} onChange={(e)=>setEdDraft({...edDraft,summary_description:e.target.value})} style={{height:60}} placeholder="상품 요약설명" />
+                  </div>
+                  {/* 간략설명 */}
+                  <div className="fld" style={{marginBottom:12}}>
+                    <label>상품 간략설명</label>
+                    <textarea value={edDraft.simple_description} onChange={(e)=>setEdDraft({...edDraft,simple_description:e.target.value})} style={{height:80}} placeholder="상품 간략설명" />
+                  </div>
+                  {/* 상세설명 */}
+                  <div className="fld" style={{marginBottom:12}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                      <label style={{margin:0}}>상품 상세설명</label>
+                      <div style={{display:"flex",gap:4}}>
+                        <button onClick={()=>setEdDescView('html')} style={{padding:"3px 10px",borderRadius:6,border:"1.5px solid",fontSize:11,cursor:"pointer",fontWeight:edDescView==="html"?700:400,borderColor:edDescView==="html"?"#0C66E4":"var(--line)",background:edDescView==="html"?"#0C66E4":"var(--bg)",color:edDescView==="html"?"#fff":"var(--ink2)"}}>HTML</button>
+                        <button onClick={()=>setEdDescView('preview')} style={{padding:"3px 10px",borderRadius:6,border:"1.5px solid",fontSize:11,cursor:"pointer",fontWeight:edDescView==="preview"?700:400,borderColor:edDescView==="preview"?"#0C66E4":"var(--line)",background:edDescView==="preview"?"#0C66E4":"var(--bg)",color:edDescView==="preview"?"#fff":"var(--ink2)"}}>이미지 보기</button>
+                      </div>
+                    </div>
+                    {edDescView==="html"
+                      ?<textarea value={edDraft.description} onChange={(e)=>setEdDraft({...edDraft,description:e.target.value})} style={{minHeight:200,fontSize:12,fontFamily:"monospace"}} />
+                      :<div style={{border:"1px solid var(--line)",borderRadius:8,padding:12,minHeight:200,maxHeight:500,overflowY:"auto",background:"#fff"}} dangerouslySetInnerHTML={{__html:edDraft.description}} />
+                    }
+                  </div>
+                  <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                    <button className="btn ghost" onClick={()=>{setEdProduct(null);setEdDraft(null);setEdSelCode(null);setEdMsg('');}}>초기화</button>
+                    <button className="btn-save" disabled={edLoading} onClick={async()=>{
+                      if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
+                      setEdLoading(true);setEdMsg('');
+                      const payload={};
+                      if(edDraft.product_name!==edProduct.product_name)payload.product_name=edDraft.product_name;
+                      if(edDraft.summary_description!==(edProduct.summary_description||''))payload.summary_description=edDraft.summary_description;
+                      if(edDraft.simple_description!==(edProduct.simple_description||''))payload.simple_description=edDraft.simple_description;
+                      if(edDraft.description!==(edProduct.description||''))payload.description=edDraft.description;
+                      if(!Object.keys(payload).length){setEdMsg("변경사항 없음");setEdLoading(false);return;}
+                      const d=await c24Api({action:'update',productNo:edProduct.product_no,payload});
+                      if(d.product)setEdMsg("✅ 저장 완료");else setEdMsg("❌ 오류: "+JSON.stringify(d.error||d));
+                      setEdLoading(false);
+                    }}>{edLoading?"저장중...":"💾 저장"}</button>
+                  </div>
                 </div>
-              </div>
-              <div className="fld" style={{marginBottom:14}}>
-                <label>상세설명 HTML</label>
-                <textarea value={edDraft.description||""} onChange={(e)=>setEdDraft({...edDraft,description:e.target.value})} style={{minHeight:160,fontSize:12,fontFamily:"monospace"}} placeholder="HTML 직접 입력" />
-              </div>
-              <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-                <button className="btn ghost" onClick={()=>{setEdProduct(null);setEdDraft(null);setEdCode('');setEdMsg('');}}>초기화</button>
-                <button className="btn-save" disabled={edLoading} onClick={async()=>{
-                  setEdLoading(true);setEdMsg('');
-                  const payload={};
-                  if(edDraft.product_name!==edProduct.product_name)payload.product_name=edDraft.product_name;
-                  if(edDraft.price!==edProduct.price)payload.price=edDraft.price;
-                  if(edDraft.selling!==edProduct.selling)payload.selling=edDraft.selling;
-                  if(edDraft.description!==edProduct.description)payload.description=edDraft.description;
-                  const d=await c24Api({action:'update',productNo:edProduct.product_no,payload});
-                  if(d.product)setEdMsg("✅ 저장 완료");else setEdMsg("❌ 오류: "+JSON.stringify(d.error||d));
-                  setEdLoading(false);
-                }}>{edLoading?"저장중...":"💾 저장"}</button>
-              </div>
-            </>}
-          </div>
-        )}
-
-        {/* ── 이벤트 관리 ─────────────────────────────── */}
-        {c24SubTab==="event"&&(
-          <div className="panel">
-            <h3 style={{marginBottom:14}}>🎉 이벤트 관리 — 상세 최상단 이미지 삽입</h3>
-            {evMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:evMsg.startsWith("✅")?"#DCFFF1":"#FFECEB",color:evMsg.startsWith("✅")?"#1F845A":"#CA3521",fontSize:13,marginBottom:12}}>{evMsg}</div>}
-            {/* 상품 검색 */}
-            <div style={{display:"flex",gap:8,marginBottom:14}}>
-              <input className="inp" style={{flex:1}} placeholder="상품코드" value={evCode} onChange={(e)=>setEvCode(e.target.value)}
-                onKeyDown={(e)=>{if(e.key==="Enter")document.getElementById("evSearchBtn").click();}} />
-              <button id="evSearchBtn" className="btn-save" disabled={evLoading} onClick={async()=>{
-                if(!c24TokenValid()){setEvMsg("❌ 카페24 로그인 필요");return;}
-                setEvLoading(true);setEvMsg('');
-                const p=await c24SearchByCode(evCode.trim());
-                if(p)setEvProduct(p);else setEvMsg("❌ 상품을 찾을 수 없습니다");
-                setEvLoading(false);
-              }}>{evLoading?"검색중...":"검색"}</button>
-            </div>
-            {evProduct&&<div style={{fontSize:13,fontWeight:700,color:"#0C66E4",marginBottom:12}}>#{evProduct.product_no} {evProduct.product_name}</div>}
-            {/* 이미지 업로드 */}
-            <div style={{marginBottom:14}}>
-              <label style={{fontSize:12,fontWeight:700,color:"var(--ink3)",display:"block",marginBottom:8}}>이벤트 이미지</label>
-              <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-                <label style={{cursor:"pointer",border:"1.5px dashed var(--line2)",borderRadius:9,padding:"10px 18px",fontSize:12,color:"#0C66E4",fontWeight:700}}>
-                  📁 이미지 선택
-                  <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
-                    const f=e.target.files?.[0];if(!f)return;
-                    const b64=await resizeImage(f,1200,1200,0.9);
-                    setEvImage({base64:b64.split(',')[1],name:f.name,preview:b64});
-                  }} />
-                </label>
-                {evImage&&<img src={evImage.preview} alt="preview" style={{height:60,borderRadius:6,border:"1px solid var(--line)"}} />}
-                {evImage&&<button style={{background:"none",border:"none",color:"var(--danger)",cursor:"pointer",fontSize:12}} onClick={()=>setEvImage(null)}>제거</button>}
-              </div>
-            </div>
-            {/* 백업 상태 */}
-            {evBackup&&<div style={{padding:"8px 12px",background:"#E9F2FF",borderRadius:8,fontSize:12,color:"#0C66E4",marginBottom:12}}>
-              💾 #{evBackup.productNo} 원본 백업됨 — 원복 가능
-            </div>}
-            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-              {evBackup&&<button className="btn ghost" style={{color:"#1F845A"}} disabled={evLoading} onClick={async()=>{
-                setEvLoading(true);setEvMsg('');
-                const d=await c24Api({action:'restore',productNo:evBackup.productNo,payload:{originalDesc:evBackup.originalDesc}});
-                if(d.product){setEvMsg("✅ 원복 완료");setEvBackup(null);}else setEvMsg("❌ 원복 실패: "+JSON.stringify(d.error||d));
-                setEvLoading(false);
-              }}>↩ 원복</button>}
-              <button className="btn-save" disabled={evLoading||!evProduct||!evImage} onClick={async()=>{
-                if(!c24TokenValid()){setEvMsg("❌ 카페24 로그인 필요");return;}
-                setEvLoading(true);setEvMsg('이미지 업로드 중...');
-                // 1단계: 이미지 업로드
-                const upR=await c24Api({action:'uploadImage',imageBase64:evImage.base64,imageName:evImage.name});
-                console.log('upR',JSON.stringify(upR).slice(0,200));
-                const imgUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
-                if(!imgUrl){setEvMsg("❌ 이미지 업로드 실패: "+JSON.stringify(upR));setEvLoading(false);return;}
-                setEvMsg('상세 삽입 중...');
-                // 2단계: 상세 최상단에 삽입
-                const insertHtml=`<div style="width:100%;text-align:center;"><img src="${imgUrl}" style="max-width:100%;" alt="event" /></div>`;
-                const insR=await c24Api({action:'insertTop',productNo:evProduct.product_no,payload:{insertHtml}});
-                if(insR.product){
-                  setEvBackup({productNo:evProduct.product_no,originalDesc:insR.originalDesc});
-                  setEvMsg("✅ 이벤트 이미지 삽입 완료!");
-                }else setEvMsg("❌ 삽입 실패: "+JSON.stringify(insR.error||insR));
-                setEvLoading(false);
-              }}>{evLoading?"처리중...":"🎉 삽입"}</button>
-            </div>
-          </div>
-        )}
-
-        {/* ── 유튜브 관리 ─────────────────────────────── */}
-        {c24SubTab==="youtube"&&(
-          <div className="panel">
-            <h3 style={{marginBottom:14}}>📹 유튜브 관리 — 상세 최상단 영상 삽입</h3>
-            {ytMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:ytMsg.startsWith("✅")?"#DCFFF1":"#FFECEB",color:ytMsg.startsWith("✅")?"#1F845A":"#CA3521",fontSize:13,marginBottom:12}}>{ytMsg}</div>}
-            <div style={{display:"flex",gap:8,marginBottom:14}}>
-              <input className="inp" style={{flex:1}} placeholder="상품코드" value={ytCode} onChange={(e)=>setYtCode(e.target.value)}
-                onKeyDown={(e)=>{if(e.key==="Enter")document.getElementById("ytSearchBtn").click();}} />
-              <button id="ytSearchBtn" className="btn-save" disabled={ytLoading} onClick={async()=>{
-                if(!c24TokenValid()){setYtMsg("❌ 카페24 로그인 필요");return;}
-                setYtLoading(true);setYtMsg('');
-                const p=await c24SearchByCode(ytCode.trim());
-                if(p)setYtProduct(p);else setYtMsg("❌ 상품을 찾을 수 없습니다");
-                setYtLoading(false);
-              }}>{ytLoading?"검색중...":"검색"}</button>
-            </div>
-            {ytProduct&&<div style={{fontSize:13,fontWeight:700,color:"#0C66E4",marginBottom:12}}>#{ytProduct.product_no} {ytProduct.product_name}</div>}
-            <div className="r3" style={{marginBottom:12}}>
-              <div className="fld"><label>유튜브 URL</label><input value={ytUrl} onChange={(e)=>setYtUrl(e.target.value)} placeholder="https://youtu.be/xxxxx" /></div>
-              <div className="fld"><label>영상 제목</label><input value={ytTitle} onChange={(e)=>setYtTitle(e.target.value)} placeholder="이벤트명" /></div>
-              <div className="fld"><label>날짜</label><input type="date" value={ytDate} onChange={(e)=>setYtDate(e.target.value)} /></div>
-            </div>
-            {/* 미리보기 */}
-            {ytUrl&&(()=>{
-              const vid=ytUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/)?.[1];
-              if(!vid)return<div style={{fontSize:12,color:"var(--danger)"}}>유효하지 않은 유튜브 URL</div>;
-              return<div style={{marginBottom:14}}>
-                <div style={{fontSize:12,color:"var(--ink3)",marginBottom:6}}>미리보기</div>
-                <iframe width="100%" height="200" src={`https://www.youtube.com/embed/${vid}`} frameBorder="0" allowFullScreen style={{borderRadius:8}} title="preview" />
-              </div>;
-            })()}
-            {ytBackup&&<div style={{padding:"8px 12px",background:"#E9F2FF",borderRadius:8,fontSize:12,color:"#0C66E4",marginBottom:12}}>
-              💾 #{ytBackup.productNo} 원본 백업됨 — 원복 가능
-            </div>}
-            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-              {ytBackup&&<button className="btn ghost" style={{color:"#1F845A"}} disabled={ytLoading} onClick={async()=>{
-                setYtLoading(true);setYtMsg('');
-                const d=await c24Api({action:'restore',productNo:ytBackup.productNo,payload:{originalDesc:ytBackup.originalDesc}});
-                if(d.product){setYtMsg("✅ 원복 완료");setYtBackup(null);}else setYtMsg("❌ 원복 실패");
-                setYtLoading(false);
-              }}>↩ 원복</button>}
-              <button className="btn-save" disabled={ytLoading||!ytProduct||!ytUrl} onClick={async()=>{
-                const vid=ytUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/)?.[1];
-                if(!vid){setYtMsg("❌ 유효하지 않은 유튜브 URL");return;}
-                if(!c24TokenValid()){setYtMsg("❌ 카페24 로그인 필요");return;}
-                setYtLoading(true);setYtMsg('삽입 중...');
-                const insertHtml=`<div style="width:100%;text-align:center;margin-bottom:16px;">${ytTitle?`<p style="font-weight:bold;font-size:16px;margin-bottom:8px;">${ytTitle}</p>`:""}${ytDate?`<p style="font-size:12px;color:#888;margin-bottom:8px;">${ytDate}</p>`:""}<iframe width="100%" height="400" src="https://www.youtube.com/embed/${vid}" frameborder="0" allowfullscreen style="max-width:800px;"></iframe></div>`;
-                const insR=await c24Api({action:'insertTop',productNo:ytProduct.product_no,payload:{insertHtml}});
-                if(insR.product){
-                  setYtBackup({productNo:ytProduct.product_no,originalDesc:insR.originalDesc});
-                  setYtMsg("✅ 유튜브 영상 삽입 완료!");
-                }else setYtMsg("❌ 삽입 실패: "+JSON.stringify(insR.error||insR));
-                setYtLoading(false);
-              }}>{ytLoading?"처리중...":"📹 삽입"}</button>
+              )}
             </div>
           </div>
         )}
