@@ -52,6 +52,225 @@ const ROLES = [{ id:"admin",label:"관리자" },{ id:"member",label:"멤버" },{
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
+function ScheduleView({uid, saveBlocks: _save}) {
+        const DAYS=["월","화","수","목","금"];
+        const today=new Date();
+        const dow=today.getDay();
+        const defaultDay=dow>=1&&dow<=5?DAYS[dow-1]:"월";
+        const [scDay,setScDay]=React.useState(defaultDay);
+        const [scBlocks,setScBlocks]=React.useState(()=>{
+          try{return JSON.parse(localStorage.getItem('wb_schedule')||'{}');}catch(e){return{};}
+        });
+        const [scAddOpen,setScAddOpen]=React.useState(false);
+        const [scDraft,setScDraft]=React.useState(null);
+        const [scCopyOpen,setScCopyOpen]=React.useState(false);
+        const [scCopyTarget,setScCopyTarget]=React.useState("월");
+        const DAYS_KR={월:1,화:2,수:3,목:4,금:5};
+        const copyToDay=(targetDay)=>{
+          const src=scBlocks[scDay]||[];
+          if(!src.length){alert("복사할 일정이 없습니다.");return;}
+          const existing=scBlocks[targetDay]||[];
+          const newBlocks=src.map((b)=>({...b,id:uid()}));
+          // 기존 일정과 합치기
+          const merged=[...existing,...newBlocks];
+          saveBlocks(targetDay,merged);
+          setScCopyOpen(false);
+          alert(`${scDay}요일 일정 ${src.length}개를 ${targetDay}요일에 복사했습니다.`);
+        };
+
+        const START_H=9,START_M=30,END_H=18,END_M=30;
+        const totalMin=(END_H-START_H)*60+(END_M-START_M);
+        const COLORS=["#0C66E4","#1F845A","#E2483D","#F7B731","#8854D0","#2980B9","#E67E22"];
+
+
+
+        const toMin=(h,m)=>h*60+m;
+        const blockTop=(h,m)=>((toMin(h,m)-toMin(START_H,START_M))/totalMin)*100;
+        const blockH=(sh,sm,eh,em)=>((toMin(eh,em)-toMin(sh,sm))/totalMin)*100;
+
+        const todayDate=(day)=>{
+          const d=new Date();
+          const cur=d.getDay()||7;
+          const target=DAYS.indexOf(day)+1;
+          const diff=target-cur;
+          const dt=new Date(d);dt.setDate(d.getDate()+diff);
+          return `${dt.getMonth()+1}/${dt.getDate()}`;
+        };
+
+  const saveBlocks=(day,blocks)=>{
+    const next={...scBlocks,[day]:blocks};
+    setScBlocks(next);
+    localStorage.setItem('wb_schedule',JSON.stringify(next));
+  };
+  const blocks=scBlocks[scDay]||[];
+  return(
+        <div>
+          {/* 요일 탭 */}
+          <div style={{display:"flex",gap:0,marginBottom:16,border:"1px solid var(--line)",borderRadius:10,overflow:"hidden"}}>
+            {DAYS.map((day)=>(
+              <button key={day} onClick={()=>setScDay(day)}
+                style={{flex:1,padding:"10px 0",border:"none",cursor:"pointer",fontSize:13,fontWeight:scDay===day?800:500,
+                  background:scDay===day?"#0C66E4":"var(--card)",color:scDay===day?"#fff":"var(--ink2)",
+                  borderRight:day!=="금"?"1px solid var(--line)":"none",transition:"all .15s"}}>
+                <div>{day}</div>
+                <div style={{fontSize:11,opacity:.7,marginTop:2}}>{todayDate(day)}</div>
+              </button>
+            ))}
+          </div>
+
+          <div style={{display:"flex",gap:16}}>
+            {/* 시간 눈금 + 블록 */}
+            <div style={{flex:1,position:"relative",background:"var(--card)",borderRadius:12,boxShadow:"var(--sh)",padding:"0 0 0 56px",minHeight:520,overflow:"hidden"}}>
+              {/* 시간 눈금 */}
+              {Array.from({length:10},(_, i)=>{
+                const h=START_H+i;const m=i===0?START_M:0;
+                if(h>END_H||(h===END_H&&m>=END_M))return null;
+                const top=blockTop(h,m);
+                return(
+                  <div key={i} style={{position:"absolute",left:0,top:`${top}%`,width:"100%",display:"flex",alignItems:"center",pointerEvents:"none"}}>
+                    <span style={{width:50,fontSize:11,color:"var(--ink3)",textAlign:"right",paddingRight:8,flexShrink:0}}>{String(h).padStart(2,"0")}:{String(i===0?START_M:0).padStart(2,"0")}</span>
+                    <div style={{flex:1,height:"1px",background:"var(--line)"}} />
+                  </div>
+                );
+              })}
+              {/* 현재 시각 표시 */}
+              {scDay===defaultDay&&(()=>{
+                const now=new Date();const top=blockTop(now.getHours(),now.getMinutes());
+                if(top<0||top>100)return null;
+                return<div style={{position:"absolute",left:56,right:0,top:`${top}%`,height:2,background:"#CA3521",zIndex:10,pointerEvents:"none"}}>
+                  <div style={{position:"absolute",left:-6,top:-4,width:10,height:10,borderRadius:"50%",background:"#CA3521"}} />
+                </div>;
+              })()}
+              {/* 블록 */}
+              {blocks.map((b)=>{
+                const top=blockTop(b.sh,b.sm);
+                const h=blockH(b.sh,b.sm,b.eh,b.em);
+                return(
+                  <div key={b.id} style={{position:"absolute",left:60,right:8,top:`${top}%`,height:`${h}%`,background:b.color||"#0C66E4",borderRadius:7,padding:"6px 10px",cursor:"pointer",overflow:"hidden",boxSizing:"border-box",minHeight:24,zIndex:2}}
+                    onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.title}</div>
+                    {h>5&&<div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>}
+                  </div>
+                );
+              })}
+              {/* 빈 캔버스 클릭으로 추가 */}
+              <div style={{position:"absolute",left:56,right:0,top:0,bottom:0,zIndex:1}}
+                onClick={(e)=>{
+                  const rect=e.currentTarget.getBoundingClientRect();
+                  const pct=(e.clientY-rect.top)/rect.height;
+                  const min=Math.round(pct*totalMin/30)*30;
+                  const absMin=toMin(START_H,START_M)+min;
+                  const sh=Math.floor(absMin/60),sm=absMin%60;
+                  const eh=Math.floor((absMin+60)/60),em=(absMin+60)%60;
+                  setScDraft({id:null,title:"",sh,sm,eh:Math.min(eh,END_H),em:eh>=END_H?0:em,color:COLORS[blocks.length%COLORS.length],memo:""});
+                  setScAddOpen(true);
+                }} />
+            </div>
+            {/* 사이드 */}
+            <div style={{width:160,flexShrink:0}}>
+              <button className="btn-save" style={{width:"100%",marginBottom:8}} onClick={()=>{setScDraft({id:null,title:"",sh:9,sm:30,eh:10,em:30,color:COLORS[0],memo:""});setScAddOpen(true);}}>+ 일정 추가</button>
+              <button className="btn ghost" style={{width:"100%",marginBottom:12,fontSize:12}} onClick={()=>setScCopyOpen(true)}>📋 다른 요일로 복사</button>
+              <div style={{fontSize:12,color:"var(--ink3)",marginBottom:8,fontWeight:700}}>{scDay}요일 일정 ({blocks.length})</div>
+              {blocks.length===0&&<div style={{fontSize:12,color:"var(--ink3)"}}>일정이 없습니다</div>}
+              {[...blocks].sort((a,b)=>toMin(a.sh,a.sm)-toMin(b.sh,b.sm)).map((b)=>(
+                <div key={b.id} style={{background:b.color,borderRadius:7,padding:"7px 10px",marginBottom:6,cursor:"pointer"}} onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{b.title}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 복사 모달 */}
+          {scCopyOpen&&(
+            <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setScCopyOpen(false)}>
+              <div className="modal" style={{maxWidth:340}} onClick={(e)=>e.stopPropagation()}>
+                <div className="modal-head"><h3>📋 일정 복사</h3><button className="x" onClick={()=>setScCopyOpen(false)}>×</button></div>
+                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:14}}>
+                  <div style={{fontSize:13,color:"var(--ink2)"}}>
+                    <b>{scDay}요일</b> 일정 <b>{(scBlocks[scDay]||[]).length}개</b>를 복사할 요일을 선택하세요.
+                  </div>
+                  <div className="fld"><label>복사할 요일</label>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:4}}>
+                      {DAYS.filter((d)=>d!==scDay).map((d)=>(
+                        <button key={d} onClick={()=>setScCopyTarget(d)}
+                          style={{padding:"8px 16px",borderRadius:8,border:"1.5px solid",fontSize:13,fontWeight:700,cursor:"pointer",
+                            borderColor:scCopyTarget===d?"#0C66E4":"var(--line)",
+                            background:scCopyTarget===d?"#0C66E4":"var(--bg)",
+                            color:scCopyTarget===d?"#fff":"var(--ink2)"}}>
+                          {d}요일
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{padding:"10px 12px",background:"#F4F5F7",borderRadius:8,fontSize:12,color:"var(--ink3)"}}>
+                    ⚠ 기존 {scCopyTarget}요일 일정에 <b>추가</b>됩니다. (덮어쓰기 아님)
+                    {(scBlocks[scCopyTarget]||[]).length>0&&<span> 현재 {(scBlocks[scCopyTarget]||[]).length}개 있음.</span>}
+                  </div>
+                </div>
+                <div className="modal-foot">
+                  <button className="btn ghost" style={{fontSize:12}} onClick={()=>{
+                    if(window.confirm(`${scCopyTarget}요일 기존 일정을 모두 지우고 복사할까요?`)){
+                      saveBlocks(scCopyTarget,(scBlocks[scDay]||[]).map((b)=>({...b,id:uid()})));
+                      setScCopyOpen(false);
+                      alert(`${scDay}요일 → ${scCopyTarget}요일 덮어쓰기 완료`);
+                    }
+                  }}>덮어쓰기</button>
+                  <span className="spacer"/>
+                  <button className="btn ghost" onClick={()=>setScCopyOpen(false)}>취소</button>
+                  <button className="btn-save" onClick={()=>copyToDay(scCopyTarget)}>추가 복사</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 일정 추가/수정 모달 */}
+          {scAddOpen&&scDraft&&(
+            <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setScAddOpen(false)}>
+              <div className="modal" style={{maxWidth:380}} onClick={(e)=>e.stopPropagation()}>
+                <div className="modal-head"><h3>{scDraft.id?"일정 수정":"일정 추가"}</h3><button className="x" onClick={()=>setScAddOpen(false)}>×</button></div>
+                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:14}}>
+                  <div className="fld"><label>제목</label><input value={scDraft.title} onChange={(e)=>setScDraft({...scDraft,title:e.target.value})} placeholder="회의, 업무, 점심..." autoFocus /></div>
+                  <div className="r3">
+                    <div className="fld"><label>시작</label>
+                      <input type="time" value={`${String(scDraft.sh).padStart(2,"0")}:${String(scDraft.sm).padStart(2,"0")}`}
+                        onChange={(e)=>{const [h,m]=e.target.value.split(":").map(Number);setScDraft({...scDraft,sh:h,sm:m});}} />
+                    </div>
+                    <div className="fld"><label>종료</label>
+                      <input type="time" value={`${String(scDraft.eh).padStart(2,"0")}:${String(scDraft.em).padStart(2,"0")}`}
+                        onChange={(e)=>{const [h,m]=e.target.value.split(":").map(Number);setScDraft({...scDraft,eh:h,em:m});}} />
+                    </div>
+                    <div className="fld"><label>색상</label>
+                      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>
+                        {COLORS.map((c)=>(
+                          <div key={c} onClick={()=>setScDraft({...scDraft,color:c})}
+                            style={{width:22,height:22,borderRadius:"50%",background:c,cursor:"pointer",border:scDraft.color===c?"3px solid #172B4D":"2px solid transparent"}} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="fld"><label>메모</label><textarea value={scDraft.memo||""} onChange={(e)=>setScDraft({...scDraft,memo:e.target.value})} style={{height:60}} placeholder="참고사항..." /></div>
+                </div>
+                <div className="modal-foot">
+                  {scDraft.id&&<button className="del" onClick={()=>{saveBlocks(scDay,blocks.filter((b)=>b.id!==scDraft.id));setScAddOpen(false);}}>삭제</button>}
+                  <span className="spacer"/>
+                  <button className="btn ghost" onClick={()=>setScAddOpen(false)}>취소</button>
+                  <button className="btn-save" onClick={()=>{
+                    if(!scDraft.title.trim())return;
+                    const b={...scDraft,id:scDraft.id||uid()};
+                    const next=scDraft.id?blocks.map((x)=>x.id===b.id?b:x):[...blocks,b];
+                    saveBlocks(scDay,next);setScAddOpen(false);
+                  }}>저장</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        
+  );
+}
+
+
 function IssueInput({planId,onAdd}){
   const [text,setText]=React.useState("");
   const [images,setImages]=React.useState([]);
@@ -2821,221 +3040,7 @@ function Board() {
       )}
 
       {/* 시간표 */}
-      {view==="schedule"&&(()=>{
-        const DAYS=["월","화","수","목","금"];
-        const today=new Date();
-        const dow=today.getDay();
-        const defaultDay=dow>=1&&dow<=5?DAYS[dow-1]:"월";
-        const [scDay,setScDay]=React.useState(defaultDay);
-        const [scBlocks,setScBlocks]=React.useState(()=>{
-          try{return JSON.parse(localStorage.getItem('wb_schedule')||'{}');}catch(e){return{};}
-        });
-        const [scAddOpen,setScAddOpen]=React.useState(false);
-        const [scDraft,setScDraft]=React.useState(null);
-        const [scCopyOpen,setScCopyOpen]=React.useState(false);
-        const [scCopyTarget,setScCopyTarget]=React.useState("월");
-        const DAYS_KR={월:1,화:2,수:3,목:4,금:5};
-        const copyToDay=(targetDay)=>{
-          const src=scBlocks[scDay]||[];
-          if(!src.length){alert("복사할 일정이 없습니다.");return;}
-          const existing=scBlocks[targetDay]||[];
-          const newBlocks=src.map((b)=>({...b,id:uid()}));
-          // 기존 일정과 합치기
-          const merged=[...existing,...newBlocks];
-          saveBlocks(targetDay,merged);
-          setScCopyOpen(false);
-          alert(`${scDay}요일 일정 ${src.length}개를 ${targetDay}요일에 복사했습니다.`);
-        };
-
-        const START_H=9,START_M=30,END_H=18,END_M=30;
-        const totalMin=(END_H-START_H)*60+(END_M-START_M);
-        const COLORS=["#0C66E4","#1F845A","#E2483D","#F7B731","#8854D0","#2980B9","#E67E22"];
-
-        const saveBlocks=(day,blocks)=>{
-          const next={...scBlocks,[day]:blocks};
-          setScBlocks(next);
-          localStorage.setItem('wb_schedule',JSON.stringify(next));
-        };
-        const blocks=scBlocks[scDay]||[];
-
-        const toMin=(h,m)=>h*60+m;
-        const blockTop=(h,m)=>((toMin(h,m)-toMin(START_H,START_M))/totalMin)*100;
-        const blockH=(sh,sm,eh,em)=>((toMin(eh,em)-toMin(sh,sm))/totalMin)*100;
-
-        const todayDate=(day)=>{
-          const d=new Date();
-          const cur=d.getDay()||7;
-          const target=DAYS.indexOf(day)+1;
-          const diff=target-cur;
-          const dt=new Date(d);dt.setDate(d.getDate()+diff);
-          return `${dt.getMonth()+1}/${dt.getDate()}`;
-        };
-
-        return(
-        <div>
-          {/* 요일 탭 */}
-          <div style={{display:"flex",gap:0,marginBottom:16,border:"1px solid var(--line)",borderRadius:10,overflow:"hidden"}}>
-            {DAYS.map((day)=>(
-              <button key={day} onClick={()=>setScDay(day)}
-                style={{flex:1,padding:"10px 0",border:"none",cursor:"pointer",fontSize:13,fontWeight:scDay===day?800:500,
-                  background:scDay===day?"#0C66E4":"var(--card)",color:scDay===day?"#fff":"var(--ink2)",
-                  borderRight:day!=="금"?"1px solid var(--line)":"none",transition:"all .15s"}}>
-                <div>{day}</div>
-                <div style={{fontSize:11,opacity:.7,marginTop:2}}>{todayDate(day)}</div>
-              </button>
-            ))}
-          </div>
-
-          <div style={{display:"flex",gap:16}}>
-            {/* 시간 눈금 + 블록 */}
-            <div style={{flex:1,position:"relative",background:"var(--card)",borderRadius:12,boxShadow:"var(--sh)",padding:"0 0 0 56px",minHeight:520,overflow:"hidden"}}>
-              {/* 시간 눈금 */}
-              {Array.from({length:10},(_, i)=>{
-                const h=START_H+i;const m=i===0?START_M:0;
-                if(h>END_H||(h===END_H&&m>=END_M))return null;
-                const top=blockTop(h,m);
-                return(
-                  <div key={i} style={{position:"absolute",left:0,top:`${top}%`,width:"100%",display:"flex",alignItems:"center",pointerEvents:"none"}}>
-                    <span style={{width:50,fontSize:11,color:"var(--ink3)",textAlign:"right",paddingRight:8,flexShrink:0}}>{String(h).padStart(2,"0")}:{String(i===0?START_M:0).padStart(2,"0")}</span>
-                    <div style={{flex:1,height:"1px",background:"var(--line)"}} />
-                  </div>
-                );
-              })}
-              {/* 현재 시각 표시 */}
-              {scDay===defaultDay&&(()=>{
-                const now=new Date();const top=blockTop(now.getHours(),now.getMinutes());
-                if(top<0||top>100)return null;
-                return<div style={{position:"absolute",left:56,right:0,top:`${top}%`,height:2,background:"#CA3521",zIndex:10,pointerEvents:"none"}}>
-                  <div style={{position:"absolute",left:-6,top:-4,width:10,height:10,borderRadius:"50%",background:"#CA3521"}} />
-                </div>;
-              })()}
-              {/* 블록 */}
-              {blocks.map((b)=>{
-                const top=blockTop(b.sh,b.sm);
-                const h=blockH(b.sh,b.sm,b.eh,b.em);
-                return(
-                  <div key={b.id} style={{position:"absolute",left:60,right:8,top:`${top}%`,height:`${h}%`,background:b.color||"#0C66E4",borderRadius:7,padding:"6px 10px",cursor:"pointer",overflow:"hidden",boxSizing:"border-box",minHeight:24,zIndex:2}}
-                    onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.title}</div>
-                    {h>5&&<div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>}
-                  </div>
-                );
-              })}
-              {/* 빈 캔버스 클릭으로 추가 */}
-              <div style={{position:"absolute",left:56,right:0,top:0,bottom:0,zIndex:1}}
-                onClick={(e)=>{
-                  const rect=e.currentTarget.getBoundingClientRect();
-                  const pct=(e.clientY-rect.top)/rect.height;
-                  const min=Math.round(pct*totalMin/30)*30;
-                  const absMin=toMin(START_H,START_M)+min;
-                  const sh=Math.floor(absMin/60),sm=absMin%60;
-                  const eh=Math.floor((absMin+60)/60),em=(absMin+60)%60;
-                  setScDraft({id:null,title:"",sh,sm,eh:Math.min(eh,END_H),em:eh>=END_H?0:em,color:COLORS[blocks.length%COLORS.length],memo:""});
-                  setScAddOpen(true);
-                }} />
-            </div>
-            {/* 사이드 */}
-            <div style={{width:160,flexShrink:0}}>
-              <button className="btn-save" style={{width:"100%",marginBottom:8}} onClick={()=>{setScDraft({id:null,title:"",sh:9,sm:30,eh:10,em:30,color:COLORS[0],memo:""});setScAddOpen(true);}}>+ 일정 추가</button>
-              <button className="btn ghost" style={{width:"100%",marginBottom:12,fontSize:12}} onClick={()=>setScCopyOpen(true)}>📋 다른 요일로 복사</button>
-              <div style={{fontSize:12,color:"var(--ink3)",marginBottom:8,fontWeight:700}}>{scDay}요일 일정 ({blocks.length})</div>
-              {blocks.length===0&&<div style={{fontSize:12,color:"var(--ink3)"}}>일정이 없습니다</div>}
-              {[...blocks].sort((a,b)=>toMin(a.sh,a.sm)-toMin(b.sh,b.sm)).map((b)=>(
-                <div key={b.id} style={{background:b.color,borderRadius:7,padding:"7px 10px",marginBottom:6,cursor:"pointer"}} onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{b.title}</div>
-                  <div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 복사 모달 */}
-          {scCopyOpen&&(
-            <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setScCopyOpen(false)}>
-              <div className="modal" style={{maxWidth:340}} onClick={(e)=>e.stopPropagation()}>
-                <div className="modal-head"><h3>📋 일정 복사</h3><button className="x" onClick={()=>setScCopyOpen(false)}>×</button></div>
-                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:14}}>
-                  <div style={{fontSize:13,color:"var(--ink2)"}}>
-                    <b>{scDay}요일</b> 일정 <b>{(scBlocks[scDay]||[]).length}개</b>를 복사할 요일을 선택하세요.
-                  </div>
-                  <div className="fld"><label>복사할 요일</label>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:4}}>
-                      {DAYS.filter((d)=>d!==scDay).map((d)=>(
-                        <button key={d} onClick={()=>setScCopyTarget(d)}
-                          style={{padding:"8px 16px",borderRadius:8,border:"1.5px solid",fontSize:13,fontWeight:700,cursor:"pointer",
-                            borderColor:scCopyTarget===d?"#0C66E4":"var(--line)",
-                            background:scCopyTarget===d?"#0C66E4":"var(--bg)",
-                            color:scCopyTarget===d?"#fff":"var(--ink2)"}}>
-                          {d}요일
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{padding:"10px 12px",background:"#F4F5F7",borderRadius:8,fontSize:12,color:"var(--ink3)"}}>
-                    ⚠ 기존 {scCopyTarget}요일 일정에 <b>추가</b>됩니다. (덮어쓰기 아님)
-                    {(scBlocks[scCopyTarget]||[]).length>0&&<span> 현재 {(scBlocks[scCopyTarget]||[]).length}개 있음.</span>}
-                  </div>
-                </div>
-                <div className="modal-foot">
-                  <button className="btn ghost" style={{fontSize:12}} onClick={()=>{
-                    if(window.confirm(`${scCopyTarget}요일 기존 일정을 모두 지우고 복사할까요?`)){
-                      saveBlocks(scCopyTarget,(scBlocks[scDay]||[]).map((b)=>({...b,id:uid()})));
-                      setScCopyOpen(false);
-                      alert(`${scDay}요일 → ${scCopyTarget}요일 덮어쓰기 완료`);
-                    }
-                  }}>덮어쓰기</button>
-                  <span className="spacer"/>
-                  <button className="btn ghost" onClick={()=>setScCopyOpen(false)}>취소</button>
-                  <button className="btn-save" onClick={()=>copyToDay(scCopyTarget)}>추가 복사</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 일정 추가/수정 모달 */}
-          {scAddOpen&&scDraft&&(
-            <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setScAddOpen(false)}>
-              <div className="modal" style={{maxWidth:380}} onClick={(e)=>e.stopPropagation()}>
-                <div className="modal-head"><h3>{scDraft.id?"일정 수정":"일정 추가"}</h3><button className="x" onClick={()=>setScAddOpen(false)}>×</button></div>
-                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:14}}>
-                  <div className="fld"><label>제목</label><input value={scDraft.title} onChange={(e)=>setScDraft({...scDraft,title:e.target.value})} placeholder="회의, 업무, 점심..." autoFocus /></div>
-                  <div className="r3">
-                    <div className="fld"><label>시작</label>
-                      <input type="time" value={`${String(scDraft.sh).padStart(2,"0")}:${String(scDraft.sm).padStart(2,"0")}`}
-                        onChange={(e)=>{const [h,m]=e.target.value.split(":").map(Number);setScDraft({...scDraft,sh:h,sm:m});}} />
-                    </div>
-                    <div className="fld"><label>종료</label>
-                      <input type="time" value={`${String(scDraft.eh).padStart(2,"0")}:${String(scDraft.em).padStart(2,"0")}`}
-                        onChange={(e)=>{const [h,m]=e.target.value.split(":").map(Number);setScDraft({...scDraft,eh:h,em:m});}} />
-                    </div>
-                    <div className="fld"><label>색상</label>
-                      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>
-                        {COLORS.map((c)=>(
-                          <div key={c} onClick={()=>setScDraft({...scDraft,color:c})}
-                            style={{width:22,height:22,borderRadius:"50%",background:c,cursor:"pointer",border:scDraft.color===c?"3px solid #172B4D":"2px solid transparent"}} />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="fld"><label>메모</label><textarea value={scDraft.memo||""} onChange={(e)=>setScDraft({...scDraft,memo:e.target.value})} style={{height:60}} placeholder="참고사항..." /></div>
-                </div>
-                <div className="modal-foot">
-                  {scDraft.id&&<button className="del" onClick={()=>{saveBlocks(scDay,blocks.filter((b)=>b.id!==scDraft.id));setScAddOpen(false);}}>삭제</button>}
-                  <span className="spacer"/>
-                  <button className="btn ghost" onClick={()=>setScAddOpen(false)}>취소</button>
-                  <button className="btn-save" onClick={()=>{
-                    if(!scDraft.title.trim())return;
-                    const b={...scDraft,id:scDraft.id||uid()};
-                    const next=scDraft.id?blocks.map((x)=>x.id===b.id?b:x):[...blocks,b];
-                    saveBlocks(scDay,next);setScAddOpen(false);
-                  }}>저장</button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        );
-      })()}
+      {view==="schedule"&&<ScheduleView uid={uid} />}
 
       {view==="stock"&&(
         <div>
