@@ -982,7 +982,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -3019,13 +3019,15 @@ function Board() {
       {/* 탭 관리 모달 */}
       {tabMgr&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setTabMgr(false)}>
-          <div className="modal" style={{maxWidth:480}} onClick={(e)=>e.stopPropagation()}>
+          <div className="modal" style={{maxWidth:500}} onClick={(e)=>e.stopPropagation()}>
             <div className="modal-head"><h3>⚙ 탭 관리</h3><button className="x" onClick={()=>setTabMgr(false)}>×</button></div>
-            <div className="modal-body" style={{maxHeight:"60vh",overflowY:"auto"}}>
-              <div style={{fontSize:12,color:"var(--ink3)",marginBottom:12}}>드래그로 순서 변경 · 👁 숨기기 · 📁 폴더로 이동</div>
+            <div className="modal-body" style={{maxHeight:"65vh",overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{fontSize:12,color:"var(--ink3)",marginBottom:6,padding:"8px 12px",background:"#F4F5F7",borderRadius:8}}>
+                드래그로 순서 변경 &nbsp;·&nbsp; 👁 숨기기 &nbsp;·&nbsp; 📁 폴더로 이동
+              </div>
 
               {/* 표시 중 탭 */}
-              <div style={{fontSize:13,fontWeight:700,marginBottom:8}}>표시 중</div>
+              <div style={{fontSize:12,fontWeight:800,color:"var(--ink3)",padding:"4px 4px 8px"}}>표시 중 탭</div>
               {visibleTabs.map((t)=>(
                 <div key={t.id} draggable
                   onDragStart={()=>setTabDragId(t.id)}
@@ -3038,10 +3040,10 @@ function Board() {
                     saveTabOrder(next);setTabDragId(null);
                   }}
                   onDragEnd={()=>setTabDragId(null)}
-                  style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:8,border:"1px solid var(--line)",marginBottom:6,background:"var(--bg)",cursor:"grab"}}>
-                  <span style={{color:"var(--ink3)",fontSize:14,flexShrink:0}}>☰</span>
+                  style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",borderRadius:9,border:"1px solid var(--line)",background:"var(--bg)",cursor:"grab"}}>
+                  <span style={{color:"var(--ink3)",fontSize:15,flexShrink:0}}>☰</span>
                   <span style={{flex:1,fontSize:13,fontWeight:600}}>{t.label}</span>
-                  {tabFolders.length>0&&<select style={{fontSize:11,border:"1px solid var(--line)",borderRadius:5,padding:"2px 6px",color:"var(--ink3)",background:"var(--bg)",cursor:"pointer"}}
+                  {tabFolders.length>0&&<select style={{fontSize:11,border:"1px solid var(--line)",borderRadius:6,padding:"3px 8px",color:"var(--ink3)",background:"var(--bg)",cursor:"pointer"}}
                     defaultValue="" onChange={(e)=>{
                       const fid=e.target.value;if(!fid)return;
                       const folders=tabFolders.map((f)=>f.id===fid?{...f,tabs:[...(f.tabs||[]),t.id]}:f);
@@ -3052,7 +3054,7 @@ function Board() {
                     <option value="">📁 폴더로</option>
                     {tabFolders.map((f)=><option key={f.id} value={f.id}>{f.name}</option>)}
                   </select>}
-                  <button style={{background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--ink3)",flexShrink:0}}
+                  <button style={{background:"none",border:"none",cursor:"pointer",fontSize:17,color:"var(--ink3)",flexShrink:0,padding:"0 2px"}}
                     onClick={()=>{
                       const hidden=[...(data.hiddenTabs||[]),t.id];
                       saveHiddenTabs(hidden);
@@ -3062,38 +3064,41 @@ function Board() {
               ))}
 
               {/* 폴더 */}
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",margin:"14px 0 8px"}}>
-                <div style={{fontSize:13,fontWeight:700}}>폴더</div>
-                <button className="riedit" style={{fontSize:12}} onClick={()=>{const name=prompt("폴더 이름:");if(name?.trim()){saveTabFolders([...tabFolders,{id:uid(),name:name.trim(),tabs:[]}]);}}}>+ 폴더 추가</button>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 4px 8px"}}>
+                <div style={{fontSize:12,fontWeight:800,color:"var(--ink3)"}}>폴더</div>
+                <button className="btn-save" style={{fontSize:11,padding:"4px 12px"}} onClick={()=>{const name=prompt("폴더 이름:");if(name?.trim()){saveTabFolders([...tabFolders,{id:uid(),name:name.trim(),tabs:[]}]);}}}>+ 폴더 추가</button>
               </div>
+              {tabFolders.length===0&&<div style={{fontSize:12,color:"var(--ink3)",padding:"4px 4px 8px"}}>폴더가 없습니다</div>}
               {tabFolders.map((folder)=>(
-                <div key={folder.id} style={{border:"1.5px solid var(--line)",borderRadius:9,padding:"10px 12px",marginBottom:8,background:"var(--bg)"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                    <span style={{fontSize:14}}>📁</span>
+                <div key={folder.id} style={{border:"1.5px solid var(--line)",borderRadius:10,padding:"12px 14px",background:"var(--bg)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                    <span style={{fontSize:16}}>📁</span>
                     <span style={{flex:1,fontSize:13,fontWeight:700}}>{folder.name}</span>
-                    <button style={{background:"none",border:"none",color:"var(--danger)",cursor:"pointer",fontSize:12}} onClick={()=>{
+                    <button style={{background:"none",border:"none",color:"var(--danger)",cursor:"pointer",fontSize:12,fontWeight:700}} onClick={()=>{
                       if(!window.confirm("폴더를 삭제할까요? 탭은 표시 중으로 돌아옵니다."))return;
+                      const restored=(folder.tabs||[]);
                       saveTabFolders(tabFolders.filter((f)=>f.id!==folder.id));
+                      if(restored.length)saveTabOrder([...tabOrder,...restored]);
                     }}>삭제</button>
                   </div>
                   {(folder.tabs||[]).map((tabId)=>{const t=ALL_TABS.find((x)=>x.id===tabId);if(!t)return null;return(
-                    <div key={tabId} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",borderRadius:6,background:"var(--card)",marginBottom:4,fontSize:13}}>
+                    <div key={tabId} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:7,background:"var(--card)",marginBottom:5,fontSize:13}}>
                       <span style={{flex:1}}>{t.label}</span>
-                      <button style={{background:"none",border:"none",color:"#0C66E4",fontSize:11,cursor:"pointer",fontWeight:700}} onClick={()=>{
+                      <button style={{background:"none",border:"none",color:"#0C66E4",fontSize:11,cursor:"pointer",fontWeight:800}} onClick={()=>{
                         saveTabFolders(tabFolders.map((f)=>f.id===folder.id?{...f,tabs:(f.tabs||[]).filter((id)=>id!==tabId)}:f));
                         saveTabOrder([...tabOrder,tabId]);
                       }}>꺼내기</button>
                     </div>
                   );})}
-                  {!(folder.tabs||[]).length&&<div style={{fontSize:12,color:"var(--ink3)"}}>비어있음</div>}
+                  {!(folder.tabs||[]).length&&<div style={{fontSize:12,color:"var(--ink3)"}}>비어있음 — 표시 중 탭에서 📁 폴더로 버튼으로 추가하세요</div>}
                 </div>
               ))}
 
               {/* 숨긴 탭 */}
               {(data.hiddenTabs||[]).length>0&&<>
-                <div style={{fontSize:13,fontWeight:700,margin:"14px 0 8px",color:"var(--ink3)"}}>숨긴 탭</div>
+                <div style={{fontSize:12,fontWeight:800,color:"var(--ink3)",padding:"14px 4px 8px"}}>숨긴 탭</div>
                 {(data.hiddenTabs||[]).map((id)=>{const t=ALL_TABS.find((x)=>x.id===id);if(!t)return null;return(
-                  <div key={id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:8,border:"1px dashed var(--line)",marginBottom:6,opacity:.7}}>
+                  <div key={id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:9,border:"1px dashed var(--line)",opacity:.75}}>
                     <span style={{flex:1,fontSize:13}}>{t.label}</span>
                     <button className="riedit" onClick={()=>{
                       saveHiddenTabs((data.hiddenTabs||[]).filter((x)=>x!==id));
@@ -3103,7 +3108,7 @@ function Board() {
                 );})}
               </>}
             </div>
-            <div className="modal-foot"><span className="spacer"/><button className="btn-save" onClick={()=>setTabMgr(false)}>완료</button></div>
+            <div className="modal-foot" style={{padding:"16px 24px"}}><span className="spacer"/><button className="btn-save" style={{padding:"9px 24px"}} onClick={()=>setTabMgr(false)}>완료</button></div>
           </div>
         </div>
       )}
