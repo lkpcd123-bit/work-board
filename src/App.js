@@ -925,7 +925,6 @@ function Board() {
   const [c24SubTab, setC24SubTab] = useState('schedule');
   // 상품 편집기
   const [edCat, setEdCat] = useState('보틀');
-  const [edLoading, setEdLoading] = useState(false);
   const [edMsg, setEdMsg] = useState('');
   const [edSending, setEdSending] = useState(false);
   const [edChecked, setEdChecked] = useState({});
