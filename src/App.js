@@ -933,6 +933,7 @@ function Board() {
   const [edChanged, setEdChanged] = useState({}); // {idx: true} 변경된 이미지
   const [edSendLog, setEdSendLog] = useState([]); // 전송 이력
   const [edSubTab, setEdSubTab] = useState('master'); // 'master'|'products'|'history'
+  const [edSummary, setEdSummary] = useState({}); // {분류: '요약설명'}
   const ED_CATS = ['보틀','대용량','파우치'];
   const c24TimerRef = useRef(null);
   const c24TokenRef = useRef('');
@@ -1662,7 +1663,10 @@ function Board() {
             else descHtml+=newTag+'\n';
           }
         }
-        const d=await c24Api({action:'update',productNo:found.product_no,payload:{description:descHtml}});
+        const d=await c24Api({action:'update',productNo:found.product_no,payload:{
+          description:descHtml,
+          ...(edSummary[edCat]?{summary_description:edSummary[edCat]}:{})
+        }});
         if(d.product){
           successCount++;
           // lastSentAt 업데이트
@@ -3750,6 +3754,19 @@ function Board() {
                   <div style={{fontSize:12,color:"var(--ink3)"}}>{((data.edMasterImages||{})[edCat]||[]).length}장 등록됨</div>
                 </div>
                 {edMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:edMsg.startsWith("✅")?"#DCFFF1":edMsg.includes("중")?"#E9F2FF":"#FFECEB",color:edMsg.startsWith("✅")?"#1F845A":edMsg.includes("중")?"#0C66E4":"#CA3521",fontSize:13,marginBottom:12}}>{edMsg}</div>}
+
+                {/* 요약설명 */}
+                <div style={{marginBottom:16,padding:14,border:"1.5px solid var(--line)",borderRadius:10,background:"var(--bg)"}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                    <label style={{fontWeight:700,fontSize:13,margin:0}}>상품 요약설명</label>
+                    <span style={{fontSize:11,color:"var(--ink3)"}}>일괄 전송 시 체크된 상품에 동일 적용</span>
+                  </div>
+                  <textarea
+                    value={edSummary[edCat]||""}
+                    onChange={(e)=>setEdSummary({...edSummary,[edCat]:e.target.value})}
+                    placeholder="상품 요약설명 입력 (비워두면 전송 안 함)"
+                    style={{width:"100%",minHeight:60,fontSize:13,border:"1px solid var(--line2)",borderRadius:7,padding:"8px 10px",resize:"vertical",fontFamily:"inherit"}} />
+                </div>
 
                 {/* 이미지 목록 */}
                 {((data.edMasterImages||{})[edCat]||[]).map((img,i)=>(
