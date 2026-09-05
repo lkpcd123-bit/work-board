@@ -922,7 +922,8 @@ function Board() {
   const [edDraft, setEdDraft] = useState(null); // 편집 중인 draft
   const [edLoading, setEdLoading] = useState(false);
   const [edMsg, setEdMsg] = useState('');
-  const [edDescView, setEdDescView] = useState('html'); // 'html' | 'preview'
+  const [edDescView, setEdDescView] = useState('parts'); // 'parts' | 'html' | 'preview'
+  const [edSending, setEdSending] = useState(false);
   const [edAddCode, setEdAddCode] = useState('');
   const [edAddName, setEdAddName] = useState('');
   const ED_CATS = ['보틀','대용량','파우치'];
@@ -3663,7 +3664,7 @@ function Board() {
                       const detail=await c24GetProduct(found.product_no);
                       const prod=detail||found;
                       setEdProduct(prod);
-                      setEdDraft({product_name:prod.product_name||'',summary_description:prod.summary_description||'',simple_description:prod.simple_description||'',description:prod.description||''});
+                      setEdDraft({product_name:prod.product_name||'',summary_description:prod.summary_description||'',simple_description:prod.simple_description||'',description:prod.description||'',imageParts:[],summaryImage:null});
                       setEdMsg('');
                     }else setEdMsg("❌ "+p.code+" 조회 실패");
                     setEdLoading(false);
@@ -3706,50 +3707,175 @@ function Board() {
               {edProduct&&edDraft&&(
                 <div className="panel" style={{padding:20}}>
                   <div style={{fontSize:14,fontWeight:800,color:"#0C66E4",marginBottom:16}}>#{edProduct.product_no} {edProduct.product_name}</div>
+
                   {/* 상품명 */}
-                  <div className="fld" style={{marginBottom:12}}>
+                  <div className="fld" style={{marginBottom:16}}>
                     <label>상품명</label>
                     <input value={edDraft.product_name} onChange={(e)=>setEdDraft({...edDraft,product_name:e.target.value})} />
                   </div>
-                  {/* 요약설명 */}
-                  <div className="fld" style={{marginBottom:12}}>
-                    <label>상품 요약설명</label>
-                    <textarea value={edDraft.summary_description} onChange={(e)=>setEdDraft({...edDraft,summary_description:e.target.value})} style={{height:60}} placeholder="상품 요약설명" />
+
+                  {/* 요약설명 이미지 */}
+                  <div style={{marginBottom:20}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                      <label style={{fontWeight:700,fontSize:13}}>요약설명 이미지</label>
+                      <span style={{fontSize:11,color:"var(--ink3)"}}>카페24 summary_description에 img 태그로 전송</span>
+                    </div>
+                    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",padding:12,border:"1.5px dashed var(--line2)",borderRadius:9,background:"var(--bg)"}}>
+                      {edDraft.summaryImage
+                        ?<>
+                          <img src={edDraft.summaryImage.preview} alt="summary" style={{height:72,borderRadius:6,border:"1px solid var(--line)",objectFit:"contain",maxWidth:200}} />
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:11,color:"var(--ink3)",marginBottom:4}}>{edDraft.summaryImage.name}</div>
+                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",fontWeight:700}} onClick={()=>setEdDraft({...edDraft,summaryImage:null})}>× 제거</button>
+                          </div>
+                        </>
+                        :<label style={{cursor:"pointer",fontSize:12,color:"#0C66E4",fontWeight:700}}>
+                            📁 이미지 선택
+                            <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
+                              const f=e.target.files?.[0];if(!f)return;
+                              const b64=await resizeImage(f,1200,1200,0.9);
+                              setEdDraft({...edDraft,summaryImage:{base64:b64.split(',')[1],name:f.name,preview:b64}});
+                            }} />
+                          </label>
+                      }
+                    </div>
                   </div>
-                  {/* 간략설명 */}
-                  <div className="fld" style={{marginBottom:12}}>
-                    <label>상품 간략설명</label>
-                    <textarea value={edDraft.simple_description} onChange={(e)=>setEdDraft({...edDraft,simple_description:e.target.value})} style={{height:80}} placeholder="상품 간략설명" />
-                  </div>
-                  {/* 상세설명 */}
-                  <div className="fld" style={{marginBottom:12}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-                      <label style={{margin:0}}>상품 상세설명</label>
-                      <div style={{display:"flex",gap:4}}>
-                        <button onClick={()=>setEdDescView('html')} style={{padding:"3px 10px",borderRadius:6,border:"1.5px solid",fontSize:11,cursor:"pointer",fontWeight:edDescView==="html"?700:400,borderColor:edDescView==="html"?"#0C66E4":"var(--line)",background:edDescView==="html"?"#0C66E4":"var(--bg)",color:edDescView==="html"?"#fff":"var(--ink2)"}}>HTML</button>
-                        <button onClick={()=>setEdDescView('preview')} style={{padding:"3px 10px",borderRadius:6,border:"1.5px solid",fontSize:11,cursor:"pointer",fontWeight:edDescView==="preview"?700:400,borderColor:edDescView==="preview"?"#0C66E4":"var(--line)",background:edDescView==="preview"?"#0C66E4":"var(--bg)",color:edDescView==="preview"?"#fff":"var(--ink2)"}}>이미지 보기</button>
+
+                  {/* 상세설명 이미지 파트 */}
+                  <div style={{marginBottom:16}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                      <label style={{fontWeight:700,fontSize:13}}>상세설명 이미지 파트</label>
+                      <div style={{display:"flex",gap:6}}>
+                        {['parts','html','preview'].map((v)=>(
+                          <button key={v} onClick={()=>setEdDescView(v)}
+                            style={{padding:"3px 10px",borderRadius:6,border:"1.5px solid",fontSize:11,cursor:"pointer",
+                              fontWeight:edDescView===v?700:400,
+                              borderColor:edDescView===v?"#0C66E4":"var(--line)",
+                              background:edDescView===v?"#0C66E4":"var(--bg)",
+                              color:edDescView===v?"#fff":"var(--ink2)"}}>
+                            {v==="parts"?"파트 편집":v==="html"?"HTML":"미리보기"}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    {edDescView==="html"
-                      ?<textarea value={edDraft.description} onChange={(e)=>setEdDraft({...edDraft,description:e.target.value})} style={{minHeight:200,fontSize:12,fontFamily:"monospace"}} />
-                      :<div style={{border:"1px solid var(--line)",borderRadius:8,padding:12,minHeight:200,maxHeight:500,overflowY:"auto",background:"#fff"}} dangerouslySetInnerHTML={{__html:edDraft.description}} />
-                    }
+
+                    {/* 파트 편집 모드 */}
+                    {edDescView==="parts"&&(
+                      <div>
+                        {(edDraft.imageParts||[]).map((part,i)=>(
+                          <div key={part.id} style={{border:"1.5px solid var(--line)",borderRadius:10,padding:14,marginBottom:10,background:"var(--bg)"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                              <span style={{fontSize:12,fontWeight:800,color:"var(--ink3)"}}>파트 {i+1}</span>
+                              <input value={part.label||""} placeholder="파트 이름 (예: 상단배너, 성분표)" onChange={(e)=>{
+                                const parts=[...edDraft.imageParts];parts[i]={...parts[i],label:e.target.value};
+                                setEdDraft({...edDraft,imageParts:parts});
+                              }} style={{flex:1,fontSize:12,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 8px"}} />
+                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"var(--ink3)"}} disabled={i===0} onClick={()=>{
+                                const parts=[...edDraft.imageParts];[parts[i-1],parts[i]]=[parts[i],parts[i-1]];
+                                setEdDraft({...edDraft,imageParts:parts});
+                              }}>▲</button>
+                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"var(--ink3)"}} disabled={i===edDraft.imageParts.length-1} onClick={()=>{
+                                const parts=[...edDraft.imageParts];[parts[i],parts[i+1]]=[parts[i+1],parts[i]];
+                                setEdDraft({...edDraft,imageParts:parts});
+                              }}>▼</button>
+                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--danger)"}} onClick={()=>{
+                                setEdDraft({...edDraft,imageParts:edDraft.imageParts.filter((_,j)=>j!==i)});
+                              }}>×</button>
+                            </div>
+                            {/* 이미지 목록 */}
+                            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                              {(part.images||[]).map((img,j)=>(
+                                <div key={j} style={{position:"relative"}}>
+                                  <img src={img.preview} alt="" style={{width:80,height:60,objectFit:"cover",borderRadius:6,border:"1px solid var(--line)"}} />
+                                  <button onClick={()=>{
+                                    const parts=[...edDraft.imageParts];
+                                    parts[i]={...parts[i],images:(parts[i].images||[]).filter((_,k)=>k!==j)};
+                                    setEdDraft({...edDraft,imageParts:parts});
+                                  }} style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.6)",color:"#fff",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",fontSize:11,padding:0}}>×</button>
+                                </div>
+                              ))}
+                              <label style={{width:80,height:60,border:"2px dashed var(--line2)",borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:22,color:"var(--ink3)"}}>
+                                +
+                                <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={async(e)=>{
+                                  const files=Array.from(e.target.files||[]);
+                                  const imgs=await Promise.all(files.map(async(f)=>{
+                                    const b64=await resizeImage(f,1200,1200,0.9);
+                                    return {base64:b64.split(',')[1],name:f.name,preview:b64};
+                                  }));
+                                  const parts=[...edDraft.imageParts];
+                                  parts[i]={...parts[i],images:[...(parts[i].images||[]),...imgs]};
+                                  setEdDraft({...edDraft,imageParts:parts});
+                                  e.target.value="";
+                                }} />
+                              </label>
+                            </div>
+                          </div>
+                        ))}
+                        <button className="btn ghost" style={{width:"100%",fontSize:12}} onClick={()=>{
+                          setEdDraft({...edDraft,imageParts:[...(edDraft.imageParts||[]),{id:uid(),label:"",images:[]}]});
+                        }}>+ 파트 추가</button>
+                      </div>
+                    )}
+
+                    {/* HTML 모드 */}
+                    {edDescView==="html"&&(
+                      <textarea value={edDraft.description} onChange={(e)=>setEdDraft({...edDraft,description:e.target.value})}
+                        style={{width:"100%",minHeight:200,fontSize:12,fontFamily:"monospace",border:"1px solid var(--line2)",borderRadius:8,padding:10,resize:"vertical"}} />
+                    )}
+
+                    {/* 미리보기 */}
+                    {edDescView==="preview"&&(
+                      <div style={{border:"1px solid var(--line)",borderRadius:8,padding:12,minHeight:200,maxHeight:600,overflowY:"auto",background:"#fff"}}
+                        dangerouslySetInnerHTML={{__html:edDraft.description}} />
+                    )}
                   </div>
-                  <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+
+                  {/* 전송 메시지 */}
+                  {edMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:edMsg.startsWith("✅")?"#DCFFF1":edMsg.includes("중")?"#E9F2FF":"#FFECEB",color:edMsg.startsWith("✅")?"#1F845A":edMsg.includes("중")?"#0C66E4":"#CA3521",fontSize:13,marginBottom:12}}>{edMsg}</div>}
+
+                  {/* 일괄 전송 */}
+                  <div style={{display:"flex",gap:8,justifyContent:"flex-end",borderTop:"1px solid var(--line)",paddingTop:14,marginTop:4}}>
                     <button className="btn ghost" onClick={()=>{setEdProduct(null);setEdDraft(null);setEdSelCode(null);setEdMsg('');}}>초기화</button>
-                    <button className="btn-save" disabled={edLoading} onClick={async()=>{
+                    <button className="btn-save" style={{background:"#1F845A"}} disabled={edSending||edLoading} onClick={async()=>{
                       if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
-                      setEdLoading(true);setEdMsg('');
+                      setEdSending(true);setEdMsg('일괄 전송 중...');
                       const payload={};
+                      // 상품명
                       if(edDraft.product_name!==edProduct.product_name)payload.product_name=edDraft.product_name;
-                      if(edDraft.summary_description!==(edProduct.summary_description||''))payload.summary_description=edDraft.summary_description;
-                      if(edDraft.simple_description!==(edProduct.simple_description||''))payload.simple_description=edDraft.simple_description;
-                      if(edDraft.description!==(edProduct.description||''))payload.description=edDraft.description;
-                      if(!Object.keys(payload).length){setEdMsg("변경사항 없음");setEdLoading(false);return;}
+                      // 요약설명 이미지
+                      if(edDraft.summaryImage){
+                        setEdMsg('요약설명 이미지 업로드 중...');
+                        const upR=await c24Api({action:'uploadImage',imageBase64:edDraft.summaryImage.base64,imageName:edDraft.summaryImage.name});
+                        const imgUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+                        if(imgUrl)payload.summary_description=`<img src="${imgUrl}" style="max-width:100%;" alt="summary" />`;
+                        else{setEdMsg("❌ 요약설명 이미지 업로드 실패: "+JSON.stringify(upR));setEdSending(false);return;}
+                      }
+                      // 상세설명 파트 이미지들
+                      if((edDraft.imageParts||[]).length>0){
+                        setEdMsg('상세설명 이미지 업로드 중...');
+                        let descHtml='';
+                        for(const part of edDraft.imageParts){
+                          if(part.label)descHtml+=`<div style="margin:8px 0;font-weight:bold;font-size:14px;">${part.label}</div>
+`;
+                          for(const img of (part.images||[])){
+                            const upR=await c24Api({action:'uploadImage',imageBase64:img.base64,imageName:img.name});
+                            const imgUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+                            if(imgUrl)descHtml+=`<div style="width:100%;text-align:center;"><img src="${imgUrl}" style="max-width:100%;" alt="${part.label||''}" /></div>
+`;
+                            else{setEdMsg("❌ 이미지 업로드 실패: "+img.name);setEdSending(false);return;}
+                          }
+                        }
+                        payload.description=descHtml;
+                      } else if(edDraft.description!==(edProduct.description||'')){
+                        payload.description=edDraft.description;
+                      }
+                      if(!Object.keys(payload).length){setEdMsg("변경사항 없음");setEdSending(false);return;}
+                      setEdMsg('카페24 저장 중...');
                       const d=await c24Api({action:'update',productNo:edProduct.product_no,payload});
-                      if(d.product)setEdMsg("✅ 저장 완료");else setEdMsg("❌ 오류: "+JSON.stringify(d.error||d));
-                      setEdLoading(false);
-                    }}>{edLoading?"저장중...":"💾 저장"}</button>
+                      if(d.product)setEdMsg("✅ 일괄 전송 완료!");
+                      else setEdMsg("❌ 오류: "+JSON.stringify(d.error||d));
+                      setEdSending(false);
+                    }}>{edSending?"전송중...":"🚀 일괄 전송"}</button>
                   </div>
                 </div>
               )}
