@@ -807,24 +807,24 @@ function Board() {
   const [ready, setReady] = useState(false);
   const [saveState, setSaveState] = useState("idle");
   const [view, setView] = useState("board");
-  const ALL_TABS=useMemo(()=>[
-    {id:"board",label:"보드",n:()=>live.length},
-    {id:"routine",label:"반복업무",n:()=>rItems.filter((it)=>!(it.checkins||{})[riDate]).length},
-    {id:"monthly",label:"월간 업무",n:()=>mlyByMonth(mlyDate).filter((m)=>!m.done).length},
-    {id:"checklist",label:"체크리스트",n:()=>checkitems.filter((c)=>!c.done).length},
-    {id:"memo",label:"메모",n:()=>memoItems.length},
-    {id:"mindmap",label:"마인드맵",n:()=>null},
-    {id:"ref",label:"래퍼런스",n:()=>null},
-    {id:"schedule",label:"시간표",n:()=>null},
-    {id:"issue",label:"이슈",n:()=>allIssues.filter((i)=>!i.resolved).length},
-    {id:"archive",label:"보관함",n:()=>archived.length},
-    {id:"log",label:"변경 이력",n:()=>null},
-    {id:"ai",label:"AI비서",n:()=>null},
-    {id:"cafe24",label:"상품스케줄",n:()=>null},
-    {id:"stock",label:"재고관리",n:()=>null},
-    {id:"team",label:"팀·설정",n:()=>null},
-  ],[live,rItems,riDate,mlyDate,checkitems,memoItems,allIssues,archived]);
-  const tabOrder=useMemo(()=>data.tabOrder||ALL_TABS.map((t)=>t.id),[data.tabOrder,ALL_TABS]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ALL_TABS=[
+    {id:"board",label:"보드"},
+    {id:"routine",label:"반복업무"},
+    {id:"monthly",label:"월간 업무"},
+    {id:"checklist",label:"체크리스트"},
+    {id:"memo",label:"메모"},
+    {id:"mindmap",label:"마인드맵"},
+    {id:"ref",label:"래퍼런스"},
+    {id:"schedule",label:"시간표"},
+    {id:"issue",label:"이슈"},
+    {id:"archive",label:"보관함"},
+    {id:"log",label:"변경 이력"},
+    {id:"ai",label:"AI비서"},
+    {id:"cafe24",label:"상품스케줄"},
+    {id:"stock",label:"재고관리"},
+    {id:"team",label:"팀·설정"},
+  ];
+  const tabOrder=useMemo(()=>data.tabOrder||ALL_TABS.map((t)=>t.id),[data.tabOrder]); // eslint-disable-line react-hooks/exhaustive-deps
   const hiddenTabs=useMemo(()=>data.hiddenTabs||[],[data.hiddenTabs]);
   const visibleTabs=useMemo(()=>{
     const order=tabOrder.filter((id)=>!hiddenTabs.includes(id));
@@ -1920,7 +1920,10 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {visibleTabs.map((t)=>{const n=t.n();return(
+        {visibleTabs.map((t)=>{
+          const badgeMap={board:live.length,routine:rItems.filter((it)=>!(it.checkins||{})[riDate]).length,monthly:mlyByMonth(mlyDate).filter((m)=>!m.done).length,checklist:checkitems.filter((c)=>!c.done).length,memo:memoItems.length,issue:allIssues.filter((i)=>!i.resolved).length,archive:archived.length};
+          const n=badgeMap[t.id]??null;
+          return(
           <button key={t.id}
             draggable
             onDragStart={()=>setTabDragId(t.id)}
