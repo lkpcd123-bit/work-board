@@ -3824,24 +3824,47 @@ function Board() {
                 </label>
 
                 {/* 전송 버튼 */}
-                {((data.edMasterImages||{})[edCat]||[]).length>0&&(
+                {(((data.edMasterImages||{})[edCat]||[]).length>0||edSummary[edCat])&&(
                   <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid var(--line)"}}>
                     <div style={{fontSize:12,color:"var(--ink3)",marginBottom:10}}>
                       {Object.keys(edChanged).length>0
                         ?<span style={{color:"#F7B731",fontWeight:700}}>⚠ {Object.keys(edChanged).length}개 이미지가 변경됨 — 변경된 것만 또는 전체 전송 가능</span>
-                        :"이미지를 전송할 상품은 [상품 목록] 탭에서 체크하세요"}
+                        :"전송할 상품은 [상품 목록] 탭에서 체크하세요"}
                     </div>
-                    <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                    <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
+                      {/* 요약설명만 전송 */}
+                      {edSummary[edCat]&&(
+                        <button className="btn ghost" style={{fontSize:12}} disabled={edSending} onClick={async()=>{
+                          if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
+                          const checkedCodes=Object.entries(edChecked).filter(([,v])=>v).map(([k])=>k);
+                          if(!checkedCodes.length){setEdMsg("❌ [상품 목록] 탭에서 상품을 먼저 체크하세요");setEdSubTab('products');return;}
+                          setEdSending(true);setEdMsg('요약설명 전송 중...');
+                          let ok=0;
+                          for(const code of checkedCodes){
+                            const found=await c24SearchByCode(code);
+                            if(!found)continue;
+                            const d=await c24Api({action:'update',productNo:found.product_no,payload:{summary_description:edSummary[edCat]}});
+                            if(d.product)ok++;
+                          }
+                          setEdMsg(`✅ 요약설명 ${ok}/${checkedCodes.length}개 상품 전송 완료!`);
+                          setEdSendLog((p)=>[...p,{ts:Date.now(),cat:edCat,codes:checkedCodes,imgIdxs:[],ok:ok>0,msg:`요약설명 ${ok}/${checkedCodes.length}개 전송`}]);
+                          setEdSending(false);
+                        }}>{edSending?"전송중...":"📝 요약설명만 전송"}</button>
+                      )}
+                      {/* 변경된 이미지만 */}
                       {Object.keys(edChanged).length>0&&(
                         <button className="btn ghost" style={{color:"#F7B731",borderColor:"#F7B731",fontWeight:700}} disabled={edSending} onClick={async()=>{
                           const targets=Object.keys(edChanged).map(Number);
                           await sendImages(targets);
-                        }}>{edSending?"전송중...":"🔄 변경된 것만 전송"}</button>
+                        }}>{edSending?"전송중...":"🔄 변경된 이미지만 전송"}</button>
                       )}
-                      <button className="btn-save" style={{background:"#1F845A"}} disabled={edSending} onClick={async()=>{
-                        const allIdx=((data.edMasterImages||{})[edCat]||[]).map((_,i)=>i);
-                        await sendImages(allIdx);
-                      }}>{edSending?"전송중...":"🚀 전체 일괄 전송"}</button>
+                      {/* 전체 */}
+                      {((data.edMasterImages||{})[edCat]||[]).length>0&&(
+                        <button className="btn-save" style={{background:"#1F845A"}} disabled={edSending} onClick={async()=>{
+                          const allIdx=((data.edMasterImages||{})[edCat]||[]).map((_,i)=>i);
+                          await sendImages(allIdx);
+                        }}>{edSending?"전송중...":"🚀 전체 일괄 전송"}</button>
+                      )}
                     </div>
                   </div>
                 )}
