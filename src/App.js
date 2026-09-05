@@ -2832,6 +2832,20 @@ function Board() {
         });
         const [scAddOpen,setScAddOpen]=React.useState(false);
         const [scDraft,setScDraft]=React.useState(null);
+        const [scCopyOpen,setScCopyOpen]=React.useState(false);
+        const [scCopyTarget,setScCopyTarget]=React.useState("월");
+        const DAYS_KR={월:1,화:2,수:3,목:4,금:5};
+        const copyToDay=(targetDay)=>{
+          const src=scBlocks[scDay]||[];
+          if(!src.length){alert("복사할 일정이 없습니다.");return;}
+          const existing=scBlocks[targetDay]||[];
+          const newBlocks=src.map((b)=>({...b,id:uid()}));
+          // 기존 일정과 합치기
+          const merged=[...existing,...newBlocks];
+          saveBlocks(targetDay,merged);
+          setScCopyOpen(false);
+          alert(`${scDay}요일 일정 ${src.length}개를 ${targetDay}요일에 복사했습니다.`);
+        };
 
         const START_H=9,START_M=30,END_H=18,END_M=30;
         const totalMin=(END_H-START_H)*60+(END_M-START_M);
@@ -2922,7 +2936,8 @@ function Board() {
             </div>
             {/* 사이드 */}
             <div style={{width:160,flexShrink:0}}>
-              <button className="btn-save" style={{width:"100%",marginBottom:12}} onClick={()=>{setScDraft({id:null,title:"",sh:9,sm:30,eh:10,em:30,color:COLORS[0],memo:""});setScAddOpen(true);}}>+ 일정 추가</button>
+              <button className="btn-save" style={{width:"100%",marginBottom:8}} onClick={()=>{setScDraft({id:null,title:"",sh:9,sm:30,eh:10,em:30,color:COLORS[0],memo:""});setScAddOpen(true);}}>+ 일정 추가</button>
+              <button className="btn ghost" style={{width:"100%",marginBottom:12,fontSize:12}} onClick={()=>setScCopyOpen(true)}>📋 다른 요일로 복사</button>
               <div style={{fontSize:12,color:"var(--ink3)",marginBottom:8,fontWeight:700}}>{scDay}요일 일정 ({blocks.length})</div>
               {blocks.length===0&&<div style={{fontSize:12,color:"var(--ink3)"}}>일정이 없습니다</div>}
               {[...blocks].sort((a,b)=>toMin(a.sh,a.sm)-toMin(b.sh,b.sm)).map((b)=>(
@@ -2933,6 +2948,49 @@ function Board() {
               ))}
             </div>
           </div>
+
+          {/* 복사 모달 */}
+          {scCopyOpen&&(
+            <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setScCopyOpen(false)}>
+              <div className="modal" style={{maxWidth:340}} onClick={(e)=>e.stopPropagation()}>
+                <div className="modal-head"><h3>📋 일정 복사</h3><button className="x" onClick={()=>setScCopyOpen(false)}>×</button></div>
+                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:14}}>
+                  <div style={{fontSize:13,color:"var(--ink2)"}}>
+                    <b>{scDay}요일</b> 일정 <b>{(scBlocks[scDay]||[]).length}개</b>를 복사할 요일을 선택하세요.
+                  </div>
+                  <div className="fld"><label>복사할 요일</label>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:4}}>
+                      {DAYS.filter((d)=>d!==scDay).map((d)=>(
+                        <button key={d} onClick={()=>setScCopyTarget(d)}
+                          style={{padding:"8px 16px",borderRadius:8,border:"1.5px solid",fontSize:13,fontWeight:700,cursor:"pointer",
+                            borderColor:scCopyTarget===d?"#0C66E4":"var(--line)",
+                            background:scCopyTarget===d?"#0C66E4":"var(--bg)",
+                            color:scCopyTarget===d?"#fff":"var(--ink2)"}}>
+                          {d}요일
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{padding:"10px 12px",background:"#F4F5F7",borderRadius:8,fontSize:12,color:"var(--ink3)"}}>
+                    ⚠ 기존 {scCopyTarget}요일 일정에 <b>추가</b>됩니다. (덮어쓰기 아님)
+                    {(scBlocks[scCopyTarget]||[]).length>0&&<span> 현재 {(scBlocks[scCopyTarget]||[]).length}개 있음.</span>}
+                  </div>
+                </div>
+                <div className="modal-foot">
+                  <button className="btn ghost" style={{fontSize:12}} onClick={()=>{
+                    if(window.confirm(`${scCopyTarget}요일 기존 일정을 모두 지우고 복사할까요?`)){
+                      saveBlocks(scCopyTarget,(scBlocks[scDay]||[]).map((b)=>({...b,id:uid()})));
+                      setScCopyOpen(false);
+                      alert(`${scDay}요일 → ${scCopyTarget}요일 덮어쓰기 완료`);
+                    }
+                  }}>덮어쓰기</button>
+                  <span className="spacer"/>
+                  <button className="btn ghost" onClick={()=>setScCopyOpen(false)}>취소</button>
+                  <button className="btn-save" onClick={()=>copyToDay(scCopyTarget)}>추가 복사</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 일정 추가/수정 모달 */}
           {scAddOpen&&scDraft&&(
