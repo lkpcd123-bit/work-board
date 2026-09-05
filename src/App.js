@@ -65,7 +65,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
         const [scDraft,setScDraft]=React.useState(null);
         const [scCopyOpen,setScCopyOpen]=React.useState(false);
         const [scCopyTarget,setScCopyTarget]=React.useState("월");
-        const DAYS_KR={월:1,화:2,수:3,목:4,금:5};
+        
         const copyToDay=(targetDay)=>{
           const src=scBlocks[scDay]||[];
           if(!src.length){alert("복사할 일정이 없습니다.");return;}
@@ -824,7 +824,7 @@ function Board() {
     {id:"stock",label:"재고관리",n:()=>null},
     {id:"team",label:"팀·설정",n:()=>null},
   ];
-  const tabOrder=useMemo(()=>data.tabOrder||ALL_TABS.map((t)=>t.id),[data.tabOrder]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tabOrder=useMemo(()=>data.tabOrder||ALL_TABS.map((t)=>t.id),[data.tabOrder,ALL_TABS]); // eslint-disable-line react-hooks/exhaustive-deps
   const hiddenTabs=useMemo(()=>data.hiddenTabs||[],[data.hiddenTabs]);
   const visibleTabs=useMemo(()=>{
     const order=tabOrder.filter((id)=>!hiddenTabs.includes(id));
