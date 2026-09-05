@@ -588,6 +588,34 @@ function Board() {
   const [ready, setReady] = useState(false);
   const [saveState, setSaveState] = useState("idle");
   const [view, setView] = useState("board");
+  const ALL_TABS=[
+    {id:"board",label:"보드",n:()=>live.length},
+    {id:"routine",label:"반복업무",n:()=>rItems.filter((it)=>!(it.checkins||{})[riDate]).length},
+    {id:"monthly",label:"월간 업무",n:()=>mlyByMonth(mlyDate).filter((m)=>!m.done).length},
+    {id:"checklist",label:"체크리스트",n:()=>checkitems.filter((c)=>!c.done).length},
+    {id:"memo",label:"메모",n:()=>memoItems.length},
+    {id:"mindmap",label:"마인드맵",n:()=>null},
+    {id:"ref",label:"래퍼런스",n:()=>null},
+    {id:"schedule",label:"시간표",n:()=>null},
+    {id:"issue",label:"이슈",n:()=>allIssues.filter((i)=>!i.resolved).length},
+    {id:"archive",label:"보관함",n:()=>archived.length},
+    {id:"log",label:"변경 이력",n:()=>null},
+    {id:"ai",label:"AI비서",n:()=>null},
+    {id:"cafe24",label:"상품스케줄",n:()=>null},
+    {id:"stock",label:"재고관리",n:()=>null},
+    {id:"team",label:"팀·설정",n:()=>null},
+  ];
+  const tabOrder=useMemo(()=>data.tabOrder||ALL_TABS.map((t)=>t.id),[data.tabOrder]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hiddenTabs=useMemo(()=>data.hiddenTabs||[],[data.hiddenTabs]);
+  const visibleTabs=useMemo(()=>{
+    const order=tabOrder.filter((id)=>!hiddenTabs.includes(id));
+    const rest=ALL_TABS.map((t)=>t.id).filter((id)=>!order.includes(id)&&!hiddenTabs.includes(id)); // eslint-disable-line react-hooks/exhaustive-deps
+    return [...order,...rest].map((id)=>ALL_TABS.find((t)=>t.id===id)).filter(Boolean); // eslint-disable-line react-hooks/exhaustive-deps
+  },[tabOrder,hiddenTabs]);
+  const [tabMgr, setTabMgr] = useState(false);
+  const [tabDragId, setTabDragId] = useState(null);
+  const saveTabOrder=(order)=>commit((d)=>({...d,tabOrder:order,updatedAt:Date.now()}),[]);
+  const saveHiddenTabs=(hidden)=>commit((d)=>({...d,hiddenTabs:hidden,updatedAt:Date.now()}),[]);
   const [q, setQ] = useState("");
   const [fCh, setFCh] = useState("전체");
   const [fOwner, setFOwner] = useState("전체");
@@ -731,7 +759,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -1673,9 +1701,25 @@ function Board() {
         <button className="ghostw" onClick={logout}>로그아웃</button>
       </div>
       <div className="tabs">
-        {[{id:"board",label:"보드",n:live.length},{id:"routine",label:"반복업무",n:rItems.filter((it)=>!(it.checkins||{})[riDate]).length},{id:"monthly",label:"월간 업무",n:mlyByMonth(mlyDate).filter((m)=>!m.done).length},{id:"checklist",label:"체크리스트",n:checkitems.filter((c)=>!c.done).length},{id:"memo",label:"메모",n:memoItems.length},{id:"mindmap",label:"마인드맵",n:null},{id:"ref",label:"래퍼런스",n:null},{id:"issue",label:"이슈",n:allIssues.filter((i)=>!i.resolved).length},{id:"archive",label:"보관함",n:archived.length},{id:"log",label:"변경 이력",n:null},{id:"ai",label:"AI비서",n:null},{id:"cafe24",label:"상품스케줄",n:null},{id:"stock",label:"재고관리",n:null},{id:"team",label:"팀·설정",n:null}].map((t)=>(
-          <button key={t.id} className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>{t.label}{t.n!==null&&<em>{t.n}</em>}</button>
-        ))}
+        {visibleTabs.map((t)=>{const n=t.n();return(
+          <button key={t.id}
+            draggable
+            onDragStart={()=>setTabDragId(t.id)}
+            onDragOver={(e)=>e.preventDefault()}
+            onDrop={()=>{
+              if(!tabDragId||tabDragId===t.id)return;
+              const cur=visibleTabs.map((x)=>x.id);
+              const fi=cur.indexOf(tabDragId);const ti=cur.indexOf(t.id);
+              if(fi<0||ti<0)return;
+              const next=[...cur];const [m]=next.splice(fi,1);next.splice(ti,0,m);
+              saveTabOrder([...next,...hiddenTabs]);setTabDragId(null);
+            }}
+            onDragEnd={()=>setTabDragId(null)}
+            className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>
+            {t.label}{n!==null&&<em>{n}</em>}
+          </button>
+        );})}
+        <button title="탭 관리" onClick={()=>setTabMgr(true)} style={{background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--ink3)",padding:"0 6px",flexShrink:0}}>⚙</button>
       </div>
       <div className="page">
 
@@ -2732,6 +2776,208 @@ function Board() {
           {(data.log||[]).map((e)=><div key={e.id} className="logrow"><span className="t">{fmtTs(e.ts)}</span><span className="w">{e.who}</span><span><b style={{fontWeight:600}}>{e.action}</b>{e.taskTitle&&<span style={{color:"#565C64"}}> · {e.taskTitle}</span>}{e.detail&&<span style={{fontSize:10.5,color:"#8F959C"}}> — {e.detail}</span>}</span></div>)}
         </div>
       )}
+
+      {/* 탭 관리 모달 */}
+      {tabMgr&&(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setTabMgr(false)}>
+          <div className="modal" style={{maxWidth:440}} onClick={(e)=>e.stopPropagation()}>
+            <div className="modal-head"><h3>⚙ 탭 관리</h3><button className="x" onClick={()=>setTabMgr(false)}>×</button></div>
+            <div className="modal-body">
+              <div style={{fontSize:12,color:"var(--ink3)",marginBottom:12}}>드래그로 순서 변경 · 눈 아이콘으로 숨기기</div>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:6}}>표시 중</div>
+              {visibleTabs.map((t,i)=>(
+                <div key={t.id} draggable
+                  onDragStart={()=>setTabDragId(t.id)}
+                  onDragOver={(e)=>e.preventDefault()}
+                  onDrop={()=>{
+                    if(!tabDragId||tabDragId===t.id)return;
+                    const cur=visibleTabs.map((x)=>x.id);
+                    const fi=cur.indexOf(tabDragId);const ti=cur.indexOf(t.id);
+                    const next=[...cur];const [m]=next.splice(fi,1);next.splice(ti,0,m);
+                    saveTabOrder([...next,...hiddenTabs]);setTabDragId(null);
+                  }}
+                  onDragEnd={()=>setTabDragId(null)}
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:8,border:"1px solid var(--line)",marginBottom:6,background:"var(--bg)",cursor:"grab"}}>
+                  <span style={{color:"var(--ink3)",fontSize:14}}>☰</span>
+                  <span style={{flex:1,fontSize:13,fontWeight:600}}>{t.label}</span>
+                  <button style={{background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--ink3)"}}
+                    onClick={()=>{const hidden=[...hiddenTabs,t.id];saveHiddenTabs(hidden);saveTabOrder(tabOrder.filter((id)=>!hidden.includes(id)));}}>👁</button>
+                </div>
+              ))}
+              {hiddenTabs.length>0&&<>
+                <div style={{fontSize:13,fontWeight:700,margin:"14px 0 6px",color:"var(--ink3)"}}>숨김 탭</div>
+                {hiddenTabs.map((id)=>{const t=ALL_TABS.find((x)=>x.id===id);if(!t)return null;return( // eslint-disable-line react-hooks/exhaustive-deps
+                  <div key={id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:8,border:"1px dashed var(--line)",marginBottom:6,opacity:.6}}>
+                    <span style={{flex:1,fontSize:13}}>{t.label}</span>
+                    <button style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"#0C66E4",fontWeight:700}}
+                      onClick={()=>{const hidden=hiddenTabs.filter((x)=>x!==id);saveHiddenTabs(hidden);}}>표시</button>
+                  </div>
+                );})}
+              </>}
+            </div>
+            <div className="modal-foot"><span className="spacer"/><button className="btn-save" onClick={()=>setTabMgr(false)}>완료</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* 시간표 */}
+      {view==="schedule"&&(()=>{
+        const DAYS=["월","화","수","목","금"];
+        const today=new Date();
+        const dow=today.getDay();
+        const defaultDay=dow>=1&&dow<=5?DAYS[dow-1]:"월";
+        const [scDay,setScDay]=React.useState(defaultDay);
+        const [scBlocks,setScBlocks]=React.useState(()=>{
+          try{return JSON.parse(localStorage.getItem('wb_schedule')||'{}');}catch(e){return{};}
+        });
+        const [scAddOpen,setScAddOpen]=React.useState(false);
+        const [scDraft,setScDraft]=React.useState(null);
+
+        const START_H=9,START_M=30,END_H=18,END_M=30;
+        const totalMin=(END_H-START_H)*60+(END_M-START_M);
+        const COLORS=["#0C66E4","#1F845A","#E2483D","#F7B731","#8854D0","#2980B9","#E67E22"];
+
+        const saveBlocks=(day,blocks)=>{
+          const next={...scBlocks,[day]:blocks};
+          setScBlocks(next);
+          localStorage.setItem('wb_schedule',JSON.stringify(next));
+        };
+        const blocks=scBlocks[scDay]||[];
+
+        const toMin=(h,m)=>h*60+m;
+        const blockTop=(h,m)=>((toMin(h,m)-toMin(START_H,START_M))/totalMin)*100;
+        const blockH=(sh,sm,eh,em)=>((toMin(eh,em)-toMin(sh,sm))/totalMin)*100;
+
+        const todayDate=(day)=>{
+          const d=new Date();
+          const cur=d.getDay()||7;
+          const target=DAYS.indexOf(day)+1;
+          const diff=target-cur;
+          const dt=new Date(d);dt.setDate(d.getDate()+diff);
+          return `${dt.getMonth()+1}/${dt.getDate()}`;
+        };
+
+        return(
+        <div>
+          {/* 요일 탭 */}
+          <div style={{display:"flex",gap:0,marginBottom:16,border:"1px solid var(--line)",borderRadius:10,overflow:"hidden"}}>
+            {DAYS.map((day)=>(
+              <button key={day} onClick={()=>setScDay(day)}
+                style={{flex:1,padding:"10px 0",border:"none",cursor:"pointer",fontSize:13,fontWeight:scDay===day?800:500,
+                  background:scDay===day?"#0C66E4":"var(--card)",color:scDay===day?"#fff":"var(--ink2)",
+                  borderRight:day!=="금"?"1px solid var(--line)":"none",transition:"all .15s"}}>
+                <div>{day}</div>
+                <div style={{fontSize:11,opacity:.7,marginTop:2}}>{todayDate(day)}</div>
+              </button>
+            ))}
+          </div>
+
+          <div style={{display:"flex",gap:16}}>
+            {/* 시간 눈금 + 블록 */}
+            <div style={{flex:1,position:"relative",background:"var(--card)",borderRadius:12,boxShadow:"var(--sh)",padding:"0 0 0 56px",minHeight:520,overflow:"hidden"}}>
+              {/* 시간 눈금 */}
+              {Array.from({length:10},(_, i)=>{
+                const h=START_H+i;const m=i===0?START_M:0;
+                if(h>END_H||(h===END_H&&m>=END_M))return null;
+                const top=blockTop(h,m);
+                return(
+                  <div key={i} style={{position:"absolute",left:0,top:`${top}%`,width:"100%",display:"flex",alignItems:"center",pointerEvents:"none"}}>
+                    <span style={{width:50,fontSize:11,color:"var(--ink3)",textAlign:"right",paddingRight:8,flexShrink:0}}>{String(h).padStart(2,"0")}:{String(i===0?START_M:0).padStart(2,"0")}</span>
+                    <div style={{flex:1,height:"1px",background:"var(--line)"}} />
+                  </div>
+                );
+              })}
+              {/* 현재 시각 표시 */}
+              {scDay===defaultDay&&(()=>{
+                const now=new Date();const top=blockTop(now.getHours(),now.getMinutes());
+                if(top<0||top>100)return null;
+                return<div style={{position:"absolute",left:56,right:0,top:`${top}%`,height:2,background:"#CA3521",zIndex:10,pointerEvents:"none"}}>
+                  <div style={{position:"absolute",left:-6,top:-4,width:10,height:10,borderRadius:"50%",background:"#CA3521"}} />
+                </div>;
+              })()}
+              {/* 블록 */}
+              {blocks.map((b)=>{
+                const top=blockTop(b.sh,b.sm);
+                const h=blockH(b.sh,b.sm,b.eh,b.em);
+                return(
+                  <div key={b.id} style={{position:"absolute",left:60,right:8,top:`${top}%`,height:`${h}%`,background:b.color||"#0C66E4",borderRadius:7,padding:"6px 10px",cursor:"pointer",overflow:"hidden",boxSizing:"border-box",minHeight:24,zIndex:2}}
+                    onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.title}</div>
+                    {h>5&&<div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>}
+                  </div>
+                );
+              })}
+              {/* 빈 캔버스 클릭으로 추가 */}
+              <div style={{position:"absolute",left:56,right:0,top:0,bottom:0,zIndex:1}}
+                onClick={(e)=>{
+                  const rect=e.currentTarget.getBoundingClientRect();
+                  const pct=(e.clientY-rect.top)/rect.height;
+                  const min=Math.round(pct*totalMin/30)*30;
+                  const absMin=toMin(START_H,START_M)+min;
+                  const sh=Math.floor(absMin/60),sm=absMin%60;
+                  const eh=Math.floor((absMin+60)/60),em=(absMin+60)%60;
+                  setScDraft({id:null,title:"",sh,sm,eh:Math.min(eh,END_H),em:eh>=END_H?0:em,color:COLORS[blocks.length%COLORS.length],memo:""});
+                  setScAddOpen(true);
+                }} />
+            </div>
+            {/* 사이드 */}
+            <div style={{width:160,flexShrink:0}}>
+              <button className="btn-save" style={{width:"100%",marginBottom:12}} onClick={()=>{setScDraft({id:null,title:"",sh:9,sm:30,eh:10,em:30,color:COLORS[0],memo:""});setScAddOpen(true);}}>+ 일정 추가</button>
+              <div style={{fontSize:12,color:"var(--ink3)",marginBottom:8,fontWeight:700}}>{scDay}요일 일정 ({blocks.length})</div>
+              {blocks.length===0&&<div style={{fontSize:12,color:"var(--ink3)"}}>일정이 없습니다</div>}
+              {[...blocks].sort((a,b)=>toMin(a.sh,a.sm)-toMin(b.sh,b.sm)).map((b)=>(
+                <div key={b.id} style={{background:b.color,borderRadius:7,padding:"7px 10px",marginBottom:6,cursor:"pointer"}} onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{b.title}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 일정 추가/수정 모달 */}
+          {scAddOpen&&scDraft&&(
+            <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setScAddOpen(false)}>
+              <div className="modal" style={{maxWidth:380}} onClick={(e)=>e.stopPropagation()}>
+                <div className="modal-head"><h3>{scDraft.id?"일정 수정":"일정 추가"}</h3><button className="x" onClick={()=>setScAddOpen(false)}>×</button></div>
+                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:14}}>
+                  <div className="fld"><label>제목</label><input value={scDraft.title} onChange={(e)=>setScDraft({...scDraft,title:e.target.value})} placeholder="회의, 업무, 점심..." autoFocus /></div>
+                  <div className="r3">
+                    <div className="fld"><label>시작</label>
+                      <input type="time" value={`${String(scDraft.sh).padStart(2,"0")}:${String(scDraft.sm).padStart(2,"0")}`}
+                        onChange={(e)=>{const [h,m]=e.target.value.split(":").map(Number);setScDraft({...scDraft,sh:h,sm:m});}} />
+                    </div>
+                    <div className="fld"><label>종료</label>
+                      <input type="time" value={`${String(scDraft.eh).padStart(2,"0")}:${String(scDraft.em).padStart(2,"0")}`}
+                        onChange={(e)=>{const [h,m]=e.target.value.split(":").map(Number);setScDraft({...scDraft,eh:h,em:m});}} />
+                    </div>
+                    <div className="fld"><label>색상</label>
+                      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>
+                        {COLORS.map((c)=>(
+                          <div key={c} onClick={()=>setScDraft({...scDraft,color:c})}
+                            style={{width:22,height:22,borderRadius:"50%",background:c,cursor:"pointer",border:scDraft.color===c?"3px solid #172B4D":"2px solid transparent"}} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="fld"><label>메모</label><textarea value={scDraft.memo||""} onChange={(e)=>setScDraft({...scDraft,memo:e.target.value})} style={{height:60}} placeholder="참고사항..." /></div>
+                </div>
+                <div className="modal-foot">
+                  {scDraft.id&&<button className="del" onClick={()=>{saveBlocks(scDay,blocks.filter((b)=>b.id!==scDraft.id));setScAddOpen(false);}}>삭제</button>}
+                  <span className="spacer"/>
+                  <button className="btn ghost" onClick={()=>setScAddOpen(false)}>취소</button>
+                  <button className="btn-save" onClick={()=>{
+                    if(!scDraft.title.trim())return;
+                    const b={...scDraft,id:scDraft.id||uid()};
+                    const next=scDraft.id?blocks.map((x)=>x.id===b.id?b:x):[...blocks,b];
+                    saveBlocks(scDay,next);setScAddOpen(false);
+                  }}>저장</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        );
+      })()}
 
       {view==="stock"&&(
         <div>
