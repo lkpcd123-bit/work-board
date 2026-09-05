@@ -3771,23 +3771,40 @@ function Board() {
                     {edDescView==="images"&&(
                       <div style={{border:"1.5px solid var(--line)",borderRadius:10,padding:14,background:"var(--bg)"}}>
                         {(edDraft.descImages||[]).map((img,i)=>(
-                          <div key={img.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,border:"1px solid var(--line)",marginBottom:6,background:"var(--card)"}}>
-                            <img src={img.preview} alt="" style={{width:80,height:60,objectFit:"cover",borderRadius:6,flexShrink:0}} />
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:12,color:"var(--ink3)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{img.name}</div>
+                          <div key={img.id} style={{marginBottom:10,border:"1.5px solid var(--line)",borderRadius:10,background:"var(--card)",overflow:"hidden"}}>
+                            {/* 이미지 헤더 */}
+                            <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",borderBottom:"1px solid var(--line)",background:"#F4F5F7"}}>
+                              <span style={{fontSize:13,fontWeight:800,color:"#0C66E4",minWidth:24}}>{i+1}</span>
+                              <span style={{flex:1,fontSize:12,color:"var(--ink3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{img.name}</span>
+                              <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                                <button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--ink3)",padding:"2px 5px"}} disabled={i===0} onClick={()=>{
+                                  const imgs=[...edDraft.descImages];[imgs[i-1],imgs[i]]=[imgs[i],imgs[i-1]];
+                                  setEdDraft({...edDraft,descImages:imgs});
+                                }} title="위로">▲</button>
+                                <button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--ink3)",padding:"2px 5px"}} disabled={i===(edDraft.descImages||[]).length-1} onClick={()=>{
+                                  const imgs=[...edDraft.descImages];[imgs[i],imgs[i+1]]=[imgs[i+1],imgs[i]];
+                                  setEdDraft({...edDraft,descImages:imgs});
+                                }} title="아래로">▼</button>
+                                {/* 수정 버튼 */}
+                                <label style={{fontSize:11,color:"#0C66E4",fontWeight:700,cursor:"pointer",border:"1px solid #0C66E4",borderRadius:5,padding:"2px 8px"}}>
+                                  수정
+                                  <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
+                                    const f=e.target.files?.[0];if(!f)return;
+                                    const b64=await resizeImage(f,1200,1200,0.9);
+                                    const imgs=[...edDraft.descImages];
+                                    imgs[i]={...imgs[i],base64:b64.split(',')[1],name:f.name,preview:b64};
+                                    setEdDraft({...edDraft,descImages:imgs});
+                                    e.target.value="";
+                                  }} />
+                                </label>
+                                <button style={{fontSize:11,color:"var(--danger)",fontWeight:700,border:"1px solid var(--danger)",borderRadius:5,padding:"2px 8px",background:"none",cursor:"pointer"}} onClick={()=>{
+                                  setEdDraft({...edDraft,descImages:(edDraft.descImages||[]).filter((_,j)=>j!==i)});
+                                }}>삭제</button>
+                              </div>
                             </div>
-                            <div style={{display:"flex",gap:4,flexShrink:0}}>
-                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--ink3)",padding:"2px 4px"}} disabled={i===0} onClick={()=>{
-                                const imgs=[...edDraft.descImages];[imgs[i-1],imgs[i]]=[imgs[i],imgs[i-1]];
-                                setEdDraft({...edDraft,descImages:imgs});
-                              }}>▲</button>
-                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--ink3)",padding:"2px 4px"}} disabled={i===(edDraft.descImages||[]).length-1} onClick={()=>{
-                                const imgs=[...edDraft.descImages];[imgs[i],imgs[i+1]]=[imgs[i+1],imgs[i]];
-                                setEdDraft({...edDraft,descImages:imgs});
-                              }}>▼</button>
-                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"var(--danger)",padding:"2px 4px"}} onClick={()=>{
-                                setEdDraft({...edDraft,descImages:(edDraft.descImages||[]).filter((_,j)=>j!==i)});
-                              }}>×</button>
+                            {/* 이미지 본체 */}
+                            <div style={{padding:10,textAlign:"center",background:"#fff"}}>
+                              <img src={img.preview} alt={`${i+1}번 이미지`} style={{maxWidth:"100%",maxHeight:200,objectFit:"contain",borderRadius:4}} />
                             </div>
                           </div>
                         ))}
