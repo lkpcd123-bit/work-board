@@ -3664,7 +3664,7 @@ function Board() {
                       const detail=await c24GetProduct(found.product_no);
                       const prod=detail||found;
                       setEdProduct(prod);
-                      setEdDraft({product_name:prod.product_name||'',summary_description:prod.summary_description||'',simple_description:prod.simple_description||'',description:prod.description||'',imageParts:[],summaryImage:null});
+                      setEdDraft({product_name:prod.product_name||'',summary_description:prod.summary_description||'',description:prod.description||'',descImages:[],summaryImage:null});
                       setEdMsg('');
                     }else setEdMsg("❌ "+p.code+" 조회 실패");
                     setEdLoading(false);
@@ -3709,27 +3709,32 @@ function Board() {
                   <div style={{fontSize:14,fontWeight:800,color:"#0C66E4",marginBottom:16}}>#{edProduct.product_no} {edProduct.product_name}</div>
 
                   {/* 상품명 */}
-                  <div className="fld" style={{marginBottom:16}}>
+                  <div className="fld" style={{marginBottom:14}}>
                     <label>상품명</label>
                     <input value={edDraft.product_name} onChange={(e)=>setEdDraft({...edDraft,product_name:e.target.value})} />
                   </div>
 
+                  {/* 요약설명 */}
+                  <div className="fld" style={{marginBottom:14}}>
+                    <label>상품 요약설명</label>
+                    <textarea value={edDraft.summary_description} onChange={(e)=>setEdDraft({...edDraft,summary_description:e.target.value})} style={{height:60}} placeholder="상품 요약설명 텍스트" />
+                  </div>
+
                   {/* 요약설명 이미지 */}
-                  <div style={{marginBottom:20}}>
+                  <div style={{marginBottom:20,padding:14,border:"1.5px solid var(--line)",borderRadius:10,background:"var(--bg)"}}>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                      <label style={{fontWeight:700,fontSize:13}}>요약설명 이미지</label>
-                      <span style={{fontSize:11,color:"var(--ink3)"}}>카페24 summary_description에 img 태그로 전송</span>
+                      <label style={{fontWeight:700,fontSize:13,margin:0}}>요약설명 이미지 <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)"}}>(카페24 업로드 후 img 태그 삽입)</span></label>
                     </div>
-                    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",padding:12,border:"1.5px dashed var(--line2)",borderRadius:9,background:"var(--bg)"}}>
+                    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
                       {edDraft.summaryImage
                         ?<>
                           <img src={edDraft.summaryImage.preview} alt="summary" style={{height:72,borderRadius:6,border:"1px solid var(--line)",objectFit:"contain",maxWidth:200}} />
-                          <div style={{flex:1}}>
+                          <div>
                             <div style={{fontSize:11,color:"var(--ink3)",marginBottom:4}}>{edDraft.summaryImage.name}</div>
                             <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",fontWeight:700}} onClick={()=>setEdDraft({...edDraft,summaryImage:null})}>× 제거</button>
                           </div>
                         </>
-                        :<label style={{cursor:"pointer",fontSize:12,color:"#0C66E4",fontWeight:700}}>
+                        :<label style={{cursor:"pointer",fontSize:12,color:"#0C66E4",fontWeight:700,border:"1px solid #0C66E4",borderRadius:6,padding:"6px 14px"}}>
                             📁 이미지 선택
                             <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
                               const f=e.target.files?.[0];if(!f)return;
@@ -3741,79 +3746,64 @@ function Board() {
                     </div>
                   </div>
 
-                  {/* 상세설명 이미지 파트 */}
+                  {/* 상세설명 이미지 목록 */}
                   <div style={{marginBottom:16}}>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                      <label style={{fontWeight:700,fontSize:13}}>상세설명 이미지 파트</label>
+                      <label style={{fontWeight:700,fontSize:13,margin:0}}>
+                        상세설명 이미지
+                        <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>이미지별로 순서 변경 가능 · 일괄 전송 시 순서대로 HTML 조합</span>
+                      </label>
                       <div style={{display:"flex",gap:6}}>
-                        {['parts','html','preview'].map((v)=>(
+                        {['images','html','preview'].map((v)=>(
                           <button key={v} onClick={()=>setEdDescView(v)}
                             style={{padding:"3px 10px",borderRadius:6,border:"1.5px solid",fontSize:11,cursor:"pointer",
                               fontWeight:edDescView===v?700:400,
                               borderColor:edDescView===v?"#0C66E4":"var(--line)",
                               background:edDescView===v?"#0C66E4":"var(--bg)",
                               color:edDescView===v?"#fff":"var(--ink2)"}}>
-                            {v==="parts"?"파트 편집":v==="html"?"HTML":"미리보기"}
+                            {v==="images"?"이미지":v==="html"?"HTML":"미리보기"}
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    {/* 파트 편집 모드 */}
-                    {edDescView==="parts"&&(
-                      <div>
-                        {(edDraft.imageParts||[]).map((part,i)=>(
-                          <div key={part.id} style={{border:"1.5px solid var(--line)",borderRadius:10,padding:14,marginBottom:10,background:"var(--bg)"}}>
-                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                              <span style={{fontSize:12,fontWeight:800,color:"var(--ink3)"}}>파트 {i+1}</span>
-                              <input value={part.label||""} placeholder="파트 이름 (예: 상단배너, 성분표)" onChange={(e)=>{
-                                const parts=[...edDraft.imageParts];parts[i]={...parts[i],label:e.target.value};
-                                setEdDraft({...edDraft,imageParts:parts});
-                              }} style={{flex:1,fontSize:12,border:"1px solid var(--line2)",borderRadius:6,padding:"4px 8px"}} />
-                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"var(--ink3)"}} disabled={i===0} onClick={()=>{
-                                const parts=[...edDraft.imageParts];[parts[i-1],parts[i]]=[parts[i],parts[i-1]];
-                                setEdDraft({...edDraft,imageParts:parts});
-                              }}>▲</button>
-                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"var(--ink3)"}} disabled={i===edDraft.imageParts.length-1} onClick={()=>{
-                                const parts=[...edDraft.imageParts];[parts[i],parts[i+1]]=[parts[i+1],parts[i]];
-                                setEdDraft({...edDraft,imageParts:parts});
-                              }}>▼</button>
-                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--danger)"}} onClick={()=>{
-                                setEdDraft({...edDraft,imageParts:edDraft.imageParts.filter((_,j)=>j!==i)});
-                              }}>×</button>
+                    {/* 이미지 목록 모드 */}
+                    {edDescView==="images"&&(
+                      <div style={{border:"1.5px solid var(--line)",borderRadius:10,padding:14,background:"var(--bg)"}}>
+                        {(edDraft.descImages||[]).map((img,i)=>(
+                          <div key={img.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,border:"1px solid var(--line)",marginBottom:6,background:"var(--card)"}}>
+                            <img src={img.preview} alt="" style={{width:80,height:60,objectFit:"cover",borderRadius:6,flexShrink:0}} />
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:12,color:"var(--ink3)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{img.name}</div>
                             </div>
-                            {/* 이미지 목록 */}
-                            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
-                              {(part.images||[]).map((img,j)=>(
-                                <div key={j} style={{position:"relative"}}>
-                                  <img src={img.preview} alt="" style={{width:80,height:60,objectFit:"cover",borderRadius:6,border:"1px solid var(--line)"}} />
-                                  <button onClick={()=>{
-                                    const parts=[...edDraft.imageParts];
-                                    parts[i]={...parts[i],images:(parts[i].images||[]).filter((_,k)=>k!==j)};
-                                    setEdDraft({...edDraft,imageParts:parts});
-                                  }} style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.6)",color:"#fff",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",fontSize:11,padding:0}}>×</button>
-                                </div>
-                              ))}
-                              <label style={{width:80,height:60,border:"2px dashed var(--line2)",borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:22,color:"var(--ink3)"}}>
-                                +
-                                <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={async(e)=>{
-                                  const files=Array.from(e.target.files||[]);
-                                  const imgs=await Promise.all(files.map(async(f)=>{
-                                    const b64=await resizeImage(f,1200,1200,0.9);
-                                    return {base64:b64.split(',')[1],name:f.name,preview:b64};
-                                  }));
-                                  const parts=[...edDraft.imageParts];
-                                  parts[i]={...parts[i],images:[...(parts[i].images||[]),...imgs]};
-                                  setEdDraft({...edDraft,imageParts:parts});
-                                  e.target.value="";
-                                }} />
-                              </label>
+                            <div style={{display:"flex",gap:4,flexShrink:0}}>
+                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--ink3)",padding:"2px 4px"}} disabled={i===0} onClick={()=>{
+                                const imgs=[...edDraft.descImages];[imgs[i-1],imgs[i]]=[imgs[i],imgs[i-1]];
+                                setEdDraft({...edDraft,descImages:imgs});
+                              }}>▲</button>
+                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--ink3)",padding:"2px 4px"}} disabled={i===(edDraft.descImages||[]).length-1} onClick={()=>{
+                                const imgs=[...edDraft.descImages];[imgs[i],imgs[i+1]]=[imgs[i+1],imgs[i]];
+                                setEdDraft({...edDraft,descImages:imgs});
+                              }}>▼</button>
+                              <button style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"var(--danger)",padding:"2px 4px"}} onClick={()=>{
+                                setEdDraft({...edDraft,descImages:(edDraft.descImages||[]).filter((_,j)=>j!==i)});
+                              }}>×</button>
                             </div>
                           </div>
                         ))}
-                        <button className="btn ghost" style={{width:"100%",fontSize:12}} onClick={()=>{
-                          setEdDraft({...edDraft,imageParts:[...(edDraft.imageParts||[]),{id:uid(),label:"",images:[]}]});
-                        }}>+ 파트 추가</button>
+                        {!(edDraft.descImages||[]).length&&<div style={{textAlign:"center",padding:"20px 0",color:"var(--ink3)",fontSize:13}}>이미지를 추가하세요</div>}
+                        <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginTop:8,cursor:"pointer",padding:"10px",border:"2px dashed var(--line2)",borderRadius:8,fontSize:12,color:"#0C66E4",fontWeight:700}}>
+                          + 이미지 추가 (여러 장 가능)
+                          <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={async(e)=>{
+                            const files=Array.from(e.target.files||[]);
+                            const imgs=await Promise.all(files.map(async(f)=>{
+                              const b64=await resizeImage(f,1200,1200,0.9);
+                              return {id:uid(),base64:b64.split(',')[1],name:f.name,preview:b64};
+                            }));
+                            setEdDraft({...edDraft,descImages:[...(edDraft.descImages||[]),...imgs]});
+                            e.target.value="";
+                          }} />
+                        </label>
                       </div>
                     )}
 
@@ -3830,11 +3820,11 @@ function Board() {
                     )}
                   </div>
 
-                  {/* 전송 메시지 */}
+                  {/* 메시지 */}
                   {edMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:edMsg.startsWith("✅")?"#DCFFF1":edMsg.includes("중")?"#E9F2FF":"#FFECEB",color:edMsg.startsWith("✅")?"#1F845A":edMsg.includes("중")?"#0C66E4":"#CA3521",fontSize:13,marginBottom:12}}>{edMsg}</div>}
 
                   {/* 일괄 전송 */}
-                  <div style={{display:"flex",gap:8,justifyContent:"flex-end",borderTop:"1px solid var(--line)",paddingTop:14,marginTop:4}}>
+                  <div style={{display:"flex",gap:8,justifyContent:"flex-end",borderTop:"1px solid var(--line)",paddingTop:14}}>
                     <button className="btn ghost" onClick={()=>{setEdProduct(null);setEdDraft(null);setEdSelCode(null);setEdMsg('');}}>초기화</button>
                     <button className="btn-save" style={{background:"#1F845A"}} disabled={edSending||edLoading} onClick={async()=>{
                       if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
@@ -3842,28 +3832,28 @@ function Board() {
                       const payload={};
                       // 상품명
                       if(edDraft.product_name!==edProduct.product_name)payload.product_name=edDraft.product_name;
-                      // 요약설명 이미지
+                      // 요약설명 텍스트
+                      if(edDraft.summary_description!==(edProduct.summary_description||''))payload.summary_description=edDraft.summary_description;
+                      // 요약설명 이미지 (텍스트보다 우선)
                       if(edDraft.summaryImage){
                         setEdMsg('요약설명 이미지 업로드 중...');
                         const upR=await c24Api({action:'uploadImage',imageBase64:edDraft.summaryImage.base64,imageName:edDraft.summaryImage.name});
                         const imgUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
-                        if(imgUrl)payload.summary_description=`<img src="${imgUrl}" style="max-width:100%;" alt="summary" />`;
+                        if(imgUrl){payload.summary_description=`<img src="${imgUrl}" style="max-width:100%;" alt="summary" />`;}
                         else{setEdMsg("❌ 요약설명 이미지 업로드 실패: "+JSON.stringify(upR));setEdSending(false);return;}
                       }
-                      // 상세설명 파트 이미지들
-                      if((edDraft.imageParts||[]).length>0){
+                      // 상세설명 이미지 목록
+                      if((edDraft.descImages||[]).length>0){
                         setEdMsg('상세설명 이미지 업로드 중...');
                         let descHtml='';
-                        for(const part of edDraft.imageParts){
-                          if(part.label)descHtml+=`<div style="margin:8px 0;font-weight:bold;font-size:14px;">${part.label}</div>
-`;
-                          for(const img of (part.images||[])){
-                            const upR=await c24Api({action:'uploadImage',imageBase64:img.base64,imageName:img.name});
-                            const imgUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
-                            if(imgUrl)descHtml+=`<div style="width:100%;text-align:center;"><img src="${imgUrl}" style="max-width:100%;" alt="${part.label||''}" /></div>
-`;
-                            else{setEdMsg("❌ 이미지 업로드 실패: "+img.name);setEdSending(false);return;}
-                          }
+                        for(let i=0;i<edDraft.descImages.length;i++){
+                          const img=edDraft.descImages[i];
+                          setEdMsg(`상세설명 이미지 업로드 중... (${i+1}/${edDraft.descImages.length})`);
+                          const upR=await c24Api({action:'uploadImage',imageBase64:img.base64,imageName:img.name});
+                          const imgUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+                          if(imgUrl){descHtml+=`<div style="width:100%;text-align:center;"><img src="${imgUrl}" style="max-width:100%;display:block;" alt="" /></div>
+`;}
+                          else{setEdMsg("❌ 이미지 업로드 실패 ("+img.name+"): "+JSON.stringify(upR));setEdSending(false);return;}
                         }
                         payload.description=descHtml;
                       } else if(edDraft.description!==(edProduct.description||'')){

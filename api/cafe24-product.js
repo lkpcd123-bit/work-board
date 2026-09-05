@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
-  const { action, token, productCode, productNo, payload } = req.body || {};
+  const { action, token, productCode, productNo, payload, imageBase64, imageName } = req.body || {};
   const MALL_ID = 'slowrocket';
   const BASE = `https://${MALL_ID}.cafe24api.com/api/v2/admin`;
   const headers = {
@@ -21,83 +21,55 @@ export default async function handler(req, res) {
       const d = await r.json();
       res.status(200).json({ product: d.products?.[0] || null });
 
-    // ── 상품 상세 조회 (description 포함) ──────────────────
+    // ── 상품 상세 조회 ──────────────────────────────────────
     } else if (action === 'get') {
       const no = parseInt(productNo, 10);
       const r = await fetch(`${BASE}/products/${no}`, { headers });
       const d = await r.json();
       res.status(r.status).json(d);
 
-    // ── 상품 수정 (판매상태/이름/가격/상세 등) ─────────────
+    // ── 상품 수정 ───────────────────────────────────────────
     } else if (action === 'update') {
       const no = parseInt(productNo, 10);
       if (!no || isNaN(no)) return res.status(400).json({ error: `Invalid productNo: ${productNo}` });
       const body = { shop_no: 1, request: payload };
-      console.log('PUT', no, JSON.stringify(body).slice(0, 200));
+      console.log('PUT', no, JSON.stringify(body).slice(0, 300));
       const r = await fetch(`${BASE}/products/${no}`, {
         method: 'PUT', headers,
         body: JSON.stringify(body),
       });
       const text = await r.text();
-      console.log('Response:', r.status, text.slice(0, 300));
+      console.log('PUT Response:', r.status, text.slice(0, 300));
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
       res.status(r.status).json(d);
 
-    // ── 이미지 업로드 (Base64 → 카페24 CDN URL) ────────────
+    // ── 이미지 업로드 ───────────────────────────────────────
+    // POST /products/images - requests 배열 형식
     } else if (action === 'uploadImage') {
-      const { imageBase64, imageName } = req.body;
       if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
 
-      // 1단계: 이미지 업로드
+      const ext = (imageName || 'image.jpg').split('.').pop().toLowerCase();
+      const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
+      const mime = mimeMap[ext] || 'image/jpeg';
+
+      // 카페24 이미지 업로드 - requests 래퍼 사용
       const uploadBody = {
-        images: [{
+        requests: [{
           image: imageBase64,
-          image_name: imageName || `event_${Date.now()}.jpg`,
+          image_type: mime,
+          image_name: imageName || `img_${Date.now()}.jpg`,
         }]
       };
+
+      console.log('Image upload body keys:', Object.keys(uploadBody.requests[0]));
+
       const r = await fetch(`${BASE}/products/images`, {
         method: 'POST', headers,
         body: JSON.stringify(uploadBody),
       });
-      const d = await r.json();
-      console.log('Upload response:', r.status, JSON.stringify(d).slice(0, 300));
-      res.status(r.status).json(d);
-
-    // ── 상세 HTML 최상단에 이미지/유튜브 삽입 ─────────────
-    } else if (action === 'insertTop') {
-      const no = parseInt(productNo, 10);
-      if (!no || isNaN(no)) return res.status(400).json({ error: `Invalid productNo: ${productNo}` });
-
-      // 현재 상세 가져오기
-      const getR = await fetch(`${BASE}/products/${no}`, { headers });
-      const getData = await getR.json();
-      const product = getData.product;
-      if (!product) return res.status(404).json({ error: '상품을 찾을 수 없습니다' });
-
-      const originalDesc = product.description || '';
-      const { insertHtml, backupKey } = payload;
-
-      // 최상단에 삽입
-      const newDesc = insertHtml + '\n' + originalDesc;
-
-      const putR = await fetch(`${BASE}/products/${no}`, {
-        method: 'PUT', headers,
-        body: JSON.stringify({ shop_no: 1, request: { description: newDesc } }),
-      });
-      const putD = await putR.json();
-      // 원본 반환 (원복용)
-      res.status(putR.status).json({ ...putD, originalDesc, backupKey });
-
-    // ── 원복 ───────────────────────────────────────────────
-    } else if (action === 'restore') {
-      const no = parseInt(productNo, 10);
-      if (!no || isNaN(no)) return res.status(400).json({ error: `Invalid productNo: ${productNo}` });
-      const { originalDesc } = payload;
-      const r = await fetch(`${BASE}/products/${no}`, {
-        method: 'PUT', headers,
-        body: JSON.stringify({ shop_no: 1, request: { description: originalDesc } }),
-      });
-      const d = await r.json();
+      const text = await r.text();
+      console.log('Image upload response:', r.status, text.slice(0, 400));
+      let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
       res.status(r.status).json(d);
 
     } else {
