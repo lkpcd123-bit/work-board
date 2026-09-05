@@ -337,7 +337,20 @@ function mergeData(r,l) {
   return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],mindmaps:[...mmi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
     routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
     colLabels:((l.colLabelsUpdatedAt||0)>=(r.colLabelsUpdatedAt||0)?l.colLabels:r.colLabels)||{},colLabelsUpdatedAt:Math.max(l.colLabelsUpdatedAt||0,r.colLabelsUpdatedAt||0),
-    log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),updatedAt:Date.now() };
+    log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),
+    tabOrder:(l.updatedAt||0)>=(r.updatedAt||0)?l.tabOrder||[]:r.tabOrder||[],
+    hiddenTabs:(l.updatedAt||0)>=(r.updatedAt||0)?l.hiddenTabs||[]:r.hiddenTabs||[],
+    tabFolders:(l.updatedAt||0)>=(r.updatedAt||0)?l.tabFolders||[]:r.tabFolders||[],
+    refs:(l.updatedAt||0)>=(r.updatedAt||0)?l.refs||[]:r.refs||[],
+    refCats:(l.updatedAt||0)>=(r.updatedAt||0)?l.refCats||[]:r.refCats||[],
+    stockData:(l.updatedAt||0)>=(r.updatedAt||0)?l.stockData||{naver:[],coupang:[]}:r.stockData||{naver:[],coupang:[]},
+    stockSafe:(l.updatedAt||0)>=(r.updatedAt||0)?l.stockSafe||{}:r.stockSafe||{},
+    reorderRequests:(l.updatedAt||0)>=(r.updatedAt||0)?l.reorderRequests||[]:r.reorderRequests||[],
+    inboundPlans:(l.updatedAt||0)>=(r.updatedAt||0)?l.inboundPlans||[]:r.inboundPlans||[],
+    cafe24_schedules:(l.updatedAt||0)>=(r.updatedAt||0)?l.cafe24_schedules||[]:r.cafe24_schedules||[],
+    cafe24_token_data:(l.updatedAt||0)>=(r.updatedAt||0)?l.cafe24_token_data||{}:r.cafe24_token_data||{},
+    notifications:(l.updatedAt||0)>=(r.updatedAt||0)?l.notifications||[]:r.notifications||[],
+    updatedAt:Date.now() };
 }
 
 const CSS = `
