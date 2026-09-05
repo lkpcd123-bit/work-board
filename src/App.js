@@ -836,9 +836,10 @@ function Board() {
   const [tabMgr, setTabMgr] = useState(false);
   const [tabDragId, setTabDragId] = useState(null);
   const tabFolders=useMemo(()=>data.tabFolders||[],[data.tabFolders]);
-  const saveTabOrder=(order)=>commit((d)=>({...d,tabOrder:order,updatedAt:Date.now()}),[]);
-  const saveHiddenTabs=(hidden)=>commit((d)=>({...d,hiddenTabs:hidden,updatedAt:Date.now()}),[]);
-  const saveTabFolders=(folders)=>commit((d)=>({...d,tabFolders:folders,updatedAt:Date.now()}),[]);
+  const saveTabConfig=(patch)=>commit((d)=>({...d,...patch,updatedAt:Date.now()}),[]);
+  const saveTabOrder=(order)=>saveTabConfig({tabOrder:order});
+  const saveHiddenTabs=(hidden)=>saveTabConfig({hiddenTabs:hidden});
+  const saveTabFolders=(folders)=>saveTabConfig({tabFolders:folders});
   const [q, setQ] = useState("");
   const [fCh, setFCh] = useState("전체");
   const [fOwner, setFOwner] = useState("전체");
@@ -1938,7 +1939,7 @@ function Board() {
               const fi=cur.indexOf(tabDragId);const ti=cur.indexOf(t.id);
               if(fi<0||ti<0)return;
               const next=[...cur];const [m]=next.splice(fi,1);next.splice(ti,0,m);
-              saveTabOrder([...next,...hiddenTabs]);setTabDragId(null);
+              saveTabConfig({tabOrder:[...next,...hiddenTabs]});setTabDragId(null);
             }}
             onDragEnd={()=>setTabDragId(null)}
             className={"tab"+(view===t.id?" sel":"")} onClick={()=>setView(t.id)}>
@@ -3037,7 +3038,7 @@ function Board() {
                     const cur=visibleTabs.map((x)=>x.id);
                     const fi=cur.indexOf(tabDragId);const ti=cur.indexOf(t.id);
                     const next=[...cur];const [m]=next.splice(fi,1);next.splice(ti,0,m);
-                    saveTabOrder(next);setTabDragId(null);
+                    saveTabConfig({tabOrder:next});setTabDragId(null);
                   }}
                   onDragEnd={()=>setTabDragId(null)}
                   style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",borderRadius:9,border:"1px solid var(--line)",background:"var(--bg)",cursor:"grab"}}>
@@ -3047,8 +3048,7 @@ function Board() {
                     defaultValue="" onChange={(e)=>{
                       const fid=e.target.value;if(!fid)return;
                       const folders=tabFolders.map((f)=>f.id===fid?{...f,tabs:[...(f.tabs||[]),t.id]}:f);
-                      saveTabFolders(folders);
-                      saveTabOrder(tabOrder.filter((id)=>id!==t.id));
+                      saveTabConfig({tabFolders:folders,tabOrder:tabOrder.filter((id)=>id!==t.id)});
                       e.target.value="";
                     }}>
                     <option value="">📁 폴더로</option>
@@ -3057,8 +3057,7 @@ function Board() {
                   <button style={{background:"none",border:"none",cursor:"pointer",fontSize:17,color:"var(--ink3)",flexShrink:0,padding:"0 2px"}}
                     onClick={()=>{
                       const hidden=[...(data.hiddenTabs||[]),t.id];
-                      saveHiddenTabs(hidden);
-                      saveTabOrder(tabOrder.filter((id)=>id!==t.id));
+                      saveTabConfig({hiddenTabs:hidden,tabOrder:tabOrder.filter((id)=>id!==t.id)});
                     }} title="숨기기">👁</button>
                 </div>
               ))}
@@ -3077,16 +3076,14 @@ function Board() {
                     <button style={{background:"none",border:"none",color:"var(--danger)",cursor:"pointer",fontSize:12,fontWeight:700}} onClick={()=>{
                       if(!window.confirm("폴더를 삭제할까요? 탭은 표시 중으로 돌아옵니다."))return;
                       const restored=(folder.tabs||[]);
-                      saveTabFolders(tabFolders.filter((f)=>f.id!==folder.id));
-                      if(restored.length)saveTabOrder([...tabOrder,...restored]);
+                      saveTabConfig({tabFolders:tabFolders.filter((f)=>f.id!==folder.id),tabOrder:restored.length?[...tabOrder,...restored]:tabOrder});
                     }}>삭제</button>
                   </div>
                   {(folder.tabs||[]).map((tabId)=>{const t=ALL_TABS.find((x)=>x.id===tabId);if(!t)return null;return(
                     <div key={tabId} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:7,background:"var(--card)",marginBottom:5,fontSize:13}}>
                       <span style={{flex:1}}>{t.label}</span>
                       <button style={{background:"none",border:"none",color:"#0C66E4",fontSize:11,cursor:"pointer",fontWeight:800}} onClick={()=>{
-                        saveTabFolders(tabFolders.map((f)=>f.id===folder.id?{...f,tabs:(f.tabs||[]).filter((id)=>id!==tabId)}:f));
-                        saveTabOrder([...tabOrder,tabId]);
+                        saveTabConfig({tabFolders:tabFolders.map((f)=>f.id===folder.id?{...f,tabs:(f.tabs||[]).filter((id)=>id!==tabId)}:f),tabOrder:[...tabOrder,tabId]});
                       }}>꺼내기</button>
                     </div>
                   );})}
@@ -3101,8 +3098,9 @@ function Board() {
                   <div key={id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:9,border:"1px dashed var(--line)",opacity:.75}}>
                     <span style={{flex:1,fontSize:13}}>{t.label}</span>
                     <button className="riedit" onClick={()=>{
-                      saveHiddenTabs((data.hiddenTabs||[]).filter((x)=>x!==id));
-                      if(!tabOrder.includes(id))saveTabOrder([...tabOrder,id]);
+                      const newHidden=(data.hiddenTabs||[]).filter((x)=>x!==id);
+                      const newOrder=tabOrder.includes(id)?tabOrder:[...tabOrder,id];
+                      saveTabConfig({hiddenTabs:newHidden,tabOrder:newOrder});
                     }}>표시</button>
                   </div>
                 );})}
