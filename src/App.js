@@ -350,6 +350,7 @@ function mergeData(r,l) {
     cafe24_schedules:(l.updatedAt||0)>=(r.updatedAt||0)?l.cafe24_schedules||[]:r.cafe24_schedules||[],
     cafe24_token_data:(l.updatedAt||0)>=(r.updatedAt||0)?l.cafe24_token_data||{}:r.cafe24_token_data||{},
     notifications:(l.updatedAt||0)>=(r.updatedAt||0)?l.notifications||[]:r.notifications||[],
+    edProducts:(l.updatedAt||0)>=(r.updatedAt||0)?l.edProducts||{보틀:[],대용량:[],파우치:[]}:r.edProducts||{보틀:[],대용량:[],파우치:[]},
     updatedAt:Date.now() };
 }
 
