@@ -328,7 +328,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -358,6 +358,7 @@ function mergeData(r,l) {
     cafe24_token_data:(l.updatedAt||0)>=(r.updatedAt||0)?l.cafe24_token_data||{}:r.cafe24_token_data||{},
     notifications:(l.updatedAt||0)>=(r.updatedAt||0)?l.notifications||[]:r.notifications||[],
     edProducts:(l.updatedAt||0)>=(r.updatedAt||0)?l.edProducts||{보틀:[],대용량:[],파우치:[]}:r.edProducts||{보틀:[],대용량:[],파우치:[]},
+    edMasterImages:(l.updatedAt||0)>=(r.updatedAt||0)?l.edMasterImages||{보틀:[],대용량:[],파우치:[]}:r.edMasterImages||{보틀:[],대용량:[],파우치:[]},
     updatedAt:Date.now() };
 }
 
@@ -923,17 +924,16 @@ function Board() {
   const [c24EditSchedule, setC24EditSchedule] = useState(null);
   const [c24SubTab, setC24SubTab] = useState('schedule');
   // 상품 편집기
-  const [edCat, setEdCat] = useState('보틀'); // 현재 선택 분류
-  const [edSelCode, setEdSelCode] = useState(null); // 선택된 상품코드
-  const [edProduct, setEdProduct] = useState(null); // 불러온 상품 상세
-  const [edDraft, setEdDraft] = useState(null); // 편집 중인 draft
+  const [edCat, setEdCat] = useState('보틀');
   const [edLoading, setEdLoading] = useState(false);
   const [edMsg, setEdMsg] = useState('');
-  const [edDescView, setEdDescView] = useState('parts'); // 'parts' | 'html' | 'preview'
   const [edSending, setEdSending] = useState(false);
-  const [edChecked, setEdChecked] = useState({}); // {code: true/false}
+  const [edChecked, setEdChecked] = useState({});
   const [edAddCode, setEdAddCode] = useState('');
   const [edAddName, setEdAddName] = useState('');
+  const [edChanged, setEdChanged] = useState({}); // {idx: true} 변경된 이미지
+  const [edSendLog, setEdSendLog] = useState([]); // 전송 이력
+  const [edSubTab, setEdSubTab] = useState('master'); // 'master'|'products'|'history'
   const ED_CATS = ['보틀','대용량','파우치'];
   const c24TimerRef = useRef(null);
   const c24TokenRef = useRef('');
@@ -1016,7 +1016,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]}}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]},edMasterImages:remote.edMasterImages||{보틀:[],대용량:[],파우치:[]}}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -1612,6 +1612,76 @@ function Board() {
   const c24GetProduct=async(no)=>{
     const d=await c24Api({action:'get',productNo:no});
     return d.product||null;
+  };
+  // 이미지 전송 함수 (체크된 상품 × 지정 이미지 번호)
+  const sendImages=async(imgIdxs)=>{
+    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
+    const checkedCodes=Object.entries(edChecked).filter(([,v])=>v).map(([k])=>k);
+    if(!checkedCodes.length){setEdMsg("❌ [상품 목록] 탭에서 상품을 먼저 체크하세요");setEdSubTab('products');return;}
+    const masterImgs=(data.edMasterImages||{})[edCat]||[];
+    if(!masterImgs.length){setEdMsg("❌ 마스터 이미지가 없습니다");return;}
+    setEdSending(true);
+    const log={ts:Date.now(),cat:edCat,codes:checkedCodes,imgIdxs,ok:false,msg:''};
+    try{
+      // 1) 이미지 업로드 (카페24 CDN)
+      setEdMsg('이미지 업로드 중...');
+      const uploadedUrls={};
+      for(const idx of imgIdxs){
+        const img=masterImgs[idx];if(!img)continue;
+        setEdMsg(`이미지 업로드 중... (${idx+1}번)`);
+        const upR=await c24Api({action:'uploadImage',imageBase64:img.base64,imageName:img.name});
+        const url=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+        if(!url){setEdMsg(`❌ ${idx+1}번 이미지 업로드 실패: `+JSON.stringify(upR));setEdSending(false);log.msg=`${idx+1}번 업로드 실패`;setEdSendLog((p)=>[...p,log]);return;}
+        uploadedUrls[idx]=url;
+      }
+      // 2) 각 상품에 상세설명 적용
+      // 기존 상세설명에서 마스터 이미지 URL만 교체하는 방식
+      // 전체 전송이면 전체 HTML 재구성, 부분이면 기존 HTML에서 해당 img만 교체
+      const isFullSend=imgIdxs.length===masterImgs.length;
+      let successCount=0;
+      for(const code of checkedCodes){
+        setEdMsg(`상품 처리 중... ${code}`);
+        const found=await c24SearchByCode(code);
+        if(!found){setEdMsg(`❌ ${code} 상품 조회 실패`);continue;}
+        let descHtml='';
+        if(isFullSend){
+          // 전체: 마스터 이미지 순서대로 HTML 구성
+          for(let i=0;i<masterImgs.length;i++){
+            const url=uploadedUrls[i]||masterImgs[i].lastUrl||'';
+            if(url)descHtml+=`<div style="width:100%;text-align:center;"><img src="${url}" style="max-width:100%;display:block;margin:0 auto;" /></div>\n`;
+          }
+        }else{
+          // 부분: 기존 상세에서 변경된 번호의 img만 교체
+          const detail=await c24GetProduct(found.product_no);
+          descHtml=detail?.description||'';
+          // img 태그 순서대로 파싱해서 해당 인덱스만 교체
+          const imgTags=[...descHtml.matchAll(/<div[^>]*><img[^>]*><\/div>/g)];
+          for(const idx of imgIdxs){
+            const url=uploadedUrls[idx];if(!url)continue;
+            const newTag=`<div style="width:100%;text-align:center;"><img src="${url}" style="max-width:100%;display:block;margin:0 auto;" /></div>`;
+            if(imgTags[idx])descHtml=descHtml.replace(imgTags[idx][0],newTag);
+            else descHtml+=newTag+'\n';
+          }
+        }
+        const d=await c24Api({action:'update',productNo:found.product_no,payload:{description:descHtml}});
+        if(d.product){
+          successCount++;
+          // lastSentAt 업데이트
+          commit((dd)=>({...dd,edProducts:{...(dd.edProducts||{}),[edCat]:(dd.edProducts||{})[edCat]?.map((p)=>p.code===code?{...p,lastSentAt:Date.now()}:p)||[]},updatedAt:Date.now()}),[]);
+        }
+      }
+      // 마스터 이미지에 lastUrl 저장
+      const updatedMaster=masterImgs.map((img,i)=>uploadedUrls[i]?{...img,lastUrl:uploadedUrls[i]}:img);
+      commit((dd)=>({...dd,edMasterImages:{...(dd.edMasterImages||{}),[edCat]:updatedMaster},updatedAt:Date.now()}),[]);
+      setEdChanged({});
+      log.ok=true;log.msg=`${successCount}/${checkedCodes.length}개 상품 전송 완료`;
+      setEdMsg(`✅ ${successCount}/${checkedCodes.length}개 상품 전송 완료!`);
+    }catch(e){
+      log.msg='오류: '+e.message;
+      setEdMsg("❌ 오류: "+e.message);
+    }
+    setEdSendLog((p)=>[...p,log]);
+    setEdSending(false);
   };
   const c24UpdateProduct=async(productNo,payload)=>{
   };
@@ -3647,286 +3717,194 @@ function Board() {
 
         {/* ── 상품 편집기 ─────────────────────────────── */}
         {c24SubTab==="editor"&&(
-          <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
-            {/* 왼쪽: 분류+상품 목록 */}
-            <div style={{width:240,flexShrink:0}}>
-              {/* 분류 탭 */}
-              <div style={{display:"flex",gap:0,marginBottom:12,borderBottom:"2px solid var(--line)"}}>
-                {ED_CATS.map((cat)=>(
-                  <button key={cat} onClick={()=>{setEdCat(cat);setEdSelCode(null);setEdProduct(null);setEdDraft(null);setEdMsg('');setEdChecked({});}}
-                    style={{flex:1,padding:"8px 0",border:"none",cursor:"pointer",fontSize:12,fontWeight:edCat===cat?800:500,
-                      background:"none",color:edCat===cat?"#0C66E4":"var(--ink3)",
-                      borderBottom:edCat===cat?"3px solid #0C66E4":"3px solid transparent",marginBottom:-2}}>
-                    {cat}
-                  </button>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {/* 서브탭 */}
+            <div style={{display:"flex",gap:0,borderBottom:"2px solid var(--line)"}}>
+              {[{id:"master",label:"🖼 마스터 이미지"},{id:"products",label:"📦 상품 목록"},{id:"history",label:"📋 전송 이력"}].map((t)=>(
+                <button key={t.id} onClick={()=>setEdSubTab(t.id)}
+                  style={{padding:"9px 18px",border:"none",cursor:"pointer",fontSize:13,fontWeight:edSubTab===t.id?800:500,
+                    background:"none",color:edSubTab===t.id?"#0C66E4":"var(--ink3)",
+                    borderBottom:edSubTab===t.id?"3px solid #0C66E4":"3px solid transparent",marginBottom:-2}}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 분류 탭 */}
+            <div style={{display:"flex",gap:6}}>
+              {ED_CATS.map((cat)=>(
+                <button key={cat} onClick={()=>{setEdCat(cat);setEdChecked({});setEdMsg('');}}
+                  style={{padding:"7px 18px",borderRadius:20,border:"1.5px solid",fontSize:13,fontWeight:700,cursor:"pointer",
+                    borderColor:edCat===cat?"#0C66E4":"var(--line)",
+                    background:edCat===cat?"#0C66E4":"var(--bg)",
+                    color:edCat===cat?"#fff":"var(--ink2)"}}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* ── 마스터 이미지 ── */}
+            {edSubTab==="master"&&(
+              <div className="panel" style={{padding:20}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                  <h3 style={{margin:0}}>{edCat} 마스터 이미지</h3>
+                  <div style={{fontSize:12,color:"var(--ink3)"}}>{((data.edMasterImages||{})[edCat]||[]).length}장 등록됨</div>
+                </div>
+                {edMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:edMsg.startsWith("✅")?"#DCFFF1":edMsg.includes("중")?"#E9F2FF":"#FFECEB",color:edMsg.startsWith("✅")?"#1F845A":edMsg.includes("중")?"#0C66E4":"#CA3521",fontSize:13,marginBottom:12}}>{edMsg}</div>}
+
+                {/* 이미지 목록 */}
+                {((data.edMasterImages||{})[edCat]||[]).map((img,i)=>(
+                  <div key={img.id||i} style={{marginBottom:10,border:`2px solid ${edChanged[i]?"#F7B731":"var(--line)"}`,borderRadius:10,background:"var(--card)",overflow:"hidden"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",borderBottom:"1px solid var(--line)",background:edChanged[i]?"#FFF8E1":"#F4F5F7"}}>
+                      <span style={{fontSize:13,fontWeight:800,color:"#0C66E4",minWidth:32}}>{i+1}번</span>
+                      {edChanged[i]&&<span style={{fontSize:11,background:"#F7B731",color:"#7A5F00",padding:"2px 8px",borderRadius:10,fontWeight:700}}>변경됨</span>}
+                      <span style={{flex:1,fontSize:12,color:"var(--ink3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{img.name}</span>
+                      <label style={{fontSize:11,color:"#0C66E4",fontWeight:700,cursor:"pointer",border:"1px solid #0C66E4",borderRadius:5,padding:"3px 10px"}}>
+                        수정
+                        <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
+                          const f=e.target.files?.[0];if(!f)return;
+                          const b64full=await readFileAsBase64(f);
+                          const imgs=[...((data.edMasterImages||{})[edCat]||[])];
+                          imgs[i]={...imgs[i],base64:b64full.split(',')[1],name:f.name,preview:b64full,updatedAt:Date.now()};
+                          commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+                          setEdChanged((prev)=>({...prev,[i]:true}));
+                          e.target.value="";
+                        }} />
+                      </label>
+                      <button style={{fontSize:11,color:"var(--danger)",fontWeight:700,border:"1px solid var(--danger)",borderRadius:5,padding:"3px 10px",background:"none",cursor:"pointer"}} onClick={()=>{
+                        const imgs=((data.edMasterImages||{})[edCat]||[]).filter((_,j)=>j!==i);
+                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+                        const nc={...edChanged};delete nc[i];setEdChanged(nc);
+                      }}>삭제</button>
+                      <button style={{fontSize:13,background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",padding:"2px 5px"}} disabled={i===0} onClick={()=>{
+                        const imgs=[...((data.edMasterImages||{})[edCat]||[])];[imgs[i-1],imgs[i]]=[imgs[i],imgs[i-1]];
+                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+                      }}>▲</button>
+                      <button style={{fontSize:13,background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",padding:"2px 5px"}} disabled={i===((data.edMasterImages||{})[edCat]||[]).length-1} onClick={()=>{
+                        const imgs=[...((data.edMasterImages||{})[edCat]||[])];[imgs[i],imgs[i+1]]=[imgs[i+1],imgs[i]];
+                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+                      }}>▼</button>
+                    </div>
+                    <div style={{padding:10,textAlign:"center",background:"#fff"}}>
+                      <img src={img.preview||img.src} alt={`${i+1}번`} style={{maxWidth:"100%",maxHeight:180,objectFit:"contain",borderRadius:4}} />
+                    </div>
+                  </div>
                 ))}
+                {!((data.edMasterImages||{})[edCat]||[]).length&&(
+                  <div style={{textAlign:"center",padding:"20px 0",color:"var(--ink3)",fontSize:13}}>이미지를 추가하세요</div>
+                )}
+                <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginTop:8,cursor:"pointer",padding:"12px",border:"2px dashed var(--line2)",borderRadius:8,fontSize:13,color:"#0C66E4",fontWeight:700}}>
+                  + 이미지 추가 (여러 장)
+                  <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={async(e)=>{
+                    const files=Array.from(e.target.files||[]);
+                    const newImgs=await Promise.all(files.map(async(f)=>{
+                      const b64full=await readFileAsBase64(f);
+                      return {id:uid(),base64:b64full.split(',')[1],name:f.name,preview:b64full,createdAt:Date.now()};
+                    }));
+                    const cur=(data.edMasterImages||{})[edCat]||[];
+                    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,...newImgs]},updatedAt:Date.now()}),[]);
+                    e.target.value="";
+                  }} />
+                </label>
+
+                {/* 전송 버튼 */}
+                {((data.edMasterImages||{})[edCat]||[]).length>0&&(
+                  <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid var(--line)"}}>
+                    <div style={{fontSize:12,color:"var(--ink3)",marginBottom:10}}>
+                      {Object.keys(edChanged).length>0
+                        ?<span style={{color:"#F7B731",fontWeight:700}}>⚠ {Object.keys(edChanged).length}개 이미지가 변경됨 — 변경된 것만 또는 전체 전송 가능</span>
+                        :"이미지를 전송할 상품은 [상품 목록] 탭에서 체크하세요"}
+                    </div>
+                    <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                      {Object.keys(edChanged).length>0&&(
+                        <button className="btn ghost" style={{color:"#F7B731",borderColor:"#F7B731",fontWeight:700}} disabled={edSending} onClick={async()=>{
+                          const targets=Object.keys(edChanged).map(Number);
+                          await sendImages(targets);
+                        }}>{edSending?"전송중...":"🔄 변경된 것만 전송"}</button>
+                      )}
+                      <button className="btn-save" style={{background:"#1F845A"}} disabled={edSending} onClick={async()=>{
+                        const allIdx=((data.edMasterImages||{})[edCat]||[]).map((_,i)=>i);
+                        await sendImages(allIdx);
+                      }}>{edSending?"전송중...":"🚀 전체 일괄 전송"}</button>
+                    </div>
+                  </div>
+                )}
               </div>
-              {/* 전체선택 */}
-              {((data.edProducts||{})[edCat]||[]).length>0&&(
-                <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",marginBottom:6,borderRadius:7,background:"#F4F5F7",fontSize:12}}>
-                  <input type="checkbox" style={{width:15,height:15,cursor:"pointer"}}
-                    checked={((data.edProducts||{})[edCat]||[]).every((p)=>edChecked[p.code])}
+            )}
+
+            {/* ── 상품 목록 ── */}
+            {edSubTab==="products"&&(
+              <div className="panel" style={{padding:20}}>
+                <h3 style={{marginBottom:14}}>{edCat} 상품 목록</h3>
+                {/* 전체 체크 */}
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:8,background:"#F4F5F7",marginBottom:10}}>
+                  <input type="checkbox" id="edCheckAll" style={{width:"auto",cursor:"pointer"}}
+                    checked={((data.edProducts||{})[edCat]||[]).length>0&&((data.edProducts||{})[edCat]||[]).every((p)=>edChecked[p.code])}
                     onChange={(e)=>{
                       const all=((data.edProducts||{})[edCat]||[]).reduce((acc,p)=>({...acc,[p.code]:e.target.checked}),{});
                       setEdChecked(all);
                     }} />
-                  <span style={{fontWeight:700,color:"var(--ink2)"}}>전체 선택</span>
-                  <span style={{color:"var(--ink3)",marginLeft:"auto"}}>{Object.values(edChecked).filter(Boolean).length}개 선택</span>
+                  <label htmlFor="edCheckAll" style={{fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                    전체 선택 ({Object.values(edChecked).filter(Boolean).length}/{((data.edProducts||{})[edCat]||[]).length}개 선택됨)
+                  </label>
                 </div>
-              )}
-              {/* 상품 목록 */}
-              <div style={{marginBottom:10}}>
-                {((data.edProducts||{})[edCat]||[]).map((p)=>(
-                  <div key={p.code} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:8,marginBottom:4,
-                      border:"1.5px solid",borderColor:edSelCode===p.code?"#0C66E4":"var(--line)",
-                      background:edSelCode===p.code?"#E9F2FF":"var(--card)"}}>
-                    <input type="checkbox" style={{width:15,height:15,cursor:"pointer",flexShrink:0}}
-                      checked={!!edChecked[p.code]}
-                      onChange={(e)=>setEdChecked({...edChecked,[p.code]:e.target.checked})}
-                      onClick={(e)=>e.stopPropagation()} />
-                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={async()=>{
-                        if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
-                        setEdSelCode(p.code);setEdProduct(null);setEdDraft(null);setEdMsg('불러오는 중...');setEdLoading(true);
-                        const found=await c24SearchByCode(p.code);
-                        if(found){
-                          const detail=await c24GetProduct(found.product_no);
-                          const prod=detail||found;
-                          setEdProduct(prod);
-                          setEdDraft({product_name:prod.product_name||'',summary_description:prod.summary_description||'',description:prod.description||'',descImages:[]});
-                          setEdMsg('');
-                        }else setEdMsg("❌ "+p.code+" 조회 실패");
-                        setEdLoading(false);
-                      }}>
-                      <div style={{fontSize:12,fontWeight:700,color:edSelCode===p.code?"#0C66E4":"var(--ink1)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name||p.code}</div>
-                      <div style={{fontSize:10,color:"var(--ink3)"}}>{p.code}</div>
+                {((data.edProducts||{})[edCat]||[]).map((p)=>{
+                  const lastSent=p.lastSentAt?new Date(p.lastSentAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):null;
+                  return(
+                  <div key={p.code} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:9,border:"1.5px solid",marginBottom:6,
+                    borderColor:edChecked[p.code]?"#0C66E4":"var(--line)",background:edChecked[p.code]?"#E9F2FF":"var(--card)"}}>
+                    <input type="checkbox" style={{width:"auto",cursor:"pointer"}} checked={!!edChecked[p.code]} onChange={(e)=>setEdChecked({...edChecked,[p.code]:e.target.checked})} />
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700}}>{p.name||p.code}</div>
+                      <div style={{fontSize:11,color:"var(--ink3)",marginTop:2}}>
+                        {p.code}
+                        {lastSent&&<span style={{marginLeft:10,color:"#1F845A"}}>✔ 마지막 전송: {lastSent}</span>}
+                      </div>
                     </div>
-                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:13,cursor:"pointer",flexShrink:0}} onClick={(e)=>{e.stopPropagation();
+                    <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:13,cursor:"pointer"}} onClick={()=>{
                       const next={...(data.edProducts||{}),[edCat]:((data.edProducts||{})[edCat]||[]).filter((x)=>x.code!==p.code)};
                       commit((d)=>({...d,edProducts:next,updatedAt:Date.now()}),[]);
-                      if(edSelCode===p.code){setEdSelCode(null);setEdProduct(null);setEdDraft(null);}
-                      setEdChecked((prev)=>{const n={...prev};delete n[p.code];return n;});
                     }}>×</button>
                   </div>
-                ))}
-                {!((data.edProducts||{})[edCat]||[]).length&&<div style={{fontSize:12,color:"var(--ink3)",padding:"8px 4px"}}>상품이 없습니다</div>}
-              </div>
-              {/* 상품 추가 */}
-              <div style={{borderTop:"1px solid var(--line)",paddingTop:10}}>
-                <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:6}}>상품 추가</div>
-                <input className="inp" style={{marginBottom:6,fontSize:12}} placeholder="상품코드" value={edAddCode} onChange={(e)=>setEdAddCode(e.target.value)} />
-                <input className="inp" style={{marginBottom:6,fontSize:12}} placeholder="상품명 (선택)" value={edAddName} onChange={(e)=>setEdAddName(e.target.value)} />
-                <button className="btn-save" style={{width:"100%",fontSize:12,padding:"6px"}} onClick={()=>{
-                  const code=edAddCode.trim();if(!code)return;
-                  const cur=(data.edProducts||{})[edCat]||[];
-                  if(cur.some((x)=>x.code===code))return;
-                  const next={...(data.edProducts||{}),[edCat]:[...cur,{code,name:edAddName.trim()||code}]};
-                  commit((d)=>({...d,edProducts:next,updatedAt:Date.now()}),[]);
-                  setEdAddCode('');setEdAddName('');
-                }}>+ 추가</button>
-              </div>
-            </div>
-            {/* 오른쪽: 상품 상세 편집 */}
-            <div style={{flex:1,minWidth:0}}>
-              {edMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:edMsg.startsWith("✅")?"#DCFFF1":edMsg==="불러오는 중..."?"#E9F2FF":"#FFECEB",color:edMsg.startsWith("✅")?"#1F845A":edMsg==="불러오는 중..."?"#0C66E4":"#CA3521",fontSize:13,marginBottom:12}}>{edMsg}</div>}
-              {!edProduct&&!edLoading&&<div style={{padding:40,textAlign:"center",color:"var(--ink3)",fontSize:13}}>왼쪽에서 상품을 선택하세요</div>}
-              {edProduct&&edDraft&&(
-                <div className="panel" style={{padding:20}}>
-                  <div style={{fontSize:14,fontWeight:800,color:"#0C66E4",marginBottom:16}}>#{edProduct.product_no} {edProduct.product_name}</div>
-
-                  {/* 상품명 */}
-                  <div className="fld" style={{marginBottom:14}}>
-                    <label>상품명</label>
-                    <input value={edDraft.product_name} onChange={(e)=>setEdDraft({...edDraft,product_name:e.target.value})} />
-                  </div>
-
-                  {/* 요약설명 */}
-                  <div className="fld" style={{marginBottom:14}}>
-                    <label>상품 요약설명</label>
-                    <textarea value={edDraft.summary_description} onChange={(e)=>setEdDraft({...edDraft,summary_description:e.target.value})} style={{height:60}} placeholder="상품 요약설명 텍스트" />
-                  </div>
-
-
-                  {/* 상세설명 이미지 목록 */}
-                  <div style={{marginBottom:16}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                      <label style={{fontWeight:700,fontSize:13,margin:0}}>
-                        상세설명 이미지
-                        <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>이미지별로 순서 변경 가능 · 일괄 전송 시 순서대로 HTML 조합</span>
-                      </label>
-                      <div style={{display:"flex",gap:6}}>
-                        {['images','html','preview'].map((v)=>(
-                          <button key={v} onClick={()=>setEdDescView(v)}
-                            style={{padding:"3px 10px",borderRadius:6,border:"1.5px solid",fontSize:11,cursor:"pointer",
-                              fontWeight:edDescView===v?700:400,
-                              borderColor:edDescView===v?"#0C66E4":"var(--line)",
-                              background:edDescView===v?"#0C66E4":"var(--bg)",
-                              color:edDescView===v?"#fff":"var(--ink2)"}}>
-                            {v==="images"?"이미지":v==="html"?"HTML":"미리보기"}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 이미지 목록 모드 */}
-                    {edDescView==="images"&&(
-                      <div style={{border:"1.5px solid var(--line)",borderRadius:10,padding:14,background:"var(--bg)"}}>
-                        {(edDraft.descImages||[]).map((img,i)=>(
-                          <div key={img.id} style={{marginBottom:10,border:"1.5px solid var(--line)",borderRadius:10,background:"var(--card)",overflow:"hidden"}}>
-                            {/* 이미지 헤더 */}
-                            <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",borderBottom:"1px solid var(--line)",background:"#F4F5F7"}}>
-                              <span style={{fontSize:13,fontWeight:800,color:"#0C66E4",minWidth:24}}>{i+1}</span>
-                              <span style={{flex:1,fontSize:12,color:"var(--ink3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{img.name}</span>
-                              <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                                <button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--ink3)",padding:"2px 5px"}} disabled={i===0} onClick={()=>{
-                                  const imgs=[...edDraft.descImages];[imgs[i-1],imgs[i]]=[imgs[i],imgs[i-1]];
-                                  setEdDraft({...edDraft,descImages:imgs});
-                                }} title="위로">▲</button>
-                                <button style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"var(--ink3)",padding:"2px 5px"}} disabled={i===(edDraft.descImages||[]).length-1} onClick={()=>{
-                                  const imgs=[...edDraft.descImages];[imgs[i],imgs[i+1]]=[imgs[i+1],imgs[i]];
-                                  setEdDraft({...edDraft,descImages:imgs});
-                                }} title="아래로">▼</button>
-                                {/* 수정 버튼 */}
-                                <label style={{fontSize:11,color:"#0C66E4",fontWeight:700,cursor:"pointer",border:"1px solid #0C66E4",borderRadius:5,padding:"2px 8px"}}>
-                                  수정
-                                  <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
-                                    const f=e.target.files?.[0];if(!f)return;
-                                    const b64full=await readFileAsBase64(f);
-                                    const imgs=[...edDraft.descImages];
-                                    imgs[i]={...imgs[i],base64:b64full.split(',')[1],name:f.name,preview:b64full};
-                                    setEdDraft({...edDraft,descImages:imgs});
-                                    e.target.value="";
-                                  }} />
-                                </label>
-                                <button style={{fontSize:11,color:"var(--danger)",fontWeight:700,border:"1px solid var(--danger)",borderRadius:5,padding:"2px 8px",background:"none",cursor:"pointer"}} onClick={()=>{
-                                  setEdDraft({...edDraft,descImages:(edDraft.descImages||[]).filter((_,j)=>j!==i)});
-                                }}>삭제</button>
-                              </div>
-                            </div>
-                            {/* 이미지 본체 */}
-                            <div style={{padding:10,textAlign:"center",background:"#fff"}}>
-                              <img src={img.preview} alt={`${i+1}번 이미지`} style={{maxWidth:"100%",maxHeight:200,objectFit:"contain",borderRadius:4}} />
-                            </div>
-                          </div>
-                        ))}
-                        {!(edDraft.descImages||[]).length&&<div style={{textAlign:"center",padding:"20px 0",color:"var(--ink3)",fontSize:13}}>이미지를 추가하세요</div>}
-                        <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginTop:8,cursor:"pointer",padding:"10px",border:"2px dashed var(--line2)",borderRadius:8,fontSize:12,color:"#0C66E4",fontWeight:700}}>
-                          + 이미지 추가 (여러 장 가능)
-                          <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={async(e)=>{
-                            const files=Array.from(e.target.files||[]);
-                            const imgs=await Promise.all(files.map(async(f)=>{
-                              const b64full=await readFileAsBase64(f);
-                              return {id:uid(),base64:b64full.split(',')[1],name:f.name,preview:b64full};
-                            }));
-                            setEdDraft({...edDraft,descImages:[...(edDraft.descImages||[]),...imgs]});
-                            e.target.value="";
-                          }} />
-                        </label>
-                      </div>
-                    )}
-
-                    {/* HTML 모드 */}
-                    {edDescView==="html"&&(
-                      <textarea value={edDraft.description} onChange={(e)=>setEdDraft({...edDraft,description:e.target.value})}
-                        style={{width:"100%",minHeight:200,fontSize:12,fontFamily:"monospace",border:"1px solid var(--line2)",borderRadius:8,padding:10,resize:"vertical"}} />
-                    )}
-
-                    {/* 미리보기 */}
-                    {edDescView==="preview"&&(
-                      <div style={{border:"1px solid var(--line)",borderRadius:8,padding:12,minHeight:200,maxHeight:600,overflowY:"auto",background:"#fff"}}
-                        dangerouslySetInnerHTML={{__html:edDraft.description}} />
-                    )}
-                  </div>
-
-                  {/* 메시지 */}
-                  {edMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:edMsg.startsWith("✅")?"#DCFFF1":edMsg.includes("중")?"#E9F2FF":"#FFECEB",color:edMsg.startsWith("✅")?"#1F845A":edMsg.includes("중")?"#0C66E4":"#CA3521",fontSize:13,marginBottom:12}}>{edMsg}</div>}
-
-                  {/* 일괄 전송 */}
-                  <div style={{display:"flex",gap:8,justifyContent:"flex-end",borderTop:"1px solid var(--line)",paddingTop:14}}>
-                    <button className="btn ghost" onClick={()=>{setEdProduct(null);setEdDraft(null);setEdSelCode(null);setEdMsg('');}}>초기화</button>
-                    <button className="btn-save" style={{background:"#1F845A"}} disabled={edSending||edLoading} onClick={async()=>{
-                      if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
-                      setEdSending(true);setEdMsg('일괄 전송 중...');
-                      const payload={};
-                      // 상품명
-                      if(edDraft.product_name!==edProduct.product_name)payload.product_name=edDraft.product_name;
-                      // 요약설명 텍스트
-                      if(edDraft.summary_description!==(edProduct.summary_description||''))payload.summary_description=edDraft.summary_description;
-                      // 상세설명 이미지 목록
-                      if((edDraft.descImages||[]).length>0){
-                        setEdMsg('상세설명 이미지 업로드 중...');
-                        let descHtml='';
-                        for(let i=0;i<edDraft.descImages.length;i++){
-                          const img=edDraft.descImages[i];
-                          setEdMsg(`상세설명 이미지 업로드 중... (${i+1}/${edDraft.descImages.length})`);
-                          const upR=await c24Api({action:'uploadImage',imageBase64:img.base64,imageName:img.name});
-                          const imgUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
-                          if(imgUrl){descHtml+=`<div style="width:100%;text-align:center;"><img src="${imgUrl}" style="max-width:100%;display:block;" alt="" /></div>
-`;}
-                          else{setEdMsg("❌ 이미지 업로드 실패 ("+img.name+"): "+JSON.stringify(upR));setEdSending(false);return;}
-                        }
-                        payload.description=descHtml;
-                      } else if(edDraft.description!==(edProduct.description||'')){
-                        payload.description=edDraft.description;
-                      }
-                      if(!Object.keys(payload).length){setEdMsg("변경사항 없음");setEdSending(false);return;}
-                      setEdMsg('카페24 저장 중...');
-                      const d=await c24Api({action:'update',productNo:edProduct.product_no,payload});
-                      if(d.product)setEdMsg("✅ 일괄 전송 완료!");
-                      else setEdMsg("❌ 오류: "+JSON.stringify(d.error||d));
-                      setEdSending(false);
-                    }}>{edSending?"전송중...":"🚀 일괄 전송"}</button>
-                    <button className="btn-save" disabled={edSending||edLoading||!(edDraft.descImages||[]).some((img)=>img.base64)} onClick={async()=>{
-                      const checkedCodes=Object.entries(edChecked).filter(([,v])=>v).map(([k])=>k);
-                      if(!checkedCodes.length){setEdMsg("❌ 왼쪽에서 적용할 상품을 체크하세요");return;}
-                      if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
-                      const changedImgs=(edDraft.descImages||[]).map((img,i)=>({...img,idx:i})).filter((img)=>img.base64);
-                      if(!changedImgs.length){setEdMsg("❌ 변경된 이미지가 없습니다");return;}
-                      setEdSending(true);
-                      // 변경된 이미지들 먼저 카페24에 업로드해서 URL 확보
-                      setEdMsg('변경 이미지 업로드 중...');
-                      const uploadedUrls={};
-                      for(const img of changedImgs){
-                        const upR=await c24Api({action:'uploadImage',imageBase64:img.base64,imageName:img.name});
-                        const url=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
-                        if(!url){setEdMsg("❌ 이미지 업로드 실패: "+img.name);setEdSending(false);return;}
-                        uploadedUrls[img.idx]=url;
-                      }
-                      // 각 상품마다 N번째 img 태그만 교체
-                      let done=0;
-                      for(const code of checkedCodes){
-                        setEdMsg(`처리 중... (${done+1}/${checkedCodes.length}) ${code}`);
-                        const found=await c24SearchByCode(code);
-                        if(!found){setEdMsg(`⚠ ${code} 조회 실패, 건너뜀`);done++;continue;}
-                        const detail=await c24GetProduct(found.product_no);
-                        if(!detail){setEdMsg(`⚠ ${code} 상세 조회 실패, 건너뜀`);done++;continue;}
-                        let html=detail.description||'';
-                        // img 태그를 순서대로 파싱해서 N번째만 교체
-                        let imgIdx=0;
-                        html=html.replace(/<img([^>]*)>/gi,(match,attrs)=>{
-                          if(uploadedUrls[imgIdx]!==undefined){
-                            const newUrl=uploadedUrls[imgIdx];
-                            // src만 교체, 나머지 속성 유지
-                            const newAttrs=attrs.replace(/src\s*=\s*["'][^"']*["']/i,`src="${newUrl}"`);
-                            imgIdx++;
-                            return `<img${newAttrs}>`;
-                          }
-                          imgIdx++;
-                          return match;
-                        });
-                        await c24Api({action:'update',productNo:found.product_no,payload:{description:html}});
-                        done++;
-                      }
-                      setEdMsg(`✅ 완료! ${done}개 상품 처리됨 (${Object.keys(uploadedUrls).length}번 이미지 교체)`);
-                      setEdSending(false);
-                    }}>🔄 선택 상품 N번 이미지 교체</button>
-                  </div>
+                );})}
+                {!((data.edProducts||{})[edCat]||[]).length&&<div style={{textAlign:"center",padding:20,color:"var(--ink3)"}}>상품을 추가하세요</div>}
+                <div style={{borderTop:"1px solid var(--line)",paddingTop:12,marginTop:8,display:"flex",gap:8}}>
+                  <input className="inp" style={{flex:1,fontSize:12}} placeholder="상품코드" value={edAddCode} onChange={(e)=>setEdAddCode(e.target.value)} />
+                  <input className="inp" style={{flex:1,fontSize:12}} placeholder="상품명 (선택)" value={edAddName} onChange={(e)=>setEdAddName(e.target.value)} />
+                  <button className="btn-save" style={{fontSize:12,padding:"6px 14px",flexShrink:0}} onClick={()=>{
+                    const code=edAddCode.trim();if(!code)return;
+                    const cur=(data.edProducts||{})[edCat]||[];
+                    if(cur.some((x)=>x.code===code))return;
+                    const next={...(data.edProducts||{}),[edCat]:[...cur,{code,name:edAddName.trim()||code,lastSentAt:null}]};
+                    commit((d)=>({...d,edProducts:next,updatedAt:Date.now()}),[]);
+                    setEdAddCode('');setEdAddName('');
+                  }}>+ 추가</button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* ── 전송 이력 ── */}
+            {edSubTab==="history"&&(
+              <div className="panel" style={{padding:20}}>
+                <h3 style={{marginBottom:14}}>{edCat} 전송 이력</h3>
+                {edSendLog.filter((l)=>l.cat===edCat).length===0&&<div style={{textAlign:"center",padding:20,color:"var(--ink3)"}}>전송 이력이 없습니다</div>}
+                {[...edSendLog].filter((l)=>l.cat===edCat).reverse().map((log,i)=>(
+                  <div key={i} style={{padding:"10px 14px",borderRadius:9,border:"1px solid var(--line)",marginBottom:8,background:"var(--card)"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{fontSize:12,fontWeight:700,color:log.ok?"#1F845A":"#CA3521"}}>{log.ok?"✅":"❌"} {log.msg}</span>
+                      <span style={{fontSize:11,color:"var(--ink3)"}}>{new Date(log.ts).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
+                    </div>
+                    <div style={{fontSize:11,color:"var(--ink3)"}}>
+                      상품: {log.codes?.join(", ")} · 이미지: {log.imgIdxs?.map((i)=>i+1+"번").join(", ")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        </div>
+      </div>
       )}
 
       {view==="team"&&(<>
