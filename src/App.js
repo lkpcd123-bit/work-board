@@ -313,6 +313,13 @@ const resizeImage=(file,maxW=800,maxH=800,quality=0.75)=>new Promise((resolve)=>
       canvas.getContext("2d").drawImage(img,0,0,w,h);
       resolve(canvas.toDataURL(file.type.includes("png")?"image/png":"image/jpeg",quality));
     };
+
+// 원본 품질 유지 (카페24 상세이미지용)
+const readFileAsBase64=(file)=>new Promise((resolve)=>{
+  const reader=new FileReader();
+  reader.onload=(e)=>resolve(e.target.result);
+  reader.readAsDataURL(file);
+});
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);
@@ -3685,7 +3692,7 @@ function Board() {
                           const detail=await c24GetProduct(found.product_no);
                           const prod=detail||found;
                           setEdProduct(prod);
-                          setEdDraft({product_name:prod.product_name||'',summary_description:prod.summary_description||'',description:prod.description||'',descImages:[],summaryImage:null});
+                          setEdDraft({product_name:prod.product_name||'',summary_description:prod.summary_description||'',description:prod.description||'',descImages:[]});
                           setEdMsg('');
                         }else setEdMsg("❌ "+p.code+" 조회 실패");
                         setEdLoading(false);
@@ -3738,31 +3745,6 @@ function Board() {
                     <textarea value={edDraft.summary_description} onChange={(e)=>setEdDraft({...edDraft,summary_description:e.target.value})} style={{height:60}} placeholder="상품 요약설명 텍스트" />
                   </div>
 
-                  {/* 요약설명 이미지 */}
-                  <div style={{marginBottom:20,padding:14,border:"1.5px solid var(--line)",borderRadius:10,background:"var(--bg)"}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                      <label style={{fontWeight:700,fontSize:13,margin:0}}>요약설명 이미지 <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)"}}>(카페24 업로드 후 img 태그 삽입)</span></label>
-                    </div>
-                    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-                      {edDraft.summaryImage
-                        ?<>
-                          <img src={edDraft.summaryImage.preview} alt="summary" style={{height:72,borderRadius:6,border:"1px solid var(--line)",objectFit:"contain",maxWidth:200}} />
-                          <div>
-                            <div style={{fontSize:11,color:"var(--ink3)",marginBottom:4}}>{edDraft.summaryImage.name}</div>
-                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",fontWeight:700}} onClick={()=>setEdDraft({...edDraft,summaryImage:null})}>× 제거</button>
-                          </div>
-                        </>
-                        :<label style={{cursor:"pointer",fontSize:12,color:"#0C66E4",fontWeight:700,border:"1px solid #0C66E4",borderRadius:6,padding:"6px 14px"}}>
-                            📁 이미지 선택
-                            <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
-                              const f=e.target.files?.[0];if(!f)return;
-                              const b64=await resizeImage(f,1200,1200,0.9);
-                              setEdDraft({...edDraft,summaryImage:{base64:b64.split(',')[1],name:f.name,preview:b64}});
-                            }} />
-                          </label>
-                      }
-                    </div>
-                  </div>
 
                   {/* 상세설명 이미지 목록 */}
                   <div style={{marginBottom:16}}>
@@ -3808,9 +3790,9 @@ function Board() {
                                   수정
                                   <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
                                     const f=e.target.files?.[0];if(!f)return;
-                                    const b64=await resizeImage(f,1200,1200,0.9);
+                                    const b64full=await readFileAsBase64(f);
                                     const imgs=[...edDraft.descImages];
-                                    imgs[i]={...imgs[i],base64:b64.split(',')[1],name:f.name,preview:b64};
+                                    imgs[i]={...imgs[i],base64:b64full.split(',')[1],name:f.name,preview:b64full};
                                     setEdDraft({...edDraft,descImages:imgs});
                                     e.target.value="";
                                   }} />
@@ -3832,8 +3814,8 @@ function Board() {
                           <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={async(e)=>{
                             const files=Array.from(e.target.files||[]);
                             const imgs=await Promise.all(files.map(async(f)=>{
-                              const b64=await resizeImage(f,1200,1200,0.9);
-                              return {id:uid(),base64:b64.split(',')[1],name:f.name,preview:b64};
+                              const b64full=await readFileAsBase64(f);
+                              return {id:uid(),base64:b64full.split(',')[1],name:f.name,preview:b64full};
                             }));
                             setEdDraft({...edDraft,descImages:[...(edDraft.descImages||[]),...imgs]});
                             e.target.value="";
@@ -3869,14 +3851,6 @@ function Board() {
                       if(edDraft.product_name!==edProduct.product_name)payload.product_name=edDraft.product_name;
                       // 요약설명 텍스트
                       if(edDraft.summary_description!==(edProduct.summary_description||''))payload.summary_description=edDraft.summary_description;
-                      // 요약설명 이미지 (텍스트보다 우선)
-                      if(edDraft.summaryImage){
-                        setEdMsg('요약설명 이미지 업로드 중...');
-                        const upR=await c24Api({action:'uploadImage',imageBase64:edDraft.summaryImage.base64,imageName:edDraft.summaryImage.name});
-                        const imgUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
-                        if(imgUrl){payload.summary_description=`<img src="${imgUrl}" style="max-width:100%;" alt="summary" />`;}
-                        else{setEdMsg("❌ 요약설명 이미지 업로드 실패: "+JSON.stringify(upR));setEdSending(false);return;}
-                      }
                       // 상세설명 이미지 목록
                       if((edDraft.descImages||[]).length>0){
                         setEdMsg('상세설명 이미지 업로드 중...');
