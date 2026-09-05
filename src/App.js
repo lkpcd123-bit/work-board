@@ -797,6 +797,23 @@ const CSS = `
 
 `;
 
+const ALL_TABS=[
+  {id:"board",label:"보드"},
+  {id:"routine",label:"반복업무"},
+  {id:"monthly",label:"월간 업무"},
+  {id:"checklist",label:"체크리스트"},
+  {id:"memo",label:"메모"},
+  {id:"mindmap",label:"마인드맵"},
+  {id:"ref",label:"래퍼런스"},
+  {id:"schedule",label:"시간표"},
+  {id:"issue",label:"이슈"},
+  {id:"archive",label:"보관함"},
+  {id:"log",label:"변경 이력"},
+  {id:"ai",label:"AI비서"},
+  {id:"cafe24",label:"상품스케줄"},
+  {id:"stock",label:"재고관리"},
+  {id:"team",label:"팀·설정"},
+];
 export default function App() {
   return <Board />;
 }
@@ -807,23 +824,6 @@ function Board() {
   const [ready, setReady] = useState(false);
   const [saveState, setSaveState] = useState("idle");
   const [view, setView] = useState("board");
-  const ALL_TABS=[
-    {id:"board",label:"보드"},
-    {id:"routine",label:"반복업무"},
-    {id:"monthly",label:"월간 업무"},
-    {id:"checklist",label:"체크리스트"},
-    {id:"memo",label:"메모"},
-    {id:"mindmap",label:"마인드맵"},
-    {id:"ref",label:"래퍼런스"},
-    {id:"schedule",label:"시간표"},
-    {id:"issue",label:"이슈"},
-    {id:"archive",label:"보관함"},
-    {id:"log",label:"변경 이력"},
-    {id:"ai",label:"AI비서"},
-    {id:"cafe24",label:"상품스케줄"},
-    {id:"stock",label:"재고관리"},
-    {id:"team",label:"팀·설정"},
-  ];
   const tabOrder=useMemo(()=>data.tabOrder||ALL_TABS.map((t)=>t.id),[data.tabOrder]); // eslint-disable-line react-hooks/exhaustive-deps
   const hiddenTabs=useMemo(()=>data.hiddenTabs||[],[data.hiddenTabs]);
   const visibleTabs=useMemo(()=>{
