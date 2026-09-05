@@ -924,6 +924,7 @@ function Board() {
   const [edMsg, setEdMsg] = useState('');
   const [edDescView, setEdDescView] = useState('parts'); // 'parts' | 'html' | 'preview'
   const [edSending, setEdSending] = useState(false);
+  const [edChecked, setEdChecked] = useState({}); // {code: true/false}
   const [edAddCode, setEdAddCode] = useState('');
   const [edAddName, setEdAddName] = useState('');
   const ED_CATS = ['보틀','대용량','파우치'];
@@ -3645,7 +3646,7 @@ function Board() {
               {/* 분류 탭 */}
               <div style={{display:"flex",gap:0,marginBottom:12,borderBottom:"2px solid var(--line)"}}>
                 {ED_CATS.map((cat)=>(
-                  <button key={cat} onClick={()=>{setEdCat(cat);setEdSelCode(null);setEdProduct(null);setEdDraft(null);setEdMsg('');}}
+                  <button key={cat} onClick={()=>{setEdCat(cat);setEdSelCode(null);setEdProduct(null);setEdDraft(null);setEdMsg('');setEdChecked({});}}
                     style={{flex:1,padding:"8px 0",border:"none",cursor:"pointer",fontSize:12,fontWeight:edCat===cat?800:500,
                       background:"none",color:edCat===cat?"#0C66E4":"var(--ink3)",
                       borderBottom:edCat===cat?"3px solid #0C66E4":"3px solid transparent",marginBottom:-2}}>
@@ -3653,26 +3654,42 @@ function Board() {
                   </button>
                 ))}
               </div>
+              {/* 전체선택 */}
+              {((data.edProducts||{})[edCat]||[]).length>0&&(
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",marginBottom:6,borderRadius:7,background:"#F4F5F7",fontSize:12}}>
+                  <input type="checkbox" style={{width:15,height:15,cursor:"pointer"}}
+                    checked={((data.edProducts||{})[edCat]||[]).every((p)=>edChecked[p.code])}
+                    onChange={(e)=>{
+                      const all=((data.edProducts||{})[edCat]||[]).reduce((acc,p)=>({...acc,[p.code]:e.target.checked}),{});
+                      setEdChecked(all);
+                    }} />
+                  <span style={{fontWeight:700,color:"var(--ink2)"}}>전체 선택</span>
+                  <span style={{color:"var(--ink3)",marginLeft:"auto"}}>{Object.values(edChecked).filter(Boolean).length}개 선택</span>
+                </div>
+              )}
               {/* 상품 목록 */}
               <div style={{marginBottom:10}}>
                 {((data.edProducts||{})[edCat]||[]).map((p)=>(
-                  <div key={p.code} onClick={async()=>{
-                    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
-                    setEdSelCode(p.code);setEdProduct(null);setEdDraft(null);setEdMsg('불러오는 중...');setEdLoading(true);
-                    const found=await c24SearchByCode(p.code);
-                    if(found){
-                      const detail=await c24GetProduct(found.product_no);
-                      const prod=detail||found;
-                      setEdProduct(prod);
-                      setEdDraft({product_name:prod.product_name||'',summary_description:prod.summary_description||'',description:prod.description||'',descImages:[],summaryImage:null});
-                      setEdMsg('');
-                    }else setEdMsg("❌ "+p.code+" 조회 실패");
-                    setEdLoading(false);
-                  }}
-                    style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:8,cursor:"pointer",marginBottom:4,
+                  <div key={p.code} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:8,marginBottom:4,
                       border:"1.5px solid",borderColor:edSelCode===p.code?"#0C66E4":"var(--line)",
                       background:edSelCode===p.code?"#E9F2FF":"var(--card)"}}>
-                    <div style={{flex:1,minWidth:0}}>
+                    <input type="checkbox" style={{width:15,height:15,cursor:"pointer",flexShrink:0}}
+                      checked={!!edChecked[p.code]}
+                      onChange={(e)=>setEdChecked({...edChecked,[p.code]:e.target.checked})}
+                      onClick={(e)=>e.stopPropagation()} />
+                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={async()=>{
+                        if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
+                        setEdSelCode(p.code);setEdProduct(null);setEdDraft(null);setEdMsg('불러오는 중...');setEdLoading(true);
+                        const found=await c24SearchByCode(p.code);
+                        if(found){
+                          const detail=await c24GetProduct(found.product_no);
+                          const prod=detail||found;
+                          setEdProduct(prod);
+                          setEdDraft({product_name:prod.product_name||'',summary_description:prod.summary_description||'',description:prod.description||'',descImages:[],summaryImage:null});
+                          setEdMsg('');
+                        }else setEdMsg("❌ "+p.code+" 조회 실패");
+                        setEdLoading(false);
+                      }}>
                       <div style={{fontSize:12,fontWeight:700,color:edSelCode===p.code?"#0C66E4":"var(--ink1)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name||p.code}</div>
                       <div style={{fontSize:10,color:"var(--ink3)"}}>{p.code}</div>
                     </div>
@@ -3680,6 +3697,7 @@ function Board() {
                       const next={...(data.edProducts||{}),[edCat]:((data.edProducts||{})[edCat]||[]).filter((x)=>x.code!==p.code)};
                       commit((d)=>({...d,edProducts:next,updatedAt:Date.now()}),[]);
                       if(edSelCode===p.code){setEdSelCode(null);setEdProduct(null);setEdDraft(null);}
+                      setEdChecked((prev)=>{const n={...prev};delete n[p.code];return n;});
                     }}>×</button>
                   </div>
                 ))}
@@ -3883,6 +3901,50 @@ function Board() {
                       else setEdMsg("❌ 오류: "+JSON.stringify(d.error||d));
                       setEdSending(false);
                     }}>{edSending?"전송중...":"🚀 일괄 전송"}</button>
+                    <button className="btn-save" disabled={edSending||edLoading||!(edDraft.descImages||[]).some((img)=>img.base64)} onClick={async()=>{
+                      const checkedCodes=Object.entries(edChecked).filter(([,v])=>v).map(([k])=>k);
+                      if(!checkedCodes.length){setEdMsg("❌ 왼쪽에서 적용할 상품을 체크하세요");return;}
+                      if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
+                      const changedImgs=(edDraft.descImages||[]).map((img,i)=>({...img,idx:i})).filter((img)=>img.base64);
+                      if(!changedImgs.length){setEdMsg("❌ 변경된 이미지가 없습니다");return;}
+                      setEdSending(true);
+                      // 변경된 이미지들 먼저 카페24에 업로드해서 URL 확보
+                      setEdMsg('변경 이미지 업로드 중...');
+                      const uploadedUrls={};
+                      for(const img of changedImgs){
+                        const upR=await c24Api({action:'uploadImage',imageBase64:img.base64,imageName:img.name});
+                        const url=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+                        if(!url){setEdMsg("❌ 이미지 업로드 실패: "+img.name);setEdSending(false);return;}
+                        uploadedUrls[img.idx]=url;
+                      }
+                      // 각 상품마다 N번째 img 태그만 교체
+                      let done=0;
+                      for(const code of checkedCodes){
+                        setEdMsg(`처리 중... (${done+1}/${checkedCodes.length}) ${code}`);
+                        const found=await c24SearchByCode(code);
+                        if(!found){setEdMsg(`⚠ ${code} 조회 실패, 건너뜀`);done++;continue;}
+                        const detail=await c24GetProduct(found.product_no);
+                        if(!detail){setEdMsg(`⚠ ${code} 상세 조회 실패, 건너뜀`);done++;continue;}
+                        let html=detail.description||'';
+                        // img 태그를 순서대로 파싱해서 N번째만 교체
+                        let imgIdx=0;
+                        html=html.replace(/<img([^>]*)>/gi,(match,attrs)=>{
+                          if(uploadedUrls[imgIdx]!==undefined){
+                            const newUrl=uploadedUrls[imgIdx];
+                            // src만 교체, 나머지 속성 유지
+                            const newAttrs=attrs.replace(/src\s*=\s*["'][^"']*["']/i,`src="${newUrl}"`);
+                            imgIdx++;
+                            return `<img${newAttrs}>`;
+                          }
+                          imgIdx++;
+                          return match;
+                        });
+                        await c24Api({action:'update',productNo:found.product_no,payload:{description:html}});
+                        done++;
+                      }
+                      setEdMsg(`✅ 완료! ${done}개 상품 처리됨 (${Object.keys(uploadedUrls).length}번 이미지 교체)`);
+                      setEdSending(false);
+                    }}>🔄 선택 상품 N번 이미지 교체</button>
                   </div>
                 </div>
               )}
