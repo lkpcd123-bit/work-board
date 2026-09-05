@@ -313,15 +313,15 @@ const resizeImage=(file,maxW=800,maxH=800,quality=0.75)=>new Promise((resolve)=>
       canvas.getContext("2d").drawImage(img,0,0,w,h);
       resolve(canvas.toDataURL(file.type.includes("png")?"image/png":"image/jpeg",quality));
     };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+});
 
 // 원본 품질 유지 (카페24 상세이미지용)
 const readFileAsBase64=(file)=>new Promise((resolve)=>{
   const reader=new FileReader();
   reader.onload=(e)=>resolve(e.target.result);
-  reader.readAsDataURL(file);
-});
-    img.src=e.target.result;
-  };
   reader.readAsDataURL(file);
 });
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
