@@ -837,8 +837,6 @@ function Board() {
   const [tabDragId, setTabDragId] = useState(null);
   const tabFolders=useMemo(()=>data.tabFolders||[],[data.tabFolders]);
   const saveTabConfig=(patch)=>commit((d)=>({...d,...patch,updatedAt:Date.now()}),[]);
-  const saveTabOrder=(order)=>saveTabConfig({tabOrder:order});
-  const saveHiddenTabs=(hidden)=>saveTabConfig({hiddenTabs:hidden});
   const saveTabFolders=(folders)=>saveTabConfig({tabFolders:folders});
   const [q, setQ] = useState("");
   const [fCh, setFCh] = useState("전체");
