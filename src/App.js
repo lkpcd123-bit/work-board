@@ -807,7 +807,7 @@ function Board() {
   const [ready, setReady] = useState(false);
   const [saveState, setSaveState] = useState("idle");
   const [view, setView] = useState("board");
-  const ALL_TABS=[
+  const ALL_TABS=useMemo(()=>[
     {id:"board",label:"보드",n:()=>live.length},
     {id:"routine",label:"반복업무",n:()=>rItems.filter((it)=>!(it.checkins||{})[riDate]).length},
     {id:"monthly",label:"월간 업무",n:()=>mlyByMonth(mlyDate).filter((m)=>!m.done).length},
@@ -823,7 +823,7 @@ function Board() {
     {id:"cafe24",label:"상품스케줄",n:()=>null},
     {id:"stock",label:"재고관리",n:()=>null},
     {id:"team",label:"팀·설정",n:()=>null},
-  ];
+  ],[live,rItems,riDate,mlyDate,checkitems,memoItems,allIssues,archived]);
   const tabOrder=useMemo(()=>data.tabOrder||ALL_TABS.map((t)=>t.id),[data.tabOrder,ALL_TABS]); // eslint-disable-line react-hooks/exhaustive-deps
   const hiddenTabs=useMemo(()=>data.hiddenTabs||[],[data.hiddenTabs]);
   const visibleTabs=useMemo(()=>{
