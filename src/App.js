@@ -1848,35 +1848,77 @@ function Board() {
     if(weekdays<1)weekdays=1;
     return Math.round((prev.stock-latest.stock)/weekdays);
   };
+  const NAVER_KEEP_SKUS=new Set(["NS1uPBOcsQM1MT","NS1vpdLRzsy8Xr","NS1vf86aATxYqZ","NS1uPBO2exBRia","NS1uPBOJrgQhYF","NS1vfsnpPCxncZ","NS1uPBNotHhmLJ","NS1vpdMwo7GMGg","NS1uPBP1uITAvC","NS1wfXZeeKDZK5","NS1vpdMajlycY5","NS1uPBMhiRJLcT","NS1vpdKMb0EHPS","NS1vf85vJ0gaCk","NS1uZ5gbN1DYgz","NS1vCCaENFVoHW","NS1vpdLykuN57H","NS1vf87gHK12ua","NS1vf7i4FBUwVF","NS1vf87BDpVYh7","NS1vf7hOtYoah7","NS1wfXZfzJe2wn","NS1vCCZIMYAdxL","NS1vf88E4xCOjU","NS1uPBMG0OxYHu","NS1vf7ibqnFnqJ","NS1vpdL6IsADzi","NS1uPBNex4R4Wk"]);
   const parseStockExcel=async(file,channel)=>{
     const buf=await file.arrayBuffer();
     const wb=XLSX.read(buf,{type:'array'});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=XLSX.utils.sheet_to_json(ws,{defval:""});
-    // ── 파일 받으면 여기서 컬럼명 맞춤 ──
     const today=todayStr();
-    const items=rows.map((r)=>({
-      id:r['상품코드']||r['SKU']||r['product_code']||String(Math.random()),
-      name:r['상품명']||r['name']||r['상품 이름']||"",
-      sku:r['상품코드']||r['SKU']||"",
-      stock:parseInt(r['현재고']||r['재고수량']||r['stock']||0,10),
-      date:today,
-    }));
-    // 기존 히스토리에 오늘 데이터 병합
-    const existing=(data.stockData||{})[channel]||[];
-    const merged=[...existing.filter((r)=>r.date!==today),...items.map((item)=>{
-      const hist=existing.filter((r)=>r.id===item.id);
-      return {...item,history:[...hist.map((h)=>({date:h.date,stock:h.stock})),{date:today,stock:item.stock}].slice(-30)};
-    })];
-    commit((d)=>({...d,stockData:{...(d.stockData||{}),naver:channel==="naver"?merged:(d.stockData||{}).naver||[],coupang:channel==="coupang"?merged:(d.stockData||{}).coupang||[]},updatedAt:Date.now()}),[]);
-    // 안전재고 미달 항목 자동 입고요청 생성
-    const alerts=items.filter((item)=>{
-      const safe=stockSafe[`${channel}_${item.id}`];
-      return safe&&item.stock<safe;
-    });
-    if(alerts.length){
-      const newRequests=alerts.map((item)=>({id:uid(),channel,productName:item.name,sku:item.sku,currentStock:item.stock,safeStock:stockSafe[`${channel}_${item.id}`],createdAt:Date.now(),done:false}));
-      commit((d)=>({...d,reorderRequests:[...(d.reorderRequests||[]).filter((r)=>!alerts.some((a)=>r.sku===a.sku&&r.channel===channel)),...newRequests],updatedAt:Date.now()}),[]);
+
+    if(channel==="naver"){
+      // 네이버 양식: 1~2행 안내문, 3행 헤더, 4행부터 데이터
+      // 컬럼: SKU ID(0), 바코드(1), SKU 명(2), 보관온도(3), 물류사(4), 물류센터(5), 판매가능 재고수량(6)
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:"",header:1});
+      // 헤더 행 찾기 (SKU ID가 있는 행)
+      let headerIdx=rows.findIndex((r)=>r[0]==="SKU ID");
+      if(headerIdx<0){alert("네이버 재고 파일 형식이 맞지 않습니다. (SKU ID 컬럼 없음)");return;}
+      // SKU별 재고 합산
+      const skuMap={}; // skuId → {name, barcode, stock}
+      for(let i=headerIdx+1;i<rows.length;i++){
+        const r=rows[i];
+        const skuId=String(r[0]||"").trim();
+        if(!skuId||!NAVER_KEEP_SKUS.has(skuId))continue;
+        const stock=parseInt(r[6]||0,10)||0;
+        if(skuMap[skuId]){
+          skuMap[skuId].stock+=stock;
+        }else{
+          skuMap[skuId]={id:skuId,barcode:String(r[1]||""),name:String(r[2]||""),stock};
+        }
+      }
+      const items=Object.values(skuMap).map((item)=>({...item,date:today}));
+      // 기존 히스토리 병합
+      const existing=(data.stockData||{}).naver||[];
+      const merged=items.map((item)=>{
+        const hist=existing.find((e)=>e.id===item.id);
+        const prevHistory=hist?.history||[];
+        return{...item,history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:item.stock}].slice(-30)};
+      });
+      // 기존 중 이번에 없는 항목도 유지
+      const existingNotInNew=existing.filter((e)=>!skuMap[e.id]);
+      const finalMerged=[...merged,...existingNotInNew];
+      commit((d)=>({...d,stockData:{...(d.stockData||{}),naver:finalMerged},updatedAt:Date.now()}),[]);
+      // 안전재고 미달 자동 입고요청
+      const alerts=items.filter((item)=>{const safe=stockSafe[`naver_${item.id}`];return safe&&item.stock<safe;});
+      if(alerts.length){
+        const newReq=alerts.map((item)=>({id:uid(),channel:"naver",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`naver_${item.id}`],createdAt:Date.now(),done:false}));
+        commit((d)=>({...d,reorderRequests:[...(d.reorderRequests||[]).filter((r)=>!alerts.some((a)=>r.sku===a.sku&&r.channel==="naver")),...newReq],updatedAt:Date.now()}),[]);
+      }
+      alert(`✅ 네이버 재고 업로드 완료 (${items.length}개 SKU)`);
+
+    }else{
+      // 쿠팡: 기존 범용 파서
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:""});
+      const items=rows.map((r)=>({
+        id:r['상품코드']||r['SKU ID']||r['SKU']||r['product_code']||String(Math.random()),
+        name:r['상품명']||r['SKU 명']||r['name']||"",
+        sku:r['상품코드']||r['SKU ID']||r['SKU']||"",
+        stock:parseInt(r['현재고']||r['재고수량']||r['판매가능 재고수량']||r['stock']||0,10),
+        date:today,
+      }));
+      const existing=(data.stockData||{}).coupang||[];
+      const merged=items.map((item)=>{
+        const hist=existing.find((e)=>e.id===item.id);
+        const prevHistory=hist?.history||[];
+        return{...item,history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:item.stock}].slice(-30)};
+      });
+      const existingNotInNew=existing.filter((e)=>!items.some((i)=>i.id===e.id));
+      commit((d)=>({...d,stockData:{...(d.stockData||{}),coupang:[...merged,...existingNotInNew]},updatedAt:Date.now()}),[]);
+      const alerts=items.filter((item)=>{const safe=stockSafe[`coupang_${item.id}`];return safe&&item.stock<safe;});
+      if(alerts.length){
+        const newReq=alerts.map((item)=>({id:uid(),channel:"coupang",productName:item.name,sku:item.sku,currentStock:item.stock,safeStock:stockSafe[`coupang_${item.id}`],createdAt:Date.now(),done:false}));
+        commit((d)=>({...d,reorderRequests:[...(d.reorderRequests||[]).filter((r)=>!alerts.some((a)=>r.sku===a.sku&&r.channel==="coupang")),...newReq],updatedAt:Date.now()}),[]);
+      }
+      alert(`✅ 쿠팡 재고 업로드 완료 (${items.length}개 SKU)`);
     }
   };
   const saveSafeStock=(channel,itemId,val)=>{
