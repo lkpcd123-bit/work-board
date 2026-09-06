@@ -1851,7 +1851,7 @@ function Board() {
     if(weekdays<1)weekdays=1;
     return Math.round((prev.stock-latest.stock)/weekdays);
   };
-  const NAVER_KEEP_SKUS=new Set(["NS1uPBOcsQM1MT","NS1vpdLRzsy8Xr","NS1vf86aATxYqZ","NS1uPBO2exBRia","NS1uPBOJrgQhYF","NS1vfsnpPCxncZ","NS1uPBNotHhmLJ","NS1vpdMwo7GMGg","NS1uPBP1uITAvC","NS1wfXZeeKDZK5","NS1vpdMajlycY5","NS1uPBMhiRJLcT","NS1vpdKMb0EHPS","NS1vf85vJ0gaCk","NS1uZ5gbN1DYgz","NS1vCCaENFVoHW","NS1vpdLykuN57H","NS1vf87gHK12ua","NS1vf7i4FBUwVF","NS1vf87BDpVYh7","NS1vf7hOtYoah7","NS1wfXZfzJe2wn","NS1vCCZIMYAdxL","NS1vf88E4xCOjU","NS1uPBMG0OxYHu","NS1vf7ibqnFnqJ","NS1vpdL6IsADzi","NS1uPBNex4R4Wk"]);
+  const NAVER_KEEP_SKUS=new Set(["NS1uPBOcsQM1MT","NS1vpdLRzsy8Xr","NS1vf86aATxYqZ","NS1uPBO2exBRia","NS1uPBOJrgQhYF","NS1vfsnpPCxncZ","NS1uPBNotHhmLJ","NS1vpdMwo7GMGg","NS1uPBP1uITAvC","NS1wfXZeeKDZK5","NS1vpdMajlycY5","NS1uPBMhiRJLcT","NS1vpdKMb0EHPS","NS1vf85vJ0gaCk","NS1uZ5gbN1DYgz","NS1vCCaENFVoHW","NS1vpdLykuN57H","NS1vf87gHK12ua","NS1vf7i4FBUwVF","NS1vf87BDpVYh7","NS1vf7hOtYoah7","NS1wfXZfzJe2wn","NS1vCCZIMYAdxL","NS1vf88E4xCOjU","NS1uPBMG0OxYHu","NS1vf7ibqnFnqJ","NS1vpdL6IsADzi","NS1uPBNex4R4Wk","NS1uPBLUnWSDV7"]);
   const parseStockExcel=async(file,channel)=>{
     const buf=await file.arrayBuffer();
     const wb=XLSX.read(buf,{type:'array'});
