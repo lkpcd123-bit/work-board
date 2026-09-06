@@ -3630,7 +3630,7 @@ function Board() {
       {inboundModal&&inboundDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setInboundModal(null)}>
           <div className="modal" style={{maxWidth:560}} onClick={(e)=>e.stopPropagation()}>
-            <div className="modal-head" style={{padding:"20px 28px"}}><h3 style={{fontSize:16}}>{inboundModal==="add"?"입고 예정 등록":"입고 예정 수정"}</h3><button className="x" onClick={()=>setInboundModal(null)}>×</button></div>
+            <div className="modal-head" style={{padding:"20px 28px",position:"relative"}}><h3 style={{fontSize:16}}>{inboundModal==="add"?"입고 예정 등록":"입고 예정 수정"}</h3><button className="x" onClick={()=>setInboundModal(null)} style={{position:"absolute",top:16,right:20,fontSize:28,lineHeight:1,background:"none",border:"none",cursor:"pointer",color:"var(--ink3)"}}>×</button></div>
             <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:22,padding:"24px 28px"}}>
               <div className="r3">
                 <div className="fld"><label>상품명</label><input value={inboundDraft.productName||""} onChange={(e)=>setInboundDraft({...inboundDraft,productName:e.target.value})} placeholder="상품명" /></div>
