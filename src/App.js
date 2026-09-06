@@ -1601,11 +1601,42 @@ function Board() {
     }catch(e){c24AddLog('❌ 조회 오류: '+e.message);}
     setC24SearchLoading(false);
   };
-  const c24Api=async(body)=>{
-    const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,token:c24TokenRef.current})});
-    return res.json();
+  // 마스터 이미지 추가 - 카페24에 즉시 업로드 후 URL만 저장
+  const addMasterImages=async(files)=>{
+    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요 — 이미지를 저장하려면 먼저 로그인하세요");return;}
+    setEdMsg('이미지 업로드 중...');
+    const cur=(data.edMasterImages||{})[edCat]||[];
+    const newImgs=[];
+    for(let i=0;i<files.length;i++){
+      const f=files[i];
+      setEdMsg(`이미지 업로드 중... (${i+1}/${files.length})`);
+      const b64full=await readFileAsBase64(f);
+      const base64=b64full.split(',')[1];
+      // 카페24에 업로드
+      const upR=await c24Api({action:'uploadImage',imageBase64:base64,imageName:f.name});
+      const url=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+      if(!url){setEdMsg(`❌ ${f.name} 업로드 실패: `+JSON.stringify(upR));return;}
+      newImgs.push({id:uid(),url,name:f.name,createdAt:Date.now()});
+    }
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,...newImgs]},updatedAt:Date.now()}),[]);
+    setEdMsg(`✅ ${newImgs.length}장 업로드 완료`);
   };
-  const c24SearchByCode=async(code)=>{
+  // 마스터 이미지 수정 - 카페24에 즉시 업로드 후 URL만 저장
+  const replaceMasterImage=async(idx,file)=>{
+    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
+    setEdMsg(`${idx+1}번 이미지 교체 중...`);
+    const b64full=await readFileAsBase64(file);
+    const base64=b64full.split(',')[1];
+    const upR=await c24Api({action:'uploadImage',imageBase64:base64,imageName:file.name});
+    const url=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+    if(!url){setEdMsg("❌ 업로드 실패: "+JSON.stringify(upR));return;}
+    const imgs=[...((data.edMasterImages||{})[edCat]||[])];
+    imgs[idx]={...imgs[idx],url,name:file.name,updatedAt:Date.now()};
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+    setEdChanged((prev)=>({...prev,[idx]:true}));
+    setEdMsg(`✅ ${idx+1}번 이미지 교체 완료`);
+  };
+  const c24Api=async(body)=>{
     const d=await c24Api({action:'search',productCode:code});
     return d.product||null;
   };
@@ -1623,16 +1654,12 @@ function Board() {
     setEdSending(true);
     const log={ts:Date.now(),cat:edCat,codes:checkedCodes,imgIdxs,ok:false,msg:''};
     try{
-      // 1) 이미지 업로드 (카페24 CDN)
-      setEdMsg('이미지 업로드 중...');
+      // 이미지가 카페24에 이미 업로드돼 URL로 저장됨 — 업로드 불필요
       const uploadedUrls={};
       for(const idx of imgIdxs){
         const img=masterImgs[idx];if(!img)continue;
-        setEdMsg(`이미지 업로드 중... (${idx+1}번)`);
-        const upR=await c24Api({action:'uploadImage',imageBase64:img.base64,imageName:img.name});
-        const url=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
-        if(!url){setEdMsg(`❌ ${idx+1}번 이미지 업로드 실패: `+JSON.stringify(upR));setEdSending(false);log.msg=`${idx+1}번 업로드 실패`;setEdSendLog((p)=>[...p,log]);return;}
-        uploadedUrls[idx]=url;
+        if(img.url){uploadedUrls[idx]=img.url;}
+        else{setEdMsg(`❌ ${idx+1}번 이미지 URL 없음 — 이미지를 다시 추가해주세요`);setEdSending(false);return;}
       }
       // 2) 각 상품에 상세설명 적용
       // 기존 상세설명에서 마스터 이미지 URL만 교체하는 방식
@@ -3779,11 +3806,7 @@ function Board() {
                         수정
                         <input type="file" accept="image/*" style={{display:"none"}} onChange={async(e)=>{
                           const f=e.target.files?.[0];if(!f)return;
-                          const b64full=await readFileAsBase64(f);
-                          const imgs=[...((data.edMasterImages||{})[edCat]||[])];
-                          imgs[i]={...imgs[i],base64:b64full.split(',')[1],name:f.name,preview:b64full,updatedAt:Date.now()};
-                          commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
-                          setEdChanged((prev)=>({...prev,[i]:true}));
+                          await replaceMasterImage(i,f);
                           e.target.value="";
                         }} />
                       </label>
@@ -3802,7 +3825,7 @@ function Board() {
                       }}>▼</button>
                     </div>
                     <div style={{padding:10,textAlign:"center",background:"#fff"}}>
-                      <img src={img.preview||img.src} alt={`${i+1}번`} style={{maxWidth:"100%",maxHeight:180,objectFit:"contain",borderRadius:4}} />
+                      <img src={img.url} alt={`${i+1}번`} style={{maxWidth:"100%",maxHeight:180,objectFit:"contain",borderRadius:4}} />
                     </div>
                   </div>
                 ))}
@@ -3813,12 +3836,7 @@ function Board() {
                   + 이미지 추가 (여러 장)
                   <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={async(e)=>{
                     const files=Array.from(e.target.files||[]);
-                    const newImgs=await Promise.all(files.map(async(f)=>{
-                      const b64full=await readFileAsBase64(f);
-                      return {id:uid(),base64:b64full.split(',')[1],name:f.name,preview:b64full,createdAt:Date.now()};
-                    }));
-                    const cur=(data.edMasterImages||{})[edCat]||[];
-                    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,...newImgs]},updatedAt:Date.now()}),[]);
+                    await addMasterImages(files);
                     e.target.value="";
                   }} />
                 </label>
