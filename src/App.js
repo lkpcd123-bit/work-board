@@ -3457,7 +3457,7 @@ function Board() {
                           draggable
                           onDragStart={()=>setStockDragId(item.id)}
                           onDragOver={(e)=>{e.preventDefault();}}
-                          onDragLeave={()=>=>v===item.id?null:v)}
+                          onDragLeave={()=>{}}
                           onDrop={(e)=>{
                             e.preventDefault();
                             if(!stockDragId||stockDragId===item.id)return;
