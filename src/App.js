@@ -328,7 +328,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -359,6 +359,7 @@ function mergeData(r,l) {
     notifications:(l.updatedAt||0)>=(r.updatedAt||0)?l.notifications||[]:r.notifications||[],
     edProducts:(l.updatedAt||0)>=(r.updatedAt||0)?l.edProducts||{보틀:[],대용량:[],파우치:[]}:r.edProducts||{보틀:[],대용량:[],파우치:[]},
     edMasterImages:(l.updatedAt||0)>=(r.updatedAt||0)?l.edMasterImages||{보틀:[],대용량:[],파우치:[]}:r.edMasterImages||{보틀:[],대용량:[],파우치:[]},
+    edSavedSummaries:(l.updatedAt||0)>=(r.updatedAt||0)?l.edSavedSummaries||[]:r.edSavedSummaries||[],
     updatedAt:Date.now() };
 }
 
@@ -934,6 +935,7 @@ function Board() {
   const [edSendLog, setEdSendLog] = useState([]); // 전송 이력
   const [edSubTab, setEdSubTab] = useState('master'); // 'master'|'products'|'history'
   const [edSummary, setEdSummary] = useState({}); // {분류: '요약설명'}
+  const [edSummaryEditId, setEdSummaryEditId] = useState(null); // 수정 중인 저장된 요약설명 id
   const ED_CATS = ['보틀','대용량','파우치'];
   const c24TimerRef = useRef(null);
   const c24TokenRef = useRef('');
@@ -1016,7 +1018,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]},edMasterImages:remote.edMasterImages||{보틀:[],대용량:[],파우치:[]}}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]},edMasterImages:remote.edMasterImages||{보틀:[],대용량:[],파우치:[]},edSavedSummaries:Array.isArray(remote.edSavedSummaries)?remote.edSavedSummaries:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -3791,15 +3793,63 @@ function Board() {
 
                 {/* 요약설명 */}
                 <div style={{marginBottom:16,padding:14,border:"1.5px solid var(--line)",borderRadius:10,background:"var(--bg)"}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                     <label style={{fontWeight:700,fontSize:13,margin:0}}>상품 요약설명</label>
                     <span style={{fontSize:11,color:"var(--ink3)"}}>일괄 전송 시 체크된 상품에 동일 적용</span>
                   </div>
+
+                  {/* 저장된 요약설명 목록 */}
+                  {(data.edSavedSummaries||[]).length>0&&(
+                    <div style={{marginBottom:10,display:"flex",flexDirection:"column",gap:6}}>
+                      {(data.edSavedSummaries||[]).map((s)=>(
+                        <div key={s.id} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 12px",borderRadius:8,border:"1.5px solid",
+                          borderColor:edSummaryEditId===s.id?"#0C66E4":"var(--line)",background:edSummaryEditId===s.id?"#E9F2FF":"var(--card)"}}>
+                          {edSummaryEditId===s.id
+                            ?<textarea autoFocus defaultValue={s.text}
+                                style={{flex:1,fontSize:12,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 8px",resize:"vertical",minHeight:48,fontFamily:"inherit"}}
+                                onBlur={(e)=>{
+                                  const v=e.target.value.trim();
+                                  if(v&&v!==s.text){
+                                    commit((d)=>({...d,edSavedSummaries:(d.edSavedSummaries||[]).map((x)=>x.id===s.id?{...x,text:v}:x),updatedAt:Date.now()}),[]);
+                                  }
+                                  setEdSummaryEditId(null);
+                                }}
+                                onKeyDown={(e)=>{if(e.key==="Escape")setEdSummaryEditId(null);}} />
+                            :<div style={{flex:1,cursor:"pointer"}} onClick={()=>setEdSummary({...edSummary,[edCat]:s.text})}>
+                                <div style={{fontSize:11,fontWeight:800,color:"var(--ink3)",marginBottom:3}}>{s.label||"저장된 요약설명"}</div>
+                                <div style={{fontSize:12,color:"var(--ink1)",lineHeight:1.5,whiteSpace:"pre-wrap"}}>{s.text}</div>
+                              </div>
+                          }
+                          <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
+                            <button style={{background:"none",border:"none",color:"#0C66E4",fontSize:11,cursor:"pointer",fontWeight:700,padding:"2px 6px"}}
+                              onClick={()=>setEdSummary({...edSummary,[edCat]:s.text})}>적용</button>
+                            <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:"2px 6px"}}
+                              onClick={()=>setEdSummaryEditId(s.id)}>수정</button>
+                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:"2px 6px"}}
+                              onClick={()=>{if(window.confirm("삭제할까요?"))commit((d)=>({...d,edSavedSummaries:(d.edSavedSummaries||[]).filter((x)=>x.id!==s.id),updatedAt:Date.now()}),[]);}}>삭제</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 입력란 */}
                   <textarea
                     value={edSummary[edCat]||""}
                     onChange={(e)=>setEdSummary({...edSummary,[edCat]:e.target.value})}
-                    placeholder="상품 요약설명 입력 (비워두면 전송 안 함)"
-                    style={{width:"100%",minHeight:60,fontSize:13,border:"1px solid var(--line2)",borderRadius:7,padding:"8px 10px",resize:"vertical",fontFamily:"inherit"}} />
+                    placeholder="요약설명 입력 (비워두면 전송 안 함) — 저장 버튼으로 자주 쓰는 문구 보관"
+                    style={{width:"100%",minHeight:70,fontSize:13,border:"1px solid var(--line2)",borderRadius:7,padding:"8px 10px",resize:"vertical",fontFamily:"inherit"}} />
+                  <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
+                    <input id="edSumLabel" placeholder="저장 이름 (예: 기본 설명)" style={{flex:1,fontSize:12,border:"1px solid var(--line2)",borderRadius:6,padding:"5px 9px"}} />
+                    <button className="btn ghost" style={{fontSize:12,padding:"5px 14px",flexShrink:0}} onClick={()=>{
+                      const text=(edSummary[edCat]||"").trim();
+                      const label=document.getElementById("edSumLabel")?.value?.trim()||"저장된 요약설명";
+                      if(!text)return;
+                      commit((d)=>({...d,edSavedSummaries:[...(d.edSavedSummaries||[]),{id:uid(),label,text,createdAt:Date.now()}],updatedAt:Date.now()}),[]);
+                      if(document.getElementById("edSumLabel"))document.getElementById("edSumLabel").value="";
+                    }}>💾 저장</button>
+                    <button className="btn ghost" style={{fontSize:12,padding:"5px 14px",flexShrink:0,color:"var(--ink3)"}} onClick={()=>setEdSummary({...edSummary,[edCat]:""})} title="초기화">✕</button>
+                  </div>
                 </div>
 
                 {/* 이미지 목록 */}
