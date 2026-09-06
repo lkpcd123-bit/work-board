@@ -1822,7 +1822,6 @@ function Board() {
   const [stockTab, setStockTab] = useState("naver");
   const [stockSafeEdit, setStockSafeEdit] = useState({});
   const [stockDragId, setStockDragId] = useState(null);
-  const [stockDragOver, setStockDragOver] = useState(null);
   const [inboundModal, setInboundModal] = useState(null); // 입고 예정 등록/수정 모달
   const [inboundDraft, setInboundDraft] = useState(null);
   const INBOUND_STEPS=["입고 준비 중","입고중","재고 확인 중","입고 완료"];
