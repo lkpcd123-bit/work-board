@@ -1879,16 +1879,24 @@ function Board() {
         }
       }
       const items=Object.values(skuMap).map((item)=>({...item,date:today}));
-      // 기존 히스토리 병합
+      // 기존 히스토리 병합 — existing 순서 기준으로 정렬 유지
       const existing=(data.stockData||{}).naver||[];
-      const merged=items.map((item)=>{
-        const hist=existing.find((e)=>e.id===item.id);
-        const prevHistory=hist?.history||[];
-        return{...item,history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:item.stock}].slice(-30)};
+      // 1) 기존에 있던 항목은 기존 순서 그대로, 재고만 업데이트
+      const orderedMerged=existing.map((e)=>{
+        const newItem=skuMap[e.id];
+        const prevHistory=e.history||[];
+        if(newItem){
+          return{...e,stock:newItem.stock,date:today,
+            history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:newItem.stock}].slice(-30)};
+        }
+        return e; // 이번 업로드에 없어도 기존 항목 유지
       });
-      // 기존 중 이번에 없는 항목도 유지
-      const existingNotInNew=existing.filter((e)=>!skuMap[e.id]);
-      const finalMerged=[...merged,...existingNotInNew];
+      // 2) 기존에 없던 새 항목은 맨 뒤에 추가
+      const existingIds=new Set(existing.map((e)=>e.id));
+      const newItems=items.filter((item)=>!existingIds.has(item.id)).map((item)=>({
+        ...item,history:[{date:today,stock:item.stock}]
+      }));
+      const finalMerged=[...orderedMerged,...newItems];
       commit((d)=>({...d,stockData:{...(d.stockData||{}),naver:finalMerged},updatedAt:Date.now()}),[]);
       // 안전재고 미달 자동 입고요청
       const alerts=items.filter((item)=>{const safe=stockSafe[`naver_${item.id}`];return safe&&item.stock<safe;});
