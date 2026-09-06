@@ -775,6 +775,8 @@ const CSS = `
 .stock-table th{background:#F4F5F7;font-weight:700;padding:10px 12px;text-align:left;border-bottom:2px solid var(--line);white-space:nowrap;}
 .stock-table td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle;}
 .stock-table tr:hover td{background:#F8F9FC;}
+.stock-row-drag{opacity:.4;}
+.stock-row-dragover td{border-top:3px solid #0C66E4;}
 .stock-row-alert td:first-child{border-left:4px solid #CA3521;}
 .stock-row-alert{background:#FFFBF9;}
 .stock-badge-alert{background:#FFECEB;color:#CA3521;border:1px solid #CA3521;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:800;white-space:nowrap;}
@@ -1819,6 +1821,8 @@ function Board() {
   /* ── 재고관리 ── */
   const [stockTab, setStockTab] = useState("naver");
   const [stockSafeEdit, setStockSafeEdit] = useState({});
+  const [stockDragId, setStockDragId] = useState(null);
+  const [stockDragOver, setStockDragOver] = useState(null);
   const [inboundModal, setInboundModal] = useState(null); // 입고 예정 등록/수정 모달
   const [inboundDraft, setInboundDraft] = useState(null);
   const INBOUND_STEPS=["입고 준비 중","입고중","재고 확인 중","입고 완료"];
@@ -3423,6 +3427,7 @@ function Board() {
                 <table className="stock-table">
                   <thead>
                     <tr>
+                      <th style={{width:28,padding:"10px 4px",color:"var(--ink3)",fontSize:12}}>≡</th>
                       <th>상품명</th>
                       <th>SKU</th>
                       <th style={{textAlign:"right"}}>현재고</th>
@@ -3447,7 +3452,27 @@ function Board() {
                       const dailyRate=calcDailyRate(sorted);
                       const daysLeft=dailyRate&&dailyRate>0?Math.floor(item.stock/dailyRate):null;
                       return(
-                        <tr key={item.id} className={isAlert?"stock-row-alert":""}>
+                        <tr key={item.id}
+                          className={"stock-row-alert"===undefined?"":isAlert?"stock-row-alert":""}
+                          style={{background:isAlert?"#FFFBF9":""}}
+                          draggable
+                          onDragStart={()=>setStockDragId(item.id)}
+                          onDragOver={(e)=>{e.preventDefault();setStockDragOver(item.id);}}
+                          onDragLeave={()=>setStockDragOver((v)=>v===item.id?null:v)}
+                          onDrop={(e)=>{
+                            e.preventDefault();
+                            if(!stockDragId||stockDragId===item.id)return;
+                            const cur=[...(data.stockData||{})[stockTab]||[]];
+                            const fi=cur.findIndex((x)=>x.id===stockDragId);
+                            const ti=cur.findIndex((x)=>x.id===item.id);
+                            if(fi<0||ti<0)return;
+                            const [moved]=cur.splice(fi,1);
+                            cur.splice(ti,0,moved);
+                            commit((d)=>({...d,stockData:{...(d.stockData||{}),[stockTab]:cur},updatedAt:Date.now()}),[]);
+                            setStockDragId(null);setStockDragOver(null);
+                          }}
+                          onDragEnd={()=>{setStockDragId(null);setStockDragOver(null);}}>
+                          <td style={{padding:"9px 4px",textAlign:"center",cursor:"grab",color:"var(--ink3)",fontSize:14,userSelect:"none"}}>≡</td>
                           <td style={{fontWeight:600}}>{item.name}</td>
                           <td style={{color:"var(--ink3)",fontSize:12}}>{item.sku}</td>
                           <td style={{textAlign:"right",fontWeight:700,fontSize:14}}>{item.stock.toLocaleString()}</td>
