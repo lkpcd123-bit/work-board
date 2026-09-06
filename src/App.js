@@ -3432,6 +3432,7 @@ function Board() {
                       <th style={{textAlign:"right"}}>안전재고</th>
                       <th style={{textAlign:"center"}}>입고 예정일</th>
                       <th style={{textAlign:"center"}}>상태</th>
+                      {canEdit&&<th style={{width:40}}></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -3486,6 +3487,11 @@ function Board() {
                               ?<span className="stock-badge-alert">⚠ 입고 요청</span>
                               :<span className="stock-badge-ok">정상</span>}
                           </td>
+                          {canEdit&&<td style={{textAlign:"center"}}>
+                            <button style={{background:"none",border:"none",color:"var(--danger)",cursor:"pointer",fontSize:15,padding:"2px 6px"}} onClick={()=>{
+                              commit((d)=>({...d,stockData:{...(d.stockData||{}),[stockTab]:((d.stockData||{})[stockTab]||[]).filter((x)=>x.id!==item.id)},updatedAt:Date.now()}),[]);
+                            }} title="삭제">×</button>
+                          </td>}
                         </tr>
                       );
                     })}
