@@ -3629,9 +3629,9 @@ function Board() {
       {/* 입고 예정 등록/수정 모달 */}
       {inboundModal&&inboundDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setInboundModal(null)}>
-          <div className="modal" style={{maxWidth:520}} onClick={(e)=>e.stopPropagation()}>
-            <div className="modal-head"><h3>{inboundModal==="add"?"입고 예정 등록":"입고 예정 수정"}</h3><button className="x" onClick={()=>setInboundModal(null)}>×</button></div>
-            <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:18}}>
+          <div className="modal" style={{maxWidth:560}} onClick={(e)=>e.stopPropagation()}>
+            <div className="modal-head" style={{padding:"20px 28px"}}><h3 style={{fontSize:16}}>{inboundModal==="add"?"입고 예정 등록":"입고 예정 수정"}</h3><button className="x" onClick={()=>setInboundModal(null)}>×</button></div>
+            <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:22,padding:"24px 28px"}}>
               <div className="r3">
                 <div className="fld"><label>상품명</label><input value={inboundDraft.productName||""} onChange={(e)=>setInboundDraft({...inboundDraft,productName:e.target.value})} placeholder="상품명" /></div>
                 <div className="fld"><label>SKU/상품코드</label><input value={inboundDraft.sku||""} onChange={(e)=>setInboundDraft({...inboundDraft,sku:e.target.value})} placeholder="P0000BBC" /></div>
@@ -3652,13 +3652,13 @@ function Board() {
                 </div>
               </div>
               <div className="fld"><label>메모</label>
-                <textarea value={inboundDraft.memo||""} onChange={(e)=>setInboundDraft({...inboundDraft,memo:e.target.value})} placeholder="공급사 정보, 특이사항 등..." style={{height:90,resize:"vertical"}} />
+                <textarea value={inboundDraft.memo||""} onChange={(e)=>setInboundDraft({...inboundDraft,memo:e.target.value})} placeholder="공급사 정보, 특이사항 등..." style={{height:100,resize:"vertical"}} />
               </div>
             </div>
-            <div className="modal-foot" style={{padding:"16px 24px"}}>
+            <div className="modal-foot" style={{padding:"18px 28px"}}>
               <span className="spacer" />
               <button className="btn ghost" onClick={()=>setInboundModal(null)}>취소</button>
-              <button className="btn-save" style={{padding:"9px 24px"}} onClick={()=>{
+              <button className="btn-save" style={{padding:"10px 28px",fontSize:14}} onClick={()=>{
                 if(inboundModal==="add")addInboundPlan(inboundDraft);
                 else updateInboundPlan(inboundDraft.id,inboundDraft);
                 setInboundModal(null);setInboundDraft(null);
