@@ -935,7 +935,8 @@ function Board() {
   const [edSendLog, setEdSendLog] = useState([]); // 전송 이력
   const [edSubTab, setEdSubTab] = useState('master'); // 'master'|'products'|'history'
   const [edSummary, setEdSummary] = useState({}); // {분류: '요약설명'}
-  const [edSummaryEditId, setEdSummaryEditId] = useState(null); // 수정 중인 저장된 요약설명 id
+  const [edSummaryEditId, setEdSummaryEditId] = useState(null);
+  const [edSumLabel, setEdSumLabel] = useState('');
   const ED_CATS = ['보틀','대용량','파우치'];
   const c24TimerRef = useRef(null);
   const c24TokenRef = useRef('');
@@ -3840,13 +3841,14 @@ function Board() {
                     placeholder="요약설명 입력 (비워두면 전송 안 함) — 저장 버튼으로 자주 쓰는 문구 보관"
                     style={{width:"100%",minHeight:70,fontSize:13,border:"1px solid var(--line2)",borderRadius:7,padding:"8px 10px",resize:"vertical",fontFamily:"inherit"}} />
                   <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
-                    <input id="edSumLabel" placeholder="저장 이름 (예: 기본 설명)" style={{flex:1,fontSize:12,border:"1px solid var(--line2)",borderRadius:6,padding:"5px 9px"}} />
+                    <input value={edSumLabel} onChange={(e)=>setEdSumLabel(e.target.value)}
+                      placeholder="저장 이름 (예: 기본 설명)" style={{flex:1,fontSize:12,border:"1px solid var(--line2)",borderRadius:6,padding:"5px 9px"}} />
                     <button className="btn ghost" style={{fontSize:12,padding:"5px 14px",flexShrink:0}} onClick={()=>{
                       const text=(edSummary[edCat]||"").trim();
-                      const label=document.getElementById("edSumLabel")?.value?.trim()||"저장된 요약설명";
                       if(!text)return;
+                      const label=edSumLabel.trim()||"저장된 요약설명";
                       commit((d)=>({...d,edSavedSummaries:[...(d.edSavedSummaries||[]),{id:uid(),label,text,createdAt:Date.now()}],updatedAt:Date.now()}),[]);
-                      if(document.getElementById("edSumLabel"))document.getElementById("edSumLabel").value="";
+                      setEdSumLabel('');
                     }}>💾 저장</button>
                     <button className="btn ghost" style={{fontSize:12,padding:"5px 14px",flexShrink:0,color:"var(--ink3)"}} onClick={()=>setEdSummary({...edSummary,[edCat]:""})} title="초기화">✕</button>
                   </div>
