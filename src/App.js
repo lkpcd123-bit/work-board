@@ -1603,8 +1603,8 @@ function Board() {
   };
   // 마스터 이미지 추가 - 카페24에 즉시 업로드 후 URL만 저장
   const c24Api=async(body)=>{
-    const d=await c24Api({action:'search',productCode:code});
-    return d.product||null;
+    const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,token:c24TokenRef.current})});
+    return res.json();
   };
 
   const c24SearchByCode=async(code)=>{
