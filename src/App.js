@@ -3456,8 +3456,8 @@ function Board() {
                           style={{background:isAlert?"#FFFBF9":""}}
                           draggable
                           onDragStart={()=>setStockDragId(item.id)}
-                          onDragOver={(e)=>{e.preventDefault();setStockDragOver(item.id);}}
-                          onDragLeave={()=>setStockDragOver((v)=>v===item.id?null:v)}
+                          onDragOver={(e)=>{e.preventDefault();}}
+                          onDragLeave={()=>=>v===item.id?null:v)}
                           onDrop={(e)=>{
                             e.preventDefault();
                             if(!stockDragId||stockDragId===item.id)return;
@@ -3468,9 +3468,9 @@ function Board() {
                             const [moved]=cur.splice(fi,1);
                             cur.splice(ti,0,moved);
                             commit((d)=>({...d,stockData:{...(d.stockData||{}),[stockTab]:cur},updatedAt:Date.now()}),[]);
-                            setStockDragId(null);setStockDragOver(null);
+                            setStockDragId(null);
                           }}
-                          onDragEnd={()=>{setStockDragId(null);setStockDragOver(null);}}>
+                          onDragEnd={()=>{setStockDragId(null);}}>
                           <td style={{padding:"9px 4px",textAlign:"center",cursor:"grab",color:"var(--ink3)",fontSize:14,userSelect:"none"}}>≡</td>
                           <td style={{fontWeight:600}}>{item.name}</td>
                           <td style={{color:"var(--ink3)",fontSize:12}}>{item.sku}</td>
