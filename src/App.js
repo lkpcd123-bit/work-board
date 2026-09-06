@@ -1602,6 +1602,21 @@ function Board() {
     setC24SearchLoading(false);
   };
   // 마스터 이미지 추가 - 카페24에 즉시 업로드 후 URL만 저장
+  const c24Api=async(body)=>{
+    const d=await c24Api({action:'search',productCode:code});
+    return d.product||null;
+  };
+
+  const c24SearchByCode=async(code)=>{
+    const d=await c24Api({action:'search',productCode:code});
+    return d.product||null;
+  };
+
+  const c24GetProduct=async(no)=>{
+    const d=await c24Api({action:'get',productNo:no});
+    return d.product||null;
+  };
+
   const addMasterImages=async(files)=>{
     if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요 — 이미지를 저장하려면 먼저 로그인하세요");return;}
     setEdMsg('이미지 업로드 중...');
@@ -1621,7 +1636,7 @@ function Board() {
     commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,...newImgs]},updatedAt:Date.now()}),[]);
     setEdMsg(`✅ ${newImgs.length}장 업로드 완료`);
   };
-  // 마스터 이미지 수정 - 카페24에 즉시 업로드 후 URL만 저장
+
   const replaceMasterImage=async(idx,file)=>{
     if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
     setEdMsg(`${idx+1}번 이미지 교체 중...`);
@@ -1636,15 +1651,7 @@ function Board() {
     setEdChanged((prev)=>({...prev,[idx]:true}));
     setEdMsg(`✅ ${idx+1}번 이미지 교체 완료`);
   };
-  const c24Api=async(body)=>{
-    const d=await c24Api({action:'search',productCode:code});
-    return d.product||null;
-  };
-  const c24GetProduct=async(no)=>{
-    const d=await c24Api({action:'get',productNo:no});
-    return d.product||null;
-  };
-  // 이미지 전송 함수 (체크된 상품 × 지정 이미지 번호)
+
   const sendImages=async(imgIdxs)=>{
     if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
     const checkedCodes=Object.entries(edChecked).filter(([,v])=>v).map(([k])=>k);
@@ -3877,7 +3884,7 @@ function Board() {
                         }}>{edSending?"전송중...":"🔄 변경된 이미지만 전송"}</button>
                       )}
                       {/* 전체 */}
-                      {((data.edMasterImages||{})[edCat]||[]).length>0&&(
+                      {(((data.edMasterImages||{})[edCat]||[]).length>0||edSummary[edCat])&&(
                         <button className="btn-save" style={{background:"#1F845A"}} disabled={edSending} onClick={async()=>{
                           const allIdx=((data.edMasterImages||{})[edCat]||[]).map((_,i)=>i);
                           await sendImages(allIdx);
