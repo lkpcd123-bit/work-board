@@ -1822,8 +1822,8 @@ function Board() {
   const [stockTab, setStockTab] = useState("naver");
   const [stockSafeEdit, setStockSafeEdit] = useState({});
   const [stockDragId, setStockDragId] = useState(null);
-  const [stockViewDate, setStockViewDate] = useState("");
-  const [stockHistModal, setStockHistModal] = useState(null);
+  const [stockViewDate, setStockViewDate] = useState(""); // 조회 날짜 (빈 문자열=최신)
+  const [stockHistModal, setStockHistModal] = useState(null); // 히스토리 모달용 item
   const [inboundModal, setInboundModal] = useState(null); // 입고 예정 등록/수정 모달
   const [inboundDraft, setInboundDraft] = useState(null);
   const INBOUND_STEPS=["입고 준비 중","입고중","재고 확인 중","입고 완료"];
@@ -1843,7 +1843,6 @@ function Board() {
     commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,issues:[...(p.issues||[]),issue],updatedAt:Date.now()}:p),updatedAt:Date.now()}),[]);
   };
   // 평일 기준 일별 소진율 계산 (주말 제외)
-  const calcDailyRate=(rows)=>{
     if(rows.length<2)return null;
     const sorted=[...rows].sort((a,b)=>new Date(a.date)-new Date(b.date));
     const latest=sorted[sorted.length-1];const prev=sorted[sorted.length-2];
@@ -3421,11 +3420,14 @@ function Board() {
             {/* 날짜 조회 */}
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"10px 14px",background:"var(--bg)",borderRadius:9,border:"1px solid var(--line)"}}>
               <span style={{fontSize:12,fontWeight:700,color:"var(--ink3)",flexShrink:0}}>📅 날짜 조회</span>
-              <input type="date" value={stockViewDate} onChange={(e)=>setStockViewDate(e.target.value)}
+              <input type="date" value={stockViewDate}
+                onChange={(e)=>setStockViewDate(e.target.value)}
                 style={{border:"1px solid var(--line2)",borderRadius:6,padding:"4px 10px",fontSize:13}} />
               {stockViewDate&&<button className="btn ghost" style={{fontSize:12,padding:"4px 10px"}} onClick={()=>setStockViewDate("")}>최신으로</button>}
               <span style={{fontSize:12,color:"var(--ink3)"}}>
-                {stockViewDate?`${stockViewDate} 기준`:`최신 (${stockItems[0]?.date||"-"})`}
+                {stockViewDate
+                  ?`${stockViewDate} 기준 재고`
+                  :`최신 업로드 기준 (${stockItems[0]?.date||"-"})`}
               </span>
             </div>
             <div style={{marginBottom:14}}>
@@ -3465,10 +3467,40 @@ function Board() {
                       const safe=stockSafe[safeKey]||0;
                       const hist=item.history||[{date:item.date,stock:item.stock}];
                       const sorted=[...hist].sort((a,b)=>new Date(a.date)-new Date(b.date));
-                      const viewStock=stockViewDate?([...sorted].reverse().find((h)=>h.date<=stockViewDate)?.stock??null):item.stock;
+                      // 날짜 기준 재고 계산
+                      const viewStock=(()=>{
+                        if(!stockViewDate)return item.stock;
+                        const found=[...sorted].reverse().find((h)=>h.date<=stockViewDate);
+                        return found?found.stock:null;
+                      })();
                       const isAlert=safe>0&&viewStock!==null&&viewStock<safe;
-                      const prev=sorted.length>=2?sorted[sorted.length-2]:null;
-                      const delta=viewStock!==null&&prev?(viewStock-prev.stock):null;
+                      // 전일대비: 조회 날짜 기준
+                      const getStockAt=(date)=>{
+                        const f=[...sorted].reverse().find((h)=>h.date<=date);
+                        return f?f.stock:null;
+                      };
+                      const prevDate=(()=>{
+                        if(stockViewDate){
+                          const d=new Date(stockViewDate);d.setDate(d.getDate()-1);
+                          // 주말 스킵
+                          while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()-1);
+                          return d.toISOString().slice(0,10);
+                        }
+                        // 최신 기준: 히스토리에서 직전 평일
+                        if(sorted.length>=2)return sorted[sorted.length-2].date;
+                        return null;
+                      })();
+                      const prevStock=prevDate?getStockAt(prevDate):null;
+                      const delta=viewStock!==null&&prevStock!==null?viewStock-prevStock:null;
+                      // 일평균소진 (평일 기준)
+                        if(rows.length<2)return null;
+                        const d1=new Date(rows[rows.length-2].date);
+                        const d2=new Date(rows[rows.length-1].date);
+                        let wdays=0;let cur=new Date(d1);
+                        while(cur<=d2){const dow=cur.getDay();if(dow!==0&&dow!==6)wdays++;cur.setDate(cur.getDate()+1);}
+                        if(wdays<1)wdays=1;
+                        return Math.round((rows[rows.length-2].stock-rows[rows.length-1].stock)/wdays);
+                      };
                       const dailyRate=calcDailyRate(sorted);
                       const daysLeft=dailyRate&&dailyRate>0&&viewStock!==null?Math.floor(viewStock/dailyRate):null;
                       return(
@@ -3494,8 +3526,10 @@ function Board() {
                           onDragEnd={()=>{setStockDragId(null);}}>
                           <td style={{padding:"9px 4px",textAlign:"center",cursor:"grab",color:"var(--ink3)",fontSize:14,userSelect:"none"}}>≡</td>
                           <td style={{fontWeight:600,cursor:"pointer",color:"#0C66E4",textDecoration:"underline"}} onClick={()=>setStockHistModal(item)}>{item.name}</td>
-                          <td style={{color:"var(--ink3)",fontSize:12}}>{item.sku}</td>
-                          <td style={{textAlign:"right",fontWeight:700,fontSize:14}}>{viewStock===null?<span style={{color:"var(--ink3)"}}>-</span>:viewStock.toLocaleString()}</td>
+                          <td style={{color:"var(--ink3)",fontSize:12}}>{item.sku||item.id}</td>
+                          <td style={{textAlign:"right",fontWeight:700,fontSize:14}}>
+                            {viewStock===null?<span style={{color:"var(--ink3)"}}>데이터 없음</span>:viewStock.toLocaleString()}
+                          </td>
                           <td style={{textAlign:"right"}}>
                             {delta===null?<span style={{color:"var(--ink3)"}}>-</span>
                               :delta>0?<span className="stock-delta-up">▲{Math.abs(delta).toLocaleString()}</span>
@@ -3556,13 +3590,14 @@ function Board() {
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setStockHistModal(null)}>
           <div className="modal" style={{maxWidth:500}} onClick={(e)=>e.stopPropagation()}>
             <div className="modal-head">
-              <h3 style={{fontSize:14,margin:0}}>{stockHistModal.name}</h3>
+              <h3 style={{fontSize:14}}>{stockHistModal.name}</h3>
               <button className="x" onClick={()=>setStockHistModal(null)}>×</button>
             </div>
             <div className="modal-body" style={{padding:0}}>
               <div style={{fontSize:11,color:"var(--ink3)",padding:"8px 20px",borderBottom:"1px solid var(--line)"}}>
-                SKU: {stockHistModal.sku||stockHistModal.id} · {(stockHistModal.history||[]).length}일 기록
+                SKU: {stockHistModal.sku||stockHistModal.id} · 최근 {(stockHistModal.history||[]).length}일 기록
               </div>
+              {/* 간단 바 차트 */}
               {(()=>{
                 const hist=[...(stockHistModal.history||[{date:stockHistModal.date,stock:stockHistModal.stock}])].sort((a,b)=>new Date(a.date)-new Date(b.date));
                 const maxStock=Math.max(...hist.map((h)=>h.stock),1);
@@ -3574,12 +3609,13 @@ function Board() {
                         <div style={{display:"flex",alignItems:"flex-end",gap:4,height:80}}>
                           {hist.map((h,i)=>{
                             const pct=Math.max((h.stock/maxStock)*100,2);
-                            const prev2=i>0?hist[i-1].stock:null;
-                            const col=prev2===null?"#0C66E4":h.stock>prev2?"#1F845A":"#CA3521";
+                            const prev=i>0?hist[i-1].stock:null;
+                            const isUp=prev!==null&&h.stock>prev;
+                            const isDown=prev!==null&&h.stock<prev;
                             return(
                               <div key={h.date} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
                                 <div style={{fontSize:9,color:"var(--ink3)"}}>{h.stock}</div>
-                                <div style={{width:"100%",height:`${pct}%`,background:col,borderRadius:"3px 3px 0 0",minHeight:4}} />
+                                <div style={{width:"100%",height:`${pct}%`,background:isDown?"#CA3521":isUp?"#1F845A":"#0C66E4",borderRadius:"3px 3px 0 0",minHeight:4}} title={`${h.date}: ${h.stock}`} />
                                 <div style={{fontSize:9,color:"var(--ink3)",transform:"rotate(-40deg)",transformOrigin:"top left",whiteSpace:"nowrap",marginTop:2}}>{h.date.slice(5)}</div>
                               </div>
                             );
@@ -3587,6 +3623,7 @@ function Board() {
                         </div>
                       </div>
                     )}
+                    {/* 날짜별 테이블 */}
                     <div style={{fontSize:12,fontWeight:700,color:"var(--ink3)",marginBottom:8}}>날짜별 재고</div>
                     <div style={{maxHeight:240,overflowY:"auto"}}>
                       <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
@@ -3599,17 +3636,14 @@ function Board() {
                         </thead>
                         <tbody>
                           {[...hist].reverse().map((h,i,arr)=>{
-                            const prev2=arr[i+1];
-                            const delta2=prev2?h.stock-prev2.stock:null;
+                            const prev=arr[i+1];
+                            const delta=prev?h.stock-prev.stock:null;
                             return(
                               <tr key={h.date} style={{borderBottom:"1px solid var(--line)",background:h.date===stockViewDate?"#E9F2FF":""}}>
                                 <td style={{padding:"7px 12px",fontWeight:h.date===stockViewDate?800:400}}>{h.date}</td>
                                 <td style={{padding:"7px 12px",textAlign:"right",fontWeight:700}}>{h.stock.toLocaleString()}</td>
                                 <td style={{padding:"7px 12px",textAlign:"right"}}>
-                                  {delta2===null?"-":delta2>0
-                                    ?<span style={{color:"#CA3521",fontWeight:700}}>▲{Math.abs(delta2)}</span>
-                                    :delta2<0?<span style={{color:"#1F845A",fontWeight:700}}>▼{Math.abs(delta2)}</span>
-                                    :<span style={{color:"var(--ink3)"}}>-</span>}
+                                  {delta===null?"-":delta>0?<span style={{color:"#CA3521",fontWeight:700}}>▲{Math.abs(delta)}</span>:delta<0?<span style={{color:"#1F845A",fontWeight:700}}>▼{Math.abs(delta)}</span>:<span style={{color:"var(--ink3)"}}>-</span>}
                                 </td>
                               </tr>
                             );
@@ -3621,7 +3655,10 @@ function Board() {
                 );
               })()}
             </div>
-            <div className="modal-foot"><span className="spacer"/><button className="btn-save" onClick={()=>setStockHistModal(null)}>닫기</button></div>
+            <div className="modal-foot">
+              <span className="spacer"/>
+              <button className="btn-save" onClick={()=>setStockHistModal(null)}>닫기</button>
+            </div>
           </div>
         </div>
       )}
