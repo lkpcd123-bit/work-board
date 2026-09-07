@@ -37,15 +37,15 @@ export default async function handler(req, res) {
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
       res.status(r.status).json(d);
 
-    } else if (action === 'copy') {
-      // 상품 복사: POST /products/{no}/copy
-      const no = parseInt(productNo, 10);
-      if (!no || isNaN(no)) return res.status(400).json({ error: `Invalid productNo: ${productNo}` });
-      const r = await fetch(`${BASE}/products/${no}/copy`, {
+    } else if (action === 'create') {
+      // 새 상품 생성 POST /products
+      const body = { shop_no: 1, request: payload };
+      const r = await fetch(`${BASE}/products`, {
         method: 'POST', headers,
-        body: JSON.stringify({ shop_no: 1, request: { display: 'F', selling: 'F' } }),
+        body: JSON.stringify(body),
       });
       const text = await r.text();
+      console.log('CREATE response:', r.status, text.slice(0, 500));
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
       res.status(r.status).json(d);
 

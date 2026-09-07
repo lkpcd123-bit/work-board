@@ -5024,29 +5024,35 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
     setSending(true);setCreated(null);
 
     try {
-      // 1) 기본 상품 복사
-      setMsg("기본 상품 복사 중...");
-      const copyRes = await c24Api({action:"copy", productNo:BASE_PRODUCT_NO});
-      if(!copyRes.product){setMsg("❌ 상품 복사 실패: "+JSON.stringify(copyRes));setSending(false);return;}
-      const newNo = copyRes.product.product_no;
-      const newCode = copyRes.product.product_code;
-
-      // 2) 기본 상품 상세 조회 (description 가져오기)
-      setMsg("상세 정보 조회 중...");
+      // 1) 기본 상품 전체 정보 조회
+      setMsg("기본 상품 조회 중...");
       const base = await c24GetProduct(BASE_PRODUCT_NO);
-      let desc = base?.description||"";
+      if(!base){setMsg("❌ 기본 상품 조회 실패");setSending(false);return;}
+
+      // 2) 상세설명에 DEPTH3 HTML 삽입
+      let desc = base.description||"";
       if(desc.includes('id="opt-depth3-spec"'))
         desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
       else desc = DEPTH3_HTML+"\n"+desc;
 
-      // 3) 복사된 상품 수정
-      setMsg("상품 정보 수정 중...");
-      const updateRes = await c24Api({action:"update", productNo:newNo, payload:{
+      // 3) 새 상품 생성 (기본 상품 정보 기반)
+      setMsg("새 상품 생성 중...");
+      const createPayload = {
         product_name: productName,
         summary_description: summaryDesc,
         description: desc,
-      }});
-      if(!updateRes.product){setMsg("❌ 상품 수정 실패: "+JSON.stringify(updateRes));setSending(false);return;}
+        display: "F",
+        selling: "F",
+        price: base.price,
+        retail_price: base.retail_price,
+        supply_price: base.supply_price,
+        product_weight: base.product_weight,
+      };
+
+      const createRes = await c24Api({action:"create", payload:createPayload});
+      if(!createRes.product){setMsg("❌ 상품 생성 실패: "+JSON.stringify(createRes));setSending(false);return;}
+      const newNo = createRes.product.product_no;
+      const newCode = createRes.product.product_code;
 
       setCreated({no:newNo, code:newCode});
       setMsg(`✅ 상품 생성 완료! 번호: ${newNo} / 코드: ${newCode}`);
