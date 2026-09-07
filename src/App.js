@@ -1062,6 +1062,8 @@ function Board() {
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
+      // Firebase 저장 전 SKU 필터 적용
+      if(merged.stockData){merged.stockData={naver:(merged.stockData.naver||[]).filter((e)=>NAVER_KEEP_SKUS.has(e.id)),coupang:(merged.stockData.coupang||[]).filter((e)=>COUPANG_KEEP_SKUS.has(e.id))};}
       await setDoc(BOARD_REF(),merged); setData(merged); setSaveState("saved"); setTimeout(()=>setSaveState("idle"),1500);
     } catch(e){setSaveState("error");} finally{busyRef.current=false;}
   }, []);
