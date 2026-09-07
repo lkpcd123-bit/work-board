@@ -1023,7 +1023,7 @@ function Board() {
   }, [load]);
 
   useEffect(() => {
-    const unsub=onSnapshot(BOARD_REF(),(snap)=>{
+    return onSnapshot(BOARD_REF(),(snap)=>{
       if(busyRef.current)return;
       if(snap.exists()){
         const r=snap.data();
