@@ -1028,14 +1028,7 @@ function Board() {
       if(snap.exists()){
         const r=snap.data();
         if(r&&(r.updatedAt||0)>(dataRef.current.updatedAt||0)){
-          const merged=mergeData(r,dataRef.current);
-          if(merged.stockData){
-            merged.stockData={
-              naver:(merged.stockData.naver||[]).filter((e)=>NAVER_KEEP_SKUS.has(e.id)),
-              coupang:(merged.stockData.coupang||[]).filter((e)=>COUPANG_KEEP_SKUS.has(e.id)),
-            };
-          }
-          setData(merged);
+          setData(mergeData(r,dataRef.current));
         }
       }
     });
@@ -1853,7 +1846,12 @@ function Board() {
   const [inboundModal, setInboundModal] = useState(null); // 입고 예정 등록/수정 모달
   const [inboundDraft, setInboundDraft] = useState(null);
   const INBOUND_STEPS=["입고 준비 중","입고중","재고 확인 중","입고 완료"];
-  const stockItems=useMemo(()=>(data.stockData||{})[stockTab]||[],[data.stockData,stockTab]);
+  const stockItems=useMemo(()=>{
+    const raw=(data.stockData||{})[stockTab]||[];
+    if(stockTab==="naver")return raw.filter((e)=>NAVER_KEEP_SKUS.has(e.id));
+    if(stockTab==="coupang")return raw.filter((e)=>COUPANG_KEEP_SKUS.has(e.id));
+    return raw;
+  },[data.stockData,stockTab]); // eslint-disable-line react-hooks/exhaustive-deps
   const stockSafe=useMemo(()=>data.stockSafe||{},[data.stockSafe]);
   const reorderRequests=useMemo(()=>(data.reorderRequests||[]).filter((r)=>!r.done),[data.reorderRequests]);
   const inboundPlans=useMemo(()=>(data.inboundPlans||[]).filter((p)=>!p.deleted),[data.inboundPlans]);
