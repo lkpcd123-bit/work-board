@@ -5020,39 +5020,33 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
 
   const handleCreate = async () => {
     if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
-    if(!targetProductNo){setMsg("❌ 복사된 상품번호를 입력해주세요");return;}
+    if(!targetProductCode){setMsg("❌ 복사된 상품코드를 입력해주세요");return;}
     if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
     setSending(true);setCreated(null);
-
     try {
-      const newNo = parseInt(targetProductNo.trim(), 10);
-      if(!newNo){setMsg("❌ 상품번호가 올바르지 않습니다");setSending(false);return;}
-
-      // 1) 복사된 상품 조회
+      // 1) 상품코드로 검색해서 product_no 획득
       setMsg("1/2 상품 조회 중...");
-      const newProduct = await c24GetProduct(newNo);
-      if(!newProduct){setMsg("❌ 상품 조회 실패 — 번호를 확인해주세요");setSending(false);return;}
-      const newCode = newProduct.product_code||"";
-
-      // 2) 상품명 + 간략설명 + 상세설명 수정
+      const found = await c24SearchByCode(targetProductCode.trim().toUpperCase());
+      if(!found){setMsg("❌ 상품을 찾을 수 없습니다 — 코드 확인");setSending(false);return;}
+      const newNo = found.product_no;
+      const newCode = found.product_code||targetProductCode;
+      if(!newNo){setMsg("❌ product_no 없음: "+JSON.stringify(found).slice(0,100));setSending(false);return;}
+      // 2) 상세 조회 후 수정
       setMsg("2/2 상품 정보 수정 중...");
-      let desc = newProduct.description||"";
+      const detail = await c24GetProduct(newNo);
+      let desc = detail?.description||"";
       if(desc.includes('id="opt-depth3-spec"'))
         desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
       else desc = DEPTH3_HTML+"\n"+desc;
-
       const updRes = await c24Api({action:"update", productNo:newNo, payload:{
         product_name: productName,
         summary_description: summaryDesc,
         description: desc,
       }});
-
       if(!updRes.product){setMsg("❌ 수정 실패: "+JSON.stringify(updRes).slice(0,200));setSending(false);return;}
-
       setCreated({no:newNo, code:newCode});
-      setTargetProductNo("");
-      setMsg("✅ 완료! "+newCode+" (no."+newNo+") 상품명/설명 수정됨");
-
+      setTargetProductCode("");
+      setMsg("✅ 완료! "+newCode+" 상품명/설명 수정됨");
     } catch(e){
       setMsg("❌ 오류: "+e.message);
     }
