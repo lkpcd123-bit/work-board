@@ -4991,7 +4991,6 @@ function Board() {
 
 // ── 유튜브 비밀링크 상품 자동생성 ────────────────────────────────
 function YtLinkView({c24Api, c24TokenValid, c24SearchByCode, c24GetProduct}) {
-  const BASE_CODE = "P0000BCP";
   const BASE_PRODUCT_NO = 743;
 
   // 옵션 구성 (고정)
@@ -5014,7 +5013,6 @@ function YtLinkView({c24Api, c24TokenValid, c24SearchByCode, c24GetProduct}) {
 
   const [ytName, setYtName] = React.useState("");
   const [dateRange, setDateRange] = React.useState("");
-  const [category, setCategory] = React.useState("유튜브 비밀 링크");
   const [price, setPrice] = React.useState("19,733");
   const [discount, setDiscount] = React.useState("63");
   const [msg, setMsg] = React.useState("");
