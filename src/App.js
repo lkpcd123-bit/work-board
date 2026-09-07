@@ -1039,8 +1039,7 @@ function Board() {
         }
       }
     });
-    return ()=>unsub();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const commit = useCallback(async (mutator, logEntries) => {
     busyRef.current=true; setSaveState("saving");
