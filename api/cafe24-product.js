@@ -48,24 +48,23 @@ export default async function handler(req, res) {
       res.status(200).json(d);
 
     } else if (action === 'uploadImageFromUrl') {
-      // 외부 URL → fetch → base64 → 카페24 업로드
+      // 카페24 서버가 URL에서 직접 이미지를 가져오도록 image_url 방식 사용
       if (!imageUrl) return res.status(400).json({ error: 'imageUrl required' });
-      const imgRes = await fetch(imageUrl);
-      if (!imgRes.ok) return res.status(400).json({ error: `Failed to fetch image: ${imgRes.status}` });
-      const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
-      const buf = await imgRes.arrayBuffer();
-      const base64 = Buffer.from(buf).toString('base64');
       const fname = imageUrl.split('/').pop().split('?')[0] || 'image.jpg';
       const uploadBody = {
-        requests: [{ image: base64, image_type: contentType, image_name: fname }]
+        requests: [{
+          image_url: imageUrl,
+          image_name: fname,
+        }]
       };
-      const upRes = await fetch(`${BASE}/products/images`, {
+      const r = await fetch(`${BASE}/products/images`, {
         method: 'POST', headers,
         body: JSON.stringify(uploadBody),
       });
-      const text = await upRes.text();
+      const text = await r.text();
+      console.log('uploadImageFromUrl status:', r.status, text.slice(0, 300));
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
-      res.status(upRes.status).json(d);
+      res.status(r.status).json(d);
 
     } else if (action === 'uploadImage') {
       if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
