@@ -4996,6 +4996,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
   const [ytName, setYtName] = React.useState("");
   const [dateRange, setDateRange] = React.useState("");
   const [targetProductCode, setTargetProductCode] = React.useState("");
+  const [optionCode, setOptionCode] = React.useState("");
   const [pasteText, setPasteText] = React.useState("");
   const [msg, setMsg] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -5024,29 +5025,62 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
     if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
     setSending(true);setCreated(null);
     try {
-      // 1) 상품코드로 검색해서 product_no 획득
-      setMsg("1/2 상품 조회 중...");
+      // 1) 상품코드로 product_no 조회
+      setMsg("1/4 상품 조회 중...");
       const found = await c24SearchByCode(targetProductCode.trim().toUpperCase());
-      if(!found){setMsg("❌ 상품을 찾을 수 없습니다 — 코드 확인");setSending(false);return;}
+      if(!found){setMsg("❌ 상품을 찾을 수 없습니다");setSending(false);return;}
       const newNo = found.product_no;
       const newCode = found.product_code||targetProductCode;
-      if(!newNo){setMsg("❌ product_no 없음: "+JSON.stringify(found).slice(0,100));setSending(false);return;}
-      // 2) 상세 조회 후 수정
-      setMsg("2/2 상품 정보 수정 중...");
+      if(!newNo){setMsg("❌ 상품번호 없음: "+JSON.stringify(found).slice(0,100));setSending(false);return;}
+
+      // 2) 상세 조회
+      setMsg("2/4 상세 정보 조회 중...");
       const detail = await c24GetProduct(newNo);
+
+      // 3) 상세설명 수정 (옵션코드 교체)
       let desc = detail?.description||"";
+      if(optionCode.trim()){
+        // code="기존코드" → code="새코드" 교체
+        desc = desc.replace(/<p code="[^"]*">/g, `<p code="${optionCode.trim()}">`);
+      }
+      // DEPTH3_HTML도 새 코드로 업데이트
+      const depth3 = DEPTH3_HTML.replace('code="P0000BCI000C"', optionCode.trim() ? `code="${optionCode.trim()}"` : 'code="P0000BCI000C"');
       if(desc.includes('id="opt-depth3-spec"'))
-        desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
-      else desc = DEPTH3_HTML+"\n"+desc;
+        desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/, depth3);
+      else desc = depth3+"\n"+desc;
+
+      // 4) 상품명 + 간략설명 + 상세설명 수정
+      setMsg("3/4 상품명/설명 수정 중...");
       const updRes = await c24Api({action:"update", productNo:newNo, payload:{
         product_name: productName,
         summary_description: summaryDesc,
         description: desc,
       }});
       if(!updRes.product){setMsg("❌ 수정 실패: "+JSON.stringify(updRes).slice(0,200));setSending(false);return;}
+
+      // 5) 옵션명 수정 (이름 포함된 것만)
+      setMsg("4/4 옵션명 수정 중...");
+      const varRes = await c24Api({action:"getVariants", productNo:newNo});
+      const variants = varRes?.variants||[];
+      let optUpdated = 0;
+      for(const v of variants){
+        const name = v.option_value||"";
+        // 이름 또는 날짜가 포함된 옵션만 수정
+        if(name.includes("PICK") || name.includes("이름") || name.match(/\d{2}\/\d{2}/)){
+          const newName = name
+            .replace(/🔥[^🔥]*PICK[^🔥]*🔥/g, `🔥${ytName} PICK!🔥`)
+            .replace(/\d{2}\/\d{2}\([^)]*\)\s*~\s*\d{2}\/\d{2}\([^)]*\)/g, dateRange);
+          if(newName !== name){
+            await c24Api({action:"updateVariant", productNo:newNo, variantCode:v.variant_code||v.code, payload:{option_value:newName}});
+            optUpdated++;
+          }
+        }
+      }
+
       setCreated({no:newNo, code:newCode});
       setTargetProductCode("");
-      setMsg("✅ 완료! "+newCode+" 상품명/설명 수정됨");
+      setOptionCode("");
+      setMsg(`✅ 완료! ${newCode} — 상품명/설명 수정, 옵션 ${optUpdated}개 수정`);
     } catch(e){
       setMsg("❌ 오류: "+e.message);
     }
@@ -5091,6 +5125,12 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
             <label>날짜 <span style={{color:"#CA3521",fontSize:11}}>*</span></label>
             <input value={dateRange} onChange={(e)=>setDateRange(e.target.value)} placeholder="09/07(토) ~ 09/14(토)" />
           </div>
+        </div>
+        <div className="fld" style={{marginBottom:12}}>
+          <label>옵션 1번 품목코드 <span style={{color:"var(--ink3)",fontSize:11}}>(선택 — 입력하면 상세설명 HTML의 code 값 자동 교체)</span></label>
+          <input value={optionCode} onChange={(e)=>setOptionCode(e.target.value.trim().toUpperCase())}
+            placeholder="예: P0000BDQ000C"
+            style={{fontFamily:"monospace",textTransform:"uppercase"}} />
         </div>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
           <button className="btn ghost" onClick={makePreview}>👁 미리보기</button>

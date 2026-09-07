@@ -137,6 +137,22 @@ export default async function handler(req, res) {
       }
       return res.status(r.status).json(d);
 
+    } else if (action === 'getVariants') {
+      const no = parseInt(productNo, 10);
+      const r = await fetch(`${BASE}/products/${no}/variants?limit=100`, { headers: H });
+      return res.status(r.status).json(await j(r));
+
+    } else if (action === 'updateVariant') {
+      const no = parseInt(productNo, 10);
+      const { variantCode } = req.body;
+      const r = await fetch(`${BASE}/products/${no}/variants/${variantCode}`, {
+        method: 'PUT', headers: H,
+        body: JSON.stringify({ shop_no: 1, request: payload }),
+      });
+      const d = await j(r);
+      console.log('updateVariant', r.status, JSON.stringify(d).slice(0,200));
+      return res.status(r.status).json(d);
+
     } else {
       return res.status(400).json({ error: `Invalid action: ${action}` });
     }
