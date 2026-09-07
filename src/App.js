@@ -4991,7 +4991,6 @@ function Board() {
 // ── 유튜브 비밀링크 상품 자동생성 ────────────────────────────────
 function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
 
-  const DEPTH3_HTML = '<div id="opt-depth3-spec" style="display:none !important;">\n\t<!--\n        [STEP3 개별화] 샘플\n        <p code="옵션 코드">내용1,내용2,내용3</p>\n    -->\n\t<p code="P0000BCI000C">딸기맛 파우치 7포,초코맛 파우치 7포,말차맛 파우치 7포,쿠키앤크림맛 파우치 7포,스윗콘플레이크맛 파우치 7포,곡물맛 파우치 7포, 티라미수&amp;마카다미아맛 45g x 7포, 트리플베리요거트맛 45g x 7포</p>\n</div>';
 
   const [ytName, setYtName] = React.useState("");
   const [dateRange, setDateRange] = React.useState("");
