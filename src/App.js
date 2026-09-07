@@ -340,6 +340,11 @@ function mergeData(r,l) {
   const mmi=new Map(); [...(r.mindmaps||[]),...(l.mindmaps||[])].forEach(t=>{const p=mmi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mmi.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
+  // 항목별 병합 (id 기준, 최신 updatedAt 우선)
+  const inbMap=new Map(); [...(r.inboundPlans||[]),...(l.inboundPlans||[])].forEach(t=>{const p=inbMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>(p.updatedAt||p.createdAt||0))inbMap.set(t.id,t);});
+  const roMap=new Map(); [...(r.reorderRequests||[]),...(l.reorderRequests||[])].forEach(t=>{const p=roMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>(p.updatedAt||p.createdAt||0))roMap.set(t.id,t);});
+  const refMap=new Map(); [...(r.refs||[]),...(l.refs||[])].forEach(t=>{const p=refMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>(p.updatedAt||p.createdAt||0))refMap.set(t.id,t);});
+  const notifMap=new Map(); [...(r.notifications||[]),...(l.notifications||[])].forEach(t=>{const p=notifMap.get(t.id);if(!p||(t.updatedAt||t.ts||0)>(p.updatedAt||p.ts||0))notifMap.set(t.id,t);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
   return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],mindmaps:[...mmi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
     routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
@@ -348,8 +353,8 @@ function mergeData(r,l) {
     tabOrder:(l.updatedAt||0)>=(r.updatedAt||0)?l.tabOrder||[]:r.tabOrder||[],
     hiddenTabs:(l.updatedAt||0)>=(r.updatedAt||0)?l.hiddenTabs||[]:r.hiddenTabs||[],
     tabFolders:(l.updatedAt||0)>=(r.updatedAt||0)?l.tabFolders||[]:r.tabFolders||[],
-    refs:(l.updatedAt||0)>=(r.updatedAt||0)?l.refs||[]:r.refs||[],
-    refCats:(l.updatedAt||0)>=(r.updatedAt||0)?l.refCats||[]:r.refCats||[],
+    refs:[...refMap.values()],
+    refCats:((l.updatedAt||0)>=(r.updatedAt||0)?l.refCats:r.refCats)||["디자인","마케팅","경쟁사","콘텐츠"],
     stockData:(()=>{
       const lsd=l.stockData||{naver:[],coupang:[]};
       const rsd=r.stockData||{naver:[],coupang:[]};
@@ -359,11 +364,11 @@ function mergeData(r,l) {
       };
     })(),
     stockSafe:(()=>{const ls=l.stockSafe||{};const rs=r.stockSafe||{};return Object.keys(ls).length>=Object.keys(rs).length?ls:rs;})(),
-    reorderRequests:(l.updatedAt||0)>=(r.updatedAt||0)?l.reorderRequests||[]:r.reorderRequests||[],
-    inboundPlans:(l.updatedAt||0)>=(r.updatedAt||0)?l.inboundPlans||[]:r.inboundPlans||[],
+    reorderRequests:[...roMap.values()],
+    inboundPlans:[...inbMap.values()],
     cafe24_schedules:(l.updatedAt||0)>=(r.updatedAt||0)?l.cafe24_schedules||[]:r.cafe24_schedules||[],
     cafe24_token_data:(l.updatedAt||0)>=(r.updatedAt||0)?l.cafe24_token_data||{}:r.cafe24_token_data||{},
-    notifications:(l.updatedAt||0)>=(r.updatedAt||0)?l.notifications||[]:r.notifications||[],
+    notifications:[...notifMap.values()],
     edProducts:(l.updatedAt||0)>=(r.updatedAt||0)?l.edProducts||{보틀:[],대용량:[],파우치:[]}:r.edProducts||{보틀:[],대용량:[],파우치:[]},
     edMasterImages:(l.updatedAt||0)>=(r.updatedAt||0)?l.edMasterImages||{보틀:[],대용량:[],파우치:[]}:r.edMasterImages||{보틀:[],대용량:[],파우치:[]},
     edSavedSummaries:(l.updatedAt||0)>=(r.updatedAt||0)?l.edSavedSummaries||[]:r.edSavedSummaries||[],
