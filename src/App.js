@@ -4995,7 +4995,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
 
   const [ytName, setYtName] = React.useState("");
   const [dateRange, setDateRange] = React.useState("");
-  const [targetProductNo, setTargetProductNo] = React.useState("");
+  const [targetProductCode, setTargetProductCode] = React.useState("");
   const [pasteText, setPasteText] = React.useState("");
   const [msg, setMsg] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -5020,39 +5020,32 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
 
   const handleCreate = async () => {
     if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
-    if(!targetProductNo){setMsg("❌ 복사된 상품번호를 입력해주세요");return;}
+    if(!targetProductCode){setMsg("❌ 복사된 상품코드를 입력해주세요");return;}
     if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
     setSending(true);setCreated(null);
-
     try {
-      const newNo = parseInt(targetProductNo.trim(), 10);
-      if(!newNo){setMsg("❌ 상품번호가 올바르지 않습니다");setSending(false);return;}
-
-      // 1) 복사된 상품 조회
+      // 1) 상품코드로 검색
       setMsg("1/2 상품 조회 중...");
-      const newProduct = await c24GetProduct(newNo);
-      if(!newProduct){setMsg("❌ 상품 조회 실패 — 번호를 확인해주세요");setSending(false);return;}
-      const newCode = newProduct.product_code||"";
-
-      // 2) 상품명 + 간략설명 + 상세설명 수정
+      const found = await c24SearchByCode(targetProductCode.trim().toUpperCase());
+      if(!found){setMsg("❌ 상품을 찾을 수 없습니다 — 코드를 확인해주세요");setSending(false);return;}
+      const newNo = found.product_no;
+      const newCode = found.product_code;
+      // 2) 상세 조회 + 수정
       setMsg("2/2 상품 정보 수정 중...");
-      let desc = newProduct.description||"";
+      const detail = await c24GetProduct(newNo);
+      let desc = detail?.description||"";
       if(desc.includes('id="opt-depth3-spec"'))
         desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
       else desc = DEPTH3_HTML+"\n"+desc;
-
       const updRes = await c24Api({action:"update", productNo:newNo, payload:{
         product_name: productName,
         summary_description: summaryDesc,
         description: desc,
       }});
-
       if(!updRes.product){setMsg("❌ 수정 실패: "+JSON.stringify(updRes).slice(0,200));setSending(false);return;}
-
       setCreated({no:newNo, code:newCode});
-      setTargetProductNo("");
-      setMsg("✅ 완료! "+newCode+" (no."+newNo+") 상품명/설명 수정됨");
-
+      setTargetProductCode("");
+      setMsg("✅ 완료! "+newCode+" 상품명/설명 수정됨");
     } catch(e){
       setMsg("❌ 오류: "+e.message);
     }
@@ -5072,17 +5065,17 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
           style={{width:"100%",height:80,fontSize:12,border:"1px solid var(--line2)",borderRadius:8,padding:"9px 12px",resize:"vertical",fontFamily:"inherit"}} />
       </div>
 
-      {/* 복사된 상품번호 입력 */}
+      {/* 복사된 상품코드 입력 */}
       <div className="panel" style={{padding:18,marginBottom:14,border:"1.5px solid #0C66E4",background:"#E9F2FF"}}>
         <label style={{fontWeight:700,fontSize:13,display:"block",marginBottom:6}}>
-          📦 복사된 상품번호
-          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>카페24에서 P0000BCP 복사 후 새 상품번호 입력</span>
+          📦 복사된 상품코드
+          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>카페24에서 P0000BCP 복사 후 새 상품코드 입력</span>
         </label>
-        <input value={targetProductNo} onChange={(e)=>setTargetProductNo(e.target.value.trim())}
-          placeholder="예: 760"
-          style={{width:"100%",fontSize:14,border:"1px solid var(--line2)",borderRadius:7,padding:"9px 12px",fontFamily:"monospace",fontWeight:700}} />
+        <input value={targetProductCode} onChange={(e)=>setTargetProductCode(e.target.value.trim().toUpperCase())}
+          placeholder="예: P0000BDG"
+          style={{width:"100%",fontSize:14,border:"1px solid var(--line2)",borderRadius:7,padding:"9px 12px",fontFamily:"monospace",fontWeight:700,textTransform:"uppercase"}} />
         <div style={{fontSize:11,color:"#0C66E4",marginTop:6}}>
-          카페24 관리자 → 상품 목록 → P0000BCP 체크 → 복사 → 새 상품의 URL에서 product_no 숫자 확인
+          카페24 관리자 → 상품 목록 → P0000BCP 체크 → 복사 → 새 상품의 상품코드 입력
         </div>
       </div>
 
