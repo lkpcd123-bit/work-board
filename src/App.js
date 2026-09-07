@@ -350,8 +350,15 @@ function mergeData(r,l) {
     tabFolders:(l.updatedAt||0)>=(r.updatedAt||0)?l.tabFolders||[]:r.tabFolders||[],
     refs:(l.updatedAt||0)>=(r.updatedAt||0)?l.refs||[]:r.refs||[],
     refCats:(l.updatedAt||0)>=(r.updatedAt||0)?l.refCats||[]:r.refCats||[],
-    stockData:(l.updatedAt||0)>=(r.updatedAt||0)?l.stockData||{naver:[],coupang:[]}:r.stockData||{naver:[],coupang:[]},
-    stockSafe:(l.updatedAt||0)>=(r.updatedAt||0)?l.stockSafe||{}:r.stockSafe||{},
+    stockData:(()=>{
+      const lsd=l.stockData||{naver:[],coupang:[]};
+      const rsd=r.stockData||{naver:[],coupang:[]};
+      return {
+        naver:(lsd.naver||[]).length>=(rsd.naver||[]).length?lsd.naver||[]:rsd.naver||[],
+        coupang:(lsd.coupang||[]).length>=(rsd.coupang||[]).length?lsd.coupang||[]:rsd.coupang||[],
+      };
+    })(),
+    stockSafe:(()=>{const ls=l.stockSafe||{};const rs=r.stockSafe||{};return Object.keys(ls).length>=Object.keys(rs).length?ls:rs;})(),
     reorderRequests:(l.updatedAt||0)>=(r.updatedAt||0)?l.reorderRequests||[]:r.reorderRequests||[],
     inboundPlans:(l.updatedAt||0)>=(r.updatedAt||0)?l.inboundPlans||[]:r.inboundPlans||[],
     cafe24_schedules:(l.updatedAt||0)>=(r.updatedAt||0)?l.cafe24_schedules||[]:r.cafe24_schedules||[],
