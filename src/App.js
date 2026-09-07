@@ -1062,8 +1062,6 @@ function Board() {
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
-      // Firebase 저장 전 SKU 필터 적용
-      if(merged.stockData){merged.stockData={naver:(merged.stockData.naver||[]).filter((e)=>NAVER_KEEP_SKUS.has(e.id)),coupang:(merged.stockData.coupang||[]).filter((e)=>COUPANG_KEEP_SKUS.has(e.id))};}
       await setDoc(BOARD_REF(),merged); setData(merged); setSaveState("saved"); setTimeout(()=>setSaveState("idle"),1500);
     } catch(e){setSaveState("error");} finally{busyRef.current=false;}
   }, []);
@@ -1934,7 +1932,7 @@ function Board() {
         const newItem=skuMap[e.id];
         const prevHistory=e.history||[];
         if(newItem){
-          return{...e,stock:newItem.stock,date:today,
+          return{...e,stock:newItem.stock,name:newItem.name||e.name,date:today,
             history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:newItem.stock}].slice(-30)};
         }
         // 이번 업로드에 없는 항목 → 재고 0으로 기록
@@ -3559,7 +3557,7 @@ function Board() {
                           }}
                           onDragEnd={()=>{setStockDragId(null);}}>
                           <td style={{padding:"9px 4px",textAlign:"center",cursor:"grab",color:"var(--ink3)",fontSize:14,userSelect:"none"}}>≡</td>
-                          <td style={{fontWeight:600,cursor:"pointer",color:"#0C66E4",textDecoration:"underline"}} onClick={()=>setStockHistModal(item)}>{item.name}</td>
+                          <td style={{fontWeight:600,cursor:"pointer",color:"#0C66E4",textDecoration:"underline"}} onClick={()=>setStockHistModal(item)}>{item.name||item.sku||item.id}</td>
                           <td style={{color:"var(--ink3)",fontSize:12}}>{item.sku}</td>
                           <td style={{textAlign:"right",fontWeight:700,fontSize:14}}>{viewStock===null?<span style={{color:"var(--ink3)"}}>-</span>:viewStock.toLocaleString()}</td>
                           <td style={{textAlign:"right"}}>
