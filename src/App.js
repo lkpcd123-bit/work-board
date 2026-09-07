@@ -5042,12 +5042,12 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
         const r = await c24Api({action:"uploadImageFromUrl", imageUrl:url});
         return r?.images?.[0]?.path||r?.images?.[0]?.image_path||r?.images?.[0]?.url||"";
       };
-      const mainImage = await uploadImg(base.detail_image||base.list_image||"");
+      const mainImage = await uploadImg(base.detail_image||"");
       const listImage = await uploadImg(base.list_image||"");
       const tinyImage = await uploadImg(base.tiny_image||"");
       const smallImage = await uploadImg(base.small_image||"");
 
-      // 4) 새 상품 생성
+      // 4) 이미지 없이 상품 먼저 생성
       setMsg("새 상품 생성 중...");
       const createPayload = {
         product_name: productName,
@@ -5062,16 +5062,23 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
         product_weight: base.product_weight||"0.00",
         tax_type: base.tax_type||"A",
         product_type: base.product_type||"P",
-        detail_image: mainImage,
-        list_image: listImage,
-        tiny_image: tinyImage,
-        small_image: smallImage,
       };
 
       const createRes = await c24Api({action:"create", payload:createPayload});
       if(!createRes.product){setMsg("❌ 상품 생성 실패: "+JSON.stringify(createRes));setSending(false);return;}
       const newNo = createRes.product.product_no;
       const newCode = createRes.product.product_code;
+
+      // 5) 이미지 별도 PUT 업데이트
+      if(mainImage||listImage||tinyImage||smallImage){
+        setMsg("이미지 등록 중...");
+        const imgPayload = {};
+        if(mainImage) imgPayload.detail_image = mainImage;
+        if(listImage) imgPayload.list_image = listImage;
+        if(tinyImage) imgPayload.tiny_image = tinyImage;
+        if(smallImage) imgPayload.small_image = smallImage;
+        await c24Api({action:"update", productNo:newNo, payload:imgPayload});
+      }
 
       // 5) 생성 완료
       setCreated({no:newNo, code:newCode});
