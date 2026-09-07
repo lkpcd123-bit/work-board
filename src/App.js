@@ -5025,62 +5025,60 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
     if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
     setSending(true);setCreated(null);
     try {
-      // 1) 상품코드로 product_no 조회
+      // 1) 상품코드 → product_no
       setMsg("1/4 상품 조회 중...");
       const found = await c24SearchByCode(targetProductCode.trim().toUpperCase());
       if(!found){setMsg("❌ 상품을 찾을 수 없습니다");setSending(false);return;}
       const newNo = found.product_no;
       const newCode = found.product_code||targetProductCode;
-      if(!newNo){setMsg("❌ 상품번호 없음: "+JSON.stringify(found).slice(0,100));setSending(false);return;}
+      if(!newNo){setMsg("❌ product_no 없음");setSending(false);return;}
 
       // 2) 상세 조회
       setMsg("2/4 상세 정보 조회 중...");
       const detail = await c24GetProduct(newNo);
 
-      // 3) 상세설명 수정 (옵션코드 교체)
+      // 3) variants 조회 - 옵션코드 자동 추출
+      setMsg("3/4 옵션 조회 중...");
+      const varRes = await c24Api({action:"getVariants", productNo:newNo});
+      const variants = varRes?.variants||[];
+      setMsg("variants: "+JSON.stringify(variants).slice(0,200));
+      await new Promise(r=>setTimeout(r,2000)); // 2초 표시
+
+      // 옵션1 품목코드 자동 추출 (PICK이 들어간 옵션)
+      const opt1 = variants.find(v=>(v.option_value||"").includes("PICK"));
+      const opt1Code = opt1?.variant_code||opt1?.code||"";
+      const opt1Name_new = `{🔥${ytName} PICK!🔥}[6개+파우치 7포] 대용량 쉐이크 6개 {🎁사은품🎁 파우치 7포 증정} ((d3))`;
+
+      // 4) 상세설명 - opt1Code로 교체
       let desc = detail?.description||"";
-      if(optionCode.trim()){
-        // code="기존코드" → code="새코드" 교체
-        desc = desc.replace(/<p code="[^"]*">/g, `<p code="${optionCode.trim()}">`);
+      if(opt1Code){
+        desc = desc.replace(/code="[A-Z0-9]+"/g, `code="${opt1Code}"`);
       }
-      // DEPTH3_HTML도 새 코드로 업데이트
-      const depth3 = DEPTH3_HTML.replace('code="P0000BCI000C"', optionCode.trim() ? `code="${optionCode.trim()}"` : 'code="P0000BCI000C"');
+      const depth3 = `<div id="opt-depth3-spec" style="display:none !important;">\n\t<!--\n        [STEP3 개별화] 샘플\n        <p code="옵션 코드">내용1,내용2,내용3</p>\n    -->\n\t<p code="${opt1Code||'P0000BCI000C'}">딸기맛 파우치 7포,초코맛 파우치 7포,말차맛 파우치 7포,쿠키앤크림맛 파우치 7포,스윗콘플레이크맛 파우치 7포,곡물맛 파우치 7포, 티라미수&amp;마카다미아맛 45g x 7포, 트리플베리요거트맛 45g x 7포</p>\n</div>`;
       if(desc.includes('id="opt-depth3-spec"'))
         desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/, depth3);
       else desc = depth3+"\n"+desc;
 
-      // 4) 상품명 + 간략설명 + 상세설명 수정
-      setMsg("3/4 상품명/설명 수정 중...");
+      // 5) 상품명 + 간략설명 + 상세설명 수정
+      setMsg("4/4 상품 수정 중...");
       const updRes = await c24Api({action:"update", productNo:newNo, payload:{
-        product_name: productName,
-        summary_description: summaryDesc,
+        product_name: `[${ytName} 전용 비밀링크] 단백질쉐이크 대용량 10종`,
+        summary_description: `<strong>🧡${ytName} 전용 비밀링크!</strong> ~최대 특가 63% SALE!🧡<br>\n✔︎ 📢${dateRange} 단, 7일간만! <br>\n✔︎ 최저가 링크!  <strong> 한 통 당 최대 19,733원💵</strong> <br>\n✔︎ 현재 페이지에서만 구매 가능한 혜택😱<br>\n✔︎ 단백질 쉐이크 유목민 정.착.템!<br>`,
         description: desc,
       }});
-      if(!updRes.product){setMsg("❌ 수정 실패: "+JSON.stringify(updRes).slice(0,200));setSending(false);return;}
+      if(!updRes.product){setMsg("❌ 상품 수정 실패: "+JSON.stringify(updRes).slice(0,200));setSending(false);return;}
 
-      // 5) 옵션명 수정 (이름 포함된 것만)
-      setMsg("4/4 옵션명 수정 중...");
-      const varRes = await c24Api({action:"getVariants", productNo:newNo});
-      const variants = varRes?.variants||[];
-      let optUpdated = 0;
-      for(const v of variants){
-        const name = v.option_value||"";
-        // 이름 또는 날짜가 포함된 옵션만 수정
-        if(name.includes("PICK") || name.includes("이름") || name.match(/\d{2}\/\d{2}/)){
-          const newName = name
-            .replace(/🔥[^🔥]*PICK[^🔥]*🔥/g, `🔥${ytName} PICK!🔥`)
-            .replace(/\d{2}\/\d{2}\([^)]*\)\s*~\s*\d{2}\/\d{2}\([^)]*\)/g, dateRange);
-          if(newName !== name){
-            await c24Api({action:"updateVariant", productNo:newNo, variantCode:v.variant_code||v.code, payload:{option_value:newName}});
-            optUpdated++;
-          }
-        }
+      // 6) 옵션명 수정 (PICK 들어간 것만)
+      let optUpdated=0;
+      if(opt1&&opt1Code){
+        const vr = await c24Api({action:"updateVariant", productNo:newNo, variantCode:opt1Code, payload:{option_value:opt1Name_new}});
+        if(vr.variant) optUpdated=1;
+        else setMsg("⚠ 옵션수정 응답: "+JSON.stringify(vr).slice(0,150));
       }
 
       setCreated({no:newNo, code:newCode});
       setTargetProductCode("");
-      setOptionCode("");
-      setMsg(`✅ 완료! ${newCode} — 상품명/설명 수정, 옵션 ${optUpdated}개 수정`);
+      setMsg(`✅ 완료! ${newCode} — 상품명/설명 수정, 옵션 ${optUpdated}개 수정 (opt1: ${opt1Code||"없음"})`);
     } catch(e){
       setMsg("❌ 오류: "+e.message);
     }
