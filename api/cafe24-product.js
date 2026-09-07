@@ -8,81 +8,105 @@ export default async function handler(req, res) {
   const { action, token, productCode, productNo, payload, imageBase64, imageName, imageUrl } = req.body || {};
   const MALL_ID = 'slowrocket';
   const BASE = `https://${MALL_ID}.cafe24api.com/api/v2/admin`;
-  const headers = {
+  const H = {
     'Authorization': `Bearer ${token}`,
     'X-Cafe24-Api-Version': '2026-03-01',
     'Content-Type': 'application/json',
   };
 
+  const j = async (r) => { const t = await r.text(); try { return JSON.parse(t); } catch(e) { return { raw: t }; } };
+
   try {
     if (action === 'search') {
-      const r = await fetch(`${BASE}/products?product_code=${encodeURIComponent(productCode)}&limit=1`, { headers });
+      const r = await fetch(`${BASE}/products?product_code=${encodeURIComponent(productCode)}&limit=1`, { headers: H });
       const d = await r.json();
-      res.status(200).json({ product: d.products?.[0] || null });
+      return res.json({ product: d.products?.[0] || null });
 
     } else if (action === 'get') {
       const no = parseInt(productNo, 10);
-      const r = await fetch(`${BASE}/products/${no}`, { headers });
-      const d = await r.json();
-      res.status(r.status).json(d);
+      const r = await fetch(`${BASE}/products/${no}`, { headers: H });
+      return res.status(r.status).json(await j(r));
+
+    } else if (action === 'getOptions') {
+      const no = parseInt(productNo, 10);
+      const r = await fetch(`${BASE}/products/${no}/options`, { headers: H });
+      return res.status(r.status).json(await j(r));
+
+    } else if (action === 'getShipping') {
+      const no = parseInt(productNo, 10);
+      const r = await fetch(`${BASE}/products/${no}/shipping`, { headers: H });
+      return res.status(r.status).json(await j(r));
 
     } else if (action === 'update') {
       const no = parseInt(productNo, 10);
-      if (!no || isNaN(no)) return res.status(400).json({ error: `Invalid productNo: ${productNo}` });
       const r = await fetch(`${BASE}/products/${no}`, {
-        method: 'PUT', headers,
+        method: 'PUT', headers: H,
         body: JSON.stringify({ shop_no: 1, request: payload }),
       });
-      const text = await r.text();
-      let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
-      res.status(r.status).json(d);
+      return res.status(r.status).json(await j(r));
 
     } else if (action === 'create') {
       const r = await fetch(`${BASE}/products`, {
-        method: 'POST', headers,
+        method: 'POST', headers: H,
         body: JSON.stringify({ shop_no: 1, request: payload }),
       });
-      const text = await r.text();
-      console.log('CREATE status:', r.status, text.slice(0, 300));
-      let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
-      res.status(200).json(d);
+      const d = await j(r);
+      console.log('CREATE', r.status, JSON.stringify(d).slice(0,200));
+      return res.json(d);
+
+    } else if (action === 'setCategory') {
+      const no = parseInt(productNo, 10);
+      const r = await fetch(`${BASE}/products/${no}/categories`, {
+        method: 'POST', headers: H,
+        body: JSON.stringify({ shop_no: 1, request: payload }),
+      });
+      const d = await j(r);
+      console.log('setCategory', r.status, JSON.stringify(d).slice(0,200));
+      return res.status(r.status).json(d);
+
+    } else if (action === 'createOptions') {
+      const no = parseInt(productNo, 10);
+      const r = await fetch(`${BASE}/products/${no}/options`, {
+        method: 'POST', headers: H,
+        body: JSON.stringify({ shop_no: 1, request: payload }),
+      });
+      const d = await j(r);
+      console.log('createOptions', r.status, JSON.stringify(d).slice(0,200));
+      return res.status(r.status).json(d);
 
     } else if (action === 'uploadImageFromUrl') {
-      // 카페24 서버가 URL에서 직접 이미지를 가져오도록 image_url 방식 사용
-      if (!imageUrl) return res.status(400).json({ error: 'imageUrl required' });
-      const fname = imageUrl.split('/').pop().split('?')[0] || 'image.jpg';
-      const uploadBody = {
-        requests: [{
-          image_url: imageUrl,
-          image_name: fname,
-        }]
-      };
-      const r = await fetch(`${BASE}/products/images`, {
-        method: 'POST', headers,
-        body: JSON.stringify(uploadBody),
+      if (!imageUrl) return res.json({ error: 'imageUrl required' });
+      // Vercel → 이미지 fetch → base64 → 카페24
+      const imgRes = await fetch(imageUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': `https://${MALL_ID}.cafe24.com/` }
       });
-      const text = await r.text();
-      console.log('uploadImageFromUrl status:', r.status, text.slice(0, 300));
-      let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
-      res.status(r.status).json(d);
+      if (!imgRes.ok) return res.json({ error: `fetch failed: ${imgRes.status}` });
+      const ct = imgRes.headers.get('content-type') || 'image/jpeg';
+      const b64 = Buffer.from(await imgRes.arrayBuffer()).toString('base64');
+      const fname = imageUrl.split('/').pop().split('?')[0] || 'img.jpg';
+      const r = await fetch(`${BASE}/products/images`, {
+        method: 'POST', headers: H,
+        body: JSON.stringify({ requests: [{ image: b64, image_type: ct, image_name: fname }] }),
+      });
+      const d = await j(r);
+      console.log('uploadFromUrl', r.status, JSON.stringify(d).slice(0,200));
+      return res.status(r.status).json(d);
 
     } else if (action === 'uploadImage') {
-      if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
-      const ext = (imageName || 'image.jpg').split('.').pop().toLowerCase();
-      const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
-      const mime = mimeMap[ext] || 'image/jpeg';
+      if (!imageBase64) return res.json({ error: 'imageBase64 required' });
+      const ext = (imageName||'img.jpg').split('.').pop().toLowerCase();
+      const mime = {jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp'}[ext]||'image/jpeg';
       const r = await fetch(`${BASE}/products/images`, {
-        method: 'POST', headers,
-        body: JSON.stringify({ requests: [{ image: imageBase64, image_type: mime, image_name: imageName || `img_${Date.now()}.jpg` }] }),
+        method: 'POST', headers: H,
+        body: JSON.stringify({ requests: [{ image: imageBase64, image_type: mime, image_name: imageName||`img_${Date.now()}.jpg` }] }),
       });
-      const text = await r.text();
-      let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
-      res.status(r.status).json(d);
+      return res.status(r.status).json(await j(r));
 
     } else {
-      res.status(400).json({ error: `Invalid action: ${action}` });
+      return res.status(400).json({ error: `Invalid action: ${action}` });
     }
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('ERROR:', e.message);
+    return res.status(500).json({ error: e.message });
   }
 }

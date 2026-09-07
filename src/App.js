@@ -5022,25 +5022,27 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
     if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
     if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
     setSending(true);setCreated(null);
-    const log = [];
-    const step = (msg) => { setMsg(msg); log.push(msg); };
+    const logs=[];
+    const step=(msg)=>{setMsg(msg);logs.push(msg);};
+    const ok=(label)=>logs.push("✔ "+label);
+    const warn=(label,d)=>logs.push("⚠ "+label+": "+JSON.stringify(d).slice(0,80));
 
     try {
-      // STEP 1: 기본 상품 조회
-      step("1/5 기본 상품 조회 중...");
+      // 1) 기본 상품 전체 조회
+      step("1/6 기본 상품 조회 중...");
       const base = await c24GetProduct(BASE_PRODUCT_NO);
       if(!base){setMsg("❌ 기본 상품 조회 실패");setSending(false);return;}
-      log.push("✔ 조회완료: "+base.product_name);
+      ok("기본 상품 조회");
 
-      // STEP 2: 상세설명 DEPTH3 삽입
+      // 2) 상세설명 DEPTH3 삽입
       let desc = base.description||"";
       if(desc.includes('id="opt-depth3-spec"'))
         desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
-      else desc = DEPTH3_HTML+"\\n"+desc;
+      else desc = DEPTH3_HTML+"\n"+desc;
 
-      // STEP 3: 상품 생성 (최소 필드)
-      step("2/5 상품 생성 중...");
-      const createRes = await c24Api({action:"create", payload:{
+      // 3) 상품 생성 (텍스트 필드만)
+      step("2/6 상품 생성 중...");
+      const basePayload = {
         product_name: productName,
         summary_description: summaryDesc,
         description: desc,
@@ -5049,54 +5051,84 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
         supply_price: base.supply_price,
         product_weight: base.product_weight||"0.00",
         tax_type: base.tax_type||"A",
-      }});
-      if(!createRes.product){
-        setMsg("❌ 상품 생성 실패: "+JSON.stringify(createRes).slice(0,200));
-        setSending(false);return;
-      }
+        display: "T",
+        selling: "T",
+        manufacturer_code: base.manufacturer_code,
+        brand_code: base.brand_code,
+        supplier_code: base.supplier_code,
+        trend_code: base.trend_code,
+        product_condition: base.product_condition||"N",
+        adult_certification: base.adult_certification||"F",
+        buy_unit: base.buy_unit||1,
+        minimum_quantity: base.minimum_quantity||1,
+      };
+      const createRes = await c24Api({action:"create", payload:basePayload});
+      if(!createRes.product){setMsg("❌ 상품 생성 실패: "+JSON.stringify(createRes).slice(0,200));setSending(false);return;}
       const newNo = createRes.product.product_no;
       const newCode = createRes.product.product_code;
-      log.push("✔ 생성완료: "+newCode+" (no."+newNo+")");
+      ok("상품 생성 ("+newCode+")");
 
-      // STEP 4: 진열/판매 + 카테고리 설정
-      step("3/5 진열/판매/분류 설정 중...");
-      const updRes1 = await c24Api({action:"update", productNo:newNo, payload:{
-        display:"T", selling:"T",
-        category:[{category_no:247,recommend:"F",new:"F"}]
-      }});
-      log.push(updRes1.product ? "✔ 진열/판매/분류 완료" : "⚠ 진열/판매/분류 실패: "+JSON.stringify(updRes1).slice(0,100));
+      // 4) 카테고리 설정
+      step("3/6 카테고리 설정 중...");
+      const catRes = await c24Api({action:"setCategory", productNo:newNo, payload:{category_no:247}});
+      catRes.category ? ok("카테고리 설정") : warn("카테고리", catRes);
 
-      // STEP 5: 이미지 업로드
-      step("4/5 이미지 업로드 중...");
+      // 5) 이미지 업로드 + 적용
+      step("4/6 이미지 업로드 중...");
       const uploadImg = async (url, label) => {
         if(!url) return "";
-        try {
-          const r = await c24Api({action:"uploadImageFromUrl", imageUrl:url});
-          const path = r?.images?.[0]?.path||r?.images?.[0]?.image_path||r?.images?.[0]?.url||"";
-          log.push(path ? `✔ ${label} 업로드 완료` : `⚠ ${label} 실패: `+JSON.stringify(r).slice(0,80));
-          return path;
-        } catch(e) { log.push(`⚠ ${label} 오류: `+e.message); return ""; }
+        const r = await c24Api({action:"uploadImageFromUrl", imageUrl:url});
+        const path = r?.images?.[0]?.path||r?.images?.[0]?.image_path||r?.images?.[0]?.url||"";
+        path ? ok(label+" 업로드") : warn(label, r);
+        return path;
       };
       const det = await uploadImg(base.detail_image||"", "대표이미지");
       const lst = await uploadImg(base.list_image||"", "목록이미지");
       const tin = await uploadImg(base.tiny_image||"", "썸네일");
       const sml = await uploadImg(base.small_image||"", "작은이미지");
-      const imgPayload = {};
-      if(det) imgPayload.detail_image=det;
-      if(lst) imgPayload.list_image=lst;
-      if(tin) imgPayload.tiny_image=tin;
-      if(sml) imgPayload.small_image=sml;
-
+      const imgPayload={};
+      if(det)imgPayload.detail_image=det;
+      if(lst)imgPayload.list_image=lst;
+      if(tin)imgPayload.tiny_image=tin;
+      if(sml)imgPayload.small_image=sml;
       if(Object.keys(imgPayload).length>0){
-        step("5/5 이미지 등록 중...");
-        const updRes2 = await c24Api({action:"update", productNo:newNo, payload:imgPayload});
-        log.push(updRes2.product ? "✔ 이미지 등록 완료" : "⚠ 이미지 등록 실패: "+JSON.stringify(updRes2).slice(0,100));
-      } else {
-        log.push("⚠ 업로드된 이미지 없음 — 카페24에서 수동 등록 필요");
+        const ir = await c24Api({action:"update", productNo:newNo, payload:imgPayload});
+        ir.product ? ok("이미지 등록") : warn("이미지 등록", ir);
       }
 
+      // 6) 배송비 설정 복사
+      step("5/6 배송 설정 중...");
+      const shipRes = await c24Api({action:"getShipping", productNo:BASE_PRODUCT_NO});
+      if(shipRes.shipping){
+        const sp = shipRes.shipping;
+        const shipPayload = {
+          shipping_method: sp.shipping_method,
+          shipping_fee_type: sp.shipping_fee_type,
+          shipping_area: sp.shipping_area,
+          shipping_period: sp.shipping_period,
+          shipping_scope: sp.shipping_scope,
+          prepaid_shipping_fee: sp.prepaid_shipping_fee,
+        };
+        const sr = await c24Api({action:"update", productNo:newNo, payload:shipPayload});
+        sr.product ? ok("배송 설정") : warn("배송 설정", sr);
+      }
+
+      // 7) 옵션 복사
+      step("6/6 옵션 복사 중...");
+      const optRes = await c24Api({action:"getOptions", productNo:BASE_PRODUCT_NO});
+      if(optRes.options&&optRes.options.length>0){
+        const opts = optRes.options.map((o)=>({
+          option_name: o.option_name,
+          option_value: o.option_value,
+          required_option: o.required_option||"T",
+        }));
+        const or = await c24Api({action:"createOptions", productNo:newNo, payload:{options:opts}});
+        or.options ? ok("옵션 복사") : warn("옵션 복사", or);
+      } else { ok("옵션 없음"); }
+
       setCreated({no:newNo, code:newCode});
-      setMsg("✅ 완료! "+log.filter(l=>l.startsWith("⚠")).join(" | ")||"✅ 모든 설정 완료!");
+      const warns = logs.filter(l=>l.startsWith("⚠"));
+      setMsg(warns.length>0 ? "✅ 완료! "+warns.join(" | ") : "✅ 모든 항목 완료!");
 
     } catch(e){
       setMsg("❌ 오류: "+e.message);
