@@ -5047,9 +5047,13 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
         retail_price: base.retail_price,
         supply_price: base.supply_price,
         product_weight: base.product_weight,
+        category: base.category||[],
+        tax_type: base.tax_type||"A",
+        product_type: base.product_type||"P",
       };
 
       const createRes = await c24Api({action:"create", payload:createPayload});
+      console.log("createRes:", JSON.stringify(createRes).slice(0,300));
       if(!createRes.product){setMsg("❌ 상품 생성 실패: "+JSON.stringify(createRes));setSending(false);return;}
       const newNo = createRes.product.product_no;
       const newCode = createRes.product.product_code;

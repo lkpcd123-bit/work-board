@@ -22,7 +22,8 @@ export default async function handler(req, res) {
 
     } else if (action === 'get') {
       const no = parseInt(productNo, 10);
-      const r = await fetch(`${BASE}/products/${no}`, { headers });
+      // embed=options,variants,categories 로 카테고리 정보도 함께 조회
+      const r = await fetch(`${BASE}/products/${no}?embed=options,variants`, { headers });
       const d = await r.json();
       res.status(r.status).json(d);
 
@@ -38,16 +39,15 @@ export default async function handler(req, res) {
       res.status(r.status).json(d);
 
     } else if (action === 'create') {
-      // 새 상품 생성 POST /products
-      const body = { shop_no: 1, request: payload };
       const r = await fetch(`${BASE}/products`, {
         method: 'POST', headers,
-        body: JSON.stringify(body),
+        body: JSON.stringify({ shop_no: 1, request: payload }),
       });
       const text = await r.text();
-      console.log('CREATE response:', r.status, text.slice(0, 500));
+      console.log('CREATE status:', r.status, 'body:', text.slice(0, 600));
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
-      res.status(r.status).json(d);
+      // 201 Created or 200 OK 모두 허용
+      res.status(200).json(d);
 
     } else if (action === 'uploadImage') {
       if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
