@@ -5072,7 +5072,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
           📦 복사된 상품번호
           <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>카페24에서 P0000BCP 복사 후 새 상품번호 입력</span>
         </label>
-        <input value={targetProductCode} onChange={(e)=>settargetProductCode(e.target.value.trim())}
+        <input value={targetProductCode} onChange={(e)=>setTargetProductCode(e.target.value.trim())}
           placeholder="예: 760"
           style={{width:"100%",fontSize:14,border:"1px solid var(--line2)",borderRadius:7,padding:"9px 12px",fontFamily:"monospace",fontWeight:700}} />
         <div style={{fontSize:11,color:"#0C66E4",marginTop:6}}>
