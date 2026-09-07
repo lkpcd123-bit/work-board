@@ -29,41 +29,21 @@ export default async function handler(req, res) {
     } else if (action === 'update') {
       const no = parseInt(productNo, 10);
       if (!no || isNaN(no)) return res.status(400).json({ error: `Invalid productNo: ${productNo}` });
-      const body = { shop_no: 1, request: payload };
       const r = await fetch(`${BASE}/products/${no}`, {
         method: 'PUT', headers,
-        body: JSON.stringify(body),
+        body: JSON.stringify({ shop_no: 1, request: payload }),
       });
       const text = await r.text();
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
       res.status(r.status).json(d);
 
-    } else if (action === 'create') {
-      // 새 상품 생성
-      const body = { shop_no: 1, request: payload };
-      const r = await fetch(`${BASE}/products`, {
+    } else if (action === 'copy') {
+      // 상품 복사: POST /products/{no}/copy
+      const no = parseInt(productNo, 10);
+      if (!no || isNaN(no)) return res.status(400).json({ error: `Invalid productNo: ${productNo}` });
+      const r = await fetch(`${BASE}/products/${no}/copy`, {
         method: 'POST', headers,
-        body: JSON.stringify(body),
-      });
-      const text = await r.text();
-      let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
-      res.status(r.status).json(d);
-
-    } else if (action === 'getVariants') {
-      // 옵션(품목) 조회
-      const no = parseInt(productNo, 10);
-      const r = await fetch(`${BASE}/products/${no}/variants`, { headers });
-      const d = await r.json();
-      res.status(r.status).json(d);
-
-    } else if (action === 'updateVariant') {
-      // 품목 수정 (옵션명, 코드 등)
-      const no = parseInt(productNo, 10);
-      const { variantCode } = req.body;
-      const body = { shop_no: 1, request: payload };
-      const r = await fetch(`${BASE}/products/${no}/variants/${variantCode}`, {
-        method: 'PUT', headers,
-        body: JSON.stringify(body),
+        body: JSON.stringify({ shop_no: 1, request: { display: 'F', selling: 'F' } }),
       });
       const text = await r.text();
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
@@ -74,16 +54,9 @@ export default async function handler(req, res) {
       const ext = (imageName || 'image.jpg').split('.').pop().toLowerCase();
       const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
       const mime = mimeMap[ext] || 'image/jpeg';
-      const uploadBody = {
-        requests: [{
-          image: imageBase64,
-          image_type: mime,
-          image_name: imageName || `img_${Date.now()}.jpg`,
-        }]
-      };
       const r = await fetch(`${BASE}/products/images`, {
         method: 'POST', headers,
-        body: JSON.stringify(uploadBody),
+        body: JSON.stringify({ requests: [{ image: imageBase64, image_type: mime, image_name: imageName || `img_${Date.now()}.jpg` }] }),
       });
       const text = await r.text();
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }

@@ -4992,72 +4992,67 @@ function Board() {
 function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
   const BASE_PRODUCT_NO = 743;
 
-  const OPTION_TEMPLATES = [
-    {label:"1번 (6개+파우치 7포)", variantCode:"P0000BCI000C", tmpl:"{🔥{이름} PICK!🔥}[6개+파우치 7포] 대용량 쉐이크 6개 {🎁사은품🎁 파우치 7포 증정} ((d3))"},
-    {label:"2번 (대용량 3개)",     variantCode:"P0000BCI000A", tmpl:"대용량 쉐이크 3개"},
-    {label:"3번 (대용량 1개)",     variantCode:"P0000BCI000B", tmpl:"대용량 쉐이크 1개"},
-  ];
-
-  const DEPTH3_HTML = `<div id="opt-depth3-spec" style="display:none !important;">\n\t<!--\n        [STEP3 개별화] 샘플\n        <p code="옵션 코드">내용1,내용2,내용3</p>\n    -->\n\t<p code="P0000BCI000C">딸기맛 파우치 7포,초코맛 파우치 7포,말차맛 파우치 7포,쿠키앤크림맛 파우치 7포,스윗콘플레이크맛 파우치 7포,곡물맛 파우치 7포, 티라미수&amp;마카다미아맛 45g x 7포, 트리플베리요거트맛 45g x 7포</p>\n</div>`;
+  const DEPTH3_HTML = '<div id="opt-depth3-spec" style="display:none !important;">\n\t<!--\n        [STEP3 개별화] 샘플\n        <p code="옵션 코드">내용1,내용2,내용3</p>\n    -->\n\t<p code="P0000BCI000C">딸기맛 파우치 7포,초코맛 파우치 7포,말차맛 파우치 7포,쿠키앤크림맛 파우치 7포,스윗콘플레이크맛 파우치 7포,곡물맛 파우치 7포, 티라미수&amp;마카다미아맛 45g x 7포, 트리플베리요거트맛 45g x 7포</p>\n</div>';
 
   const [ytName, setYtName] = React.useState("");
   const [dateRange, setDateRange] = React.useState("");
-  const [price, setPrice] = React.useState("");
-  const [discount, setDiscount] = React.useState("");
   const [pasteText, setPasteText] = React.useState("");
   const [msg, setMsg] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [preview, setPreview] = React.useState(null);
   const [created, setCreated] = React.useState(null);
 
-  // 붙여넣기 텍스트 자동 파싱
   const parsePaste = (text) => {
     const nameMatch = text.match(/유튜버명[:：]\s*(.+)/);
     const dateMatch = text.match(/날짜[:：]\s*(.+)/);
-    const priceMatch = text.match(/가격[:：]\s*(.+)/);
-    const discountMatch = text.match(/할인율[:：]\s*(.+)/);
     if(nameMatch) setYtName(nameMatch[1].trim());
     if(dateMatch) setDateRange(dateMatch[1].trim());
-    if(priceMatch) setPrice(priceMatch[1].trim());
-    if(discountMatch) setDiscount(discountMatch[1].trim());
   };
 
-  const fill = (tmpl) => tmpl.replace(/{이름}/g, ytName);
-
   const productName = ytName ? `[${ytName} 전용 비밀링크] 단백질쉐이크 대용량 10종` : "";
-  const summaryDesc = `<strong>🧡${ytName} 전용 비밀링크!</strong>${discount ? ` ~최대 특가 ${discount}% SALE!` : ""}🧡<br>\n✔︎ 📢${dateRange} 단, 7일간만! <br>\n✔︎ 최저가 링크!${price ? `  <strong> 한 통 당 최대 ${price}원💵</strong>` : ""} <br>\n✔︎ 현재 페이지에서만 구매 가능한 혜택😱<br>\n✔︎ 단백질 쉐이크 유목민 정.착.템!<br>`;
+  const summaryDesc = `<strong>🧡${ytName} 전용 비밀링크!</strong> ~최대 특가 63% SALE!🧡<br>\n✔︎ 📢${dateRange} 단, 7일간만! <br>\n✔︎ 최저가 링크!  <strong> 한 통 당 최대 19,733원💵</strong> <br>\n✔︎ 현재 페이지에서만 구매 가능한 혜택😱<br>\n✔︎ 단백질 쉐이크 유목민 정.착.템!<br>`;
+  const opt1Name = `{🔥${ytName} PICK!🔥}[6개+파우치 7포] 대용량 쉐이크 6개 {🎁사은품🎁 파우치 7포 증정} ((d3))`;
 
   const makePreview = () => {
     if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
-    setPreview({productName, summaryDesc, options: OPTION_TEMPLATES.map((o)=>({...o, name: fill(o.tmpl)}))});
-    setMsg("");
+    setPreview(true);setMsg("");
   };
 
   const handleCreate = async () => {
     if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
     if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
-    setSending(true);setMsg("기본 상품 조회 중...");
+    setSending(true);setCreated(null);
+
     try {
+      // 1) 기본 상품 복사
+      setMsg("기본 상품 복사 중...");
+      const copyRes = await c24Api({action:"copy", productNo:BASE_PRODUCT_NO});
+      if(!copyRes.product){setMsg("❌ 상품 복사 실패: "+JSON.stringify(copyRes));setSending(false);return;}
+      const newNo = copyRes.product.product_no;
+      const newCode = copyRes.product.product_code;
+
+      // 2) 기본 상품 상세 조회 (description 가져오기)
+      setMsg("상세 정보 조회 중...");
       const base = await c24GetProduct(BASE_PRODUCT_NO);
-      if(!base){setMsg("❌ 기본 상품 조회 실패");setSending(false);return;}
-      let desc = base.description||"";
+      let desc = base?.description||"";
       if(desc.includes('id="opt-depth3-spec"'))
         desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
       else desc = DEPTH3_HTML+"\n"+desc;
-      setMsg("새 상품 생성 중...");
-      const createPayload = {
-        product_name:productName,
-        summary_description:summaryDesc,
-        description:desc,
-        display:"F", selling:"F",
-        price:base.price, retail_price:base.retail_price,
-        supply_price:base.supply_price,
-      };
-      const res = await c24Api({action:"create", payload:createPayload});
-      if(!res.product){setMsg("❌ 생성 실패: "+JSON.stringify(res));setSending(false);return;}
-      setCreated({no:res.product.product_no, code:res.product.product_code});
-      setMsg(`✅ 상품 생성 완료! 번호: ${res.product.product_no} / 코드: ${res.product.product_code}`);
-    } catch(e){setMsg("❌ 오류: "+e.message);}
+
+      // 3) 복사된 상품 수정
+      setMsg("상품 정보 수정 중...");
+      const updateRes = await c24Api({action:"update", productNo:newNo, payload:{
+        product_name: productName,
+        summary_description: summaryDesc,
+        description: desc,
+      }});
+      if(!updateRes.product){setMsg("❌ 상품 수정 실패: "+JSON.stringify(updateRes));setSending(false);return;}
+
+      setCreated({no:newNo, code:newCode});
+      setMsg(`✅ 상품 생성 완료! 번호: ${newNo} / 코드: ${newCode}`);
+    } catch(e){
+      setMsg("❌ 오류: "+e.message);
+    }
     setSending(false);
   };
 
@@ -5065,41 +5060,32 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
     <div style={{maxWidth:680,margin:"0 auto",padding:"0 0 40px"}}>
       {/* 붙여넣기 공간 */}
       <div className="panel" style={{padding:18,marginBottom:14}}>
-        <label style={{fontWeight:700,fontSize:13,display:"block",marginBottom:8}}>📋 정보 붙여넣기 <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)"}}>유튜버명/날짜 등 텍스트를 붙여넣으면 자동 입력</span></label>
+        <label style={{fontWeight:700,fontSize:13,display:"block",marginBottom:8}}>
+          📋 정보 붙여넣기
+          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>유튜버명/날짜를 붙여넣으면 자동 입력</span>
+        </label>
         <textarea value={pasteText} onChange={(e)=>{setPasteText(e.target.value);parsePaste(e.target.value);}}
-          placeholder={"유튜버명: 카나미누\n날짜: 09/07(토) ~ 09/14(토)\n가격: 19,733 (선택)\n할인율: 63 (선택)"}
-          style={{width:"100%",height:90,fontSize:12,border:"1px solid var(--line2)",borderRadius:8,padding:"9px 12px",resize:"vertical",fontFamily:"inherit"}} />
+          placeholder={"유튜버명: 카나미누\n날짜: 09/07(토) ~ 09/14(토)"}
+          style={{width:"100%",height:80,fontSize:12,border:"1px solid var(--line2)",borderRadius:8,padding:"9px 12px",resize:"vertical",fontFamily:"inherit"}} />
       </div>
 
       {/* 입력 폼 */}
       <div className="panel" style={{padding:18,marginBottom:14}}>
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <div style={{display:"flex",gap:12}}>
-            <div className="fld" style={{flex:1}}>
-              <label>유튜버명 <span style={{color:"#CA3521",fontSize:11}}>*</span></label>
-              <input value={ytName} onChange={(e)=>setYtName(e.target.value)} placeholder="카나미누" />
-            </div>
-            <div className="fld" style={{flex:2}}>
-              <label>날짜 <span style={{color:"#CA3521",fontSize:11}}>*</span></label>
-              <input value={dateRange} onChange={(e)=>setDateRange(e.target.value)} placeholder="09/07(토) ~ 09/14(토)" />
-            </div>
+        <div style={{display:"flex",gap:12,marginBottom:12}}>
+          <div className="fld" style={{flex:1}}>
+            <label>유튜버명 <span style={{color:"#CA3521",fontSize:11}}>*</span></label>
+            <input value={ytName} onChange={(e)=>setYtName(e.target.value)} placeholder="카나미누" />
           </div>
-          <div style={{display:"flex",gap:12}}>
-            <div className="fld" style={{flex:1}}>
-              <label>가격 <span style={{color:"var(--ink3)",fontSize:11}}>(선택)</span></label>
-              <input value={price} onChange={(e)=>setPrice(e.target.value)} placeholder="19,733" />
-            </div>
-            <div className="fld" style={{flex:1}}>
-              <label>할인율 % <span style={{color:"var(--ink3)",fontSize:11}}>(선택)</span></label>
-              <input value={discount} onChange={(e)=>setDiscount(e.target.value)} placeholder="63" />
-            </div>
+          <div className="fld" style={{flex:2}}>
+            <label>날짜 <span style={{color:"#CA3521",fontSize:11}}>*</span></label>
+            <input value={dateRange} onChange={(e)=>setDateRange(e.target.value)} placeholder="09/07(토) ~ 09/14(토)" />
           </div>
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4}}>
-            <button className="btn ghost" onClick={makePreview}>👁 미리보기</button>
-            <button className="btn-save" style={{background:"#1F845A",padding:"9px 24px"}} disabled={sending} onClick={handleCreate}>
-              {sending?"생성 중...":"🚀 카페24에 상품 생성"}
-            </button>
-          </div>
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <button className="btn ghost" onClick={makePreview}>👁 미리보기</button>
+          <button className="btn-save" style={{background:"#1F845A",padding:"9px 24px"}} disabled={sending} onClick={handleCreate}>
+            {sending?"생성 중...":"🚀 카페24에 상품 생성"}
+          </button>
         </div>
       </div>
 
@@ -5117,25 +5103,19 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
       </div>}
 
       {/* 미리보기 */}
-      {preview&&<div className="panel" style={{padding:18}}>
+      {preview&&ytName&&dateRange&&<div className="panel" style={{padding:18}}>
         <div style={{fontWeight:800,fontSize:13,color:"#0C66E4",marginBottom:14}}>미리보기</div>
-        <div style={{marginBottom:12}}>
+        <div style={{marginBottom:10}}>
           <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:4}}>상품명</div>
-          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:13}}>{preview.productName}</div>
+          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:13}}>{productName}</div>
         </div>
-        <div style={{marginBottom:12}}>
+        <div style={{marginBottom:10}}>
           <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:4}}>상품 간략설명</div>
-          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:12,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:preview.summaryDesc}} />
+          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:12,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:summaryDesc}} />
         </div>
         <div>
-          <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:4}}>옵션명</div>
-          {preview.options.map((o,i)=>(
-            <div key={i} style={{padding:"7px 12px",background:"var(--bg)",borderRadius:7,fontSize:12,marginBottom:5,display:"flex",gap:8,alignItems:"center"}}>
-              <span style={{fontSize:11,color:"var(--ink3)",fontWeight:700,flexShrink:0}}>{o.label}</span>
-              <span style={{flex:1}}>{o.name}</span>
-              <span style={{fontSize:11,color:"#0C66E4",flexShrink:0}}>({o.variantCode})</span>
-            </div>
-          ))}
+          <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:4}}>1번 옵션명</div>
+          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:12}}>{opt1Name}</div>
         </div>
       </div>}
     </div>
