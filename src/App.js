@@ -340,11 +340,11 @@ function mergeData(r,l) {
   const mmi=new Map(); [...(r.mindmaps||[]),...(l.mindmaps||[])].forEach(t=>{const p=mmi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mmi.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
-  const inbMap=new Map(); [...(r.inboundPlans||[]),...(l.inboundPlans||[])].forEach(t=>{const p=inbMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>(p.updatedAt||p.createdAt||0))inbMap.set(t.id,t);});
-  const roMap=new Map(); [...(r.reorderRequests||[]),...(l.reorderRequests||[])].forEach(t=>{const p=roMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>(p.updatedAt||p.createdAt||0))roMap.set(t.id,t);});
-  const refMap=new Map(); [...(r.refs||[]),...(l.refs||[])].forEach(t=>{const p=refMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>(p.updatedAt||p.createdAt||0))refMap.set(t.id,t);});
-  const c24Map=new Map(); [...(r.cafe24_schedules||[]),...(l.cafe24_schedules||[])].forEach(t=>{const p=c24Map.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>(p.updatedAt||p.createdAt||0))c24Map.set(t.id,t);});
-  const notifMap=new Map(); [...(r.notifications||[]),...(l.notifications||[])].forEach(t=>{const p=notifMap.get(t.id);if(!p||(t.updatedAt||t.ts||0)>(p.updatedAt||p.ts||0))notifMap.set(t.id,t);});
+  const inbMap=new Map(); [...(r.inboundPlans||[]),...(l.inboundPlans||[])].forEach(t=>{const p=inbMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))inbMap.set(t.id,t);});
+  const roMap=new Map(); [...(r.reorderRequests||[]),...(l.reorderRequests||[])].forEach(t=>{const p=roMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))roMap.set(t.id,t);});
+  const refMap=new Map(); [...(r.refs||[]),...(l.refs||[])].forEach(t=>{const p=refMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))refMap.set(t.id,t);});
+  const c24Map=new Map(); [...(r.cafe24_schedules||[]),...(l.cafe24_schedules||[])].forEach(t=>{const p=c24Map.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))c24Map.set(t.id,t);});
+  const notifMap=new Map(); [...(r.notifications||[]),...(l.notifications||[])].forEach(t=>{const p=notifMap.get(t.id);if(!p||(t.updatedAt||t.ts||0)>=(p.updatedAt||p.ts||0))notifMap.set(t.id,t);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
   return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],mindmaps:[...mmi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
     routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
@@ -1846,7 +1846,7 @@ function Board() {
   const activeInbounds=useMemo(()=>inboundPlans.filter((p)=>p.status!=="입고 완료"),[inboundPlans]);
   const addInboundPlan=(plan)=>{commit((d)=>({...d,inboundPlans:[...(d.inboundPlans||[]),{...plan,id:uid(),createdAt:Date.now(),createdBy:me||"익명",logs:[{ts:Date.now(),text:"입고 예정 등록",by:me||"익명"}]}],updatedAt:Date.now()}),[]);};
   const updateInboundPlan=(id,patch)=>{commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,...patch,updatedAt:Date.now()}:p),updatedAt:Date.now()}),[]);};
-  const deleteInboundPlan=(id)=>{commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,deleted:true}:p),updatedAt:Date.now()}),[]);};
+  const deleteInboundPlan=(id)=>{commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,deleted:true,updatedAt:Date.now()}:p),updatedAt:Date.now()}),[]);};
   const changeInboundStatus=(id,status)=>{
     commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,status,logs:[...(p.logs||[]),{ts:Date.now(),text:`상태 변경: ${status}`,by:me||"익명"}],updatedAt:Date.now()}:p),updatedAt:Date.now()}),[]);
   };
