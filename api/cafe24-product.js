@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
-  const { action, token, productCode, productNo, payload, imageBase64, imageName } = req.body || {};
+  const { action, token, productCode, productNo, payload, imageBase64, imageName, imageUrl } = req.body || {};
   const MALL_ID = 'slowrocket';
   const BASE = `https://${MALL_ID}.cafe24api.com/api/v2/admin`;
   const headers = {
@@ -22,7 +22,6 @@ export default async function handler(req, res) {
 
     } else if (action === 'get') {
       const no = parseInt(productNo, 10);
-      // 이미지 포함 조회
       const r = await fetch(`${BASE}/products/${no}`, { headers });
       const d = await r.json();
       res.status(r.status).json(d);
@@ -44,21 +43,29 @@ export default async function handler(req, res) {
         body: JSON.stringify({ shop_no: 1, request: payload }),
       });
       const text = await r.text();
-      console.log('CREATE status:', r.status, text.slice(0, 800));
+      console.log('CREATE status:', r.status, text.slice(0, 300));
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
       res.status(200).json(d);
 
-    } else if (action === 'addImages') {
-      // 생성된 상품에 추가 이미지 등록
-      const no = parseInt(productNo, 10);
-      const r = await fetch(`${BASE}/products/${no}/images`, {
+    } else if (action === 'uploadImageFromUrl') {
+      // 외부 URL → fetch → base64 → 카페24 업로드
+      if (!imageUrl) return res.status(400).json({ error: 'imageUrl required' });
+      const imgRes = await fetch(imageUrl);
+      if (!imgRes.ok) return res.status(400).json({ error: `Failed to fetch image: ${imgRes.status}` });
+      const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+      const buf = await imgRes.arrayBuffer();
+      const base64 = Buffer.from(buf).toString('base64');
+      const fname = imageUrl.split('/').pop().split('?')[0] || 'image.jpg';
+      const uploadBody = {
+        requests: [{ image: base64, image_type: contentType, image_name: fname }]
+      };
+      const upRes = await fetch(`${BASE}/products/images`, {
         method: 'POST', headers,
-        body: JSON.stringify({ shop_no: 1, request: payload }),
+        body: JSON.stringify(uploadBody),
       });
-      const text = await r.text();
-      console.log('ADD IMAGES status:', r.status, text.slice(0, 400));
+      const text = await upRes.text();
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
-      res.status(r.status).json(d);
+      res.status(upRes.status).json(d);
 
     } else if (action === 'uploadImage') {
       if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });

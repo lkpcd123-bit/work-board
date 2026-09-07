@@ -5035,12 +5035,17 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
         desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
       else desc = DEPTH3_HTML+"\n"+desc;
 
-      // 3) 이미지 정보 추출
-      const mainImage = base.detail_image||base.list_image||"";
-      const listImage = base.list_image||"";
-      const tinyImage = base.tiny_image||"";
-      const smallImage = base.small_image||"";
-      const extraImages = base.detail_image_extra||base.additional_images||[];
+      // 3) 이미지 재업로드 (외부 URL → 카페24 CDN)
+      setMsg("이미지 업로드 중...");
+      const uploadImg = async (url) => {
+        if(!url) return "";
+        const r = await c24Api({action:"uploadImageFromUrl", imageUrl:url});
+        return r?.images?.[0]?.path||r?.images?.[0]?.image_path||r?.images?.[0]?.url||"";
+      };
+      const mainImage = await uploadImg(base.detail_image||base.list_image||"");
+      const listImage = await uploadImg(base.list_image||"");
+      const tinyImage = await uploadImg(base.tiny_image||"");
+      const smallImage = await uploadImg(base.small_image||"");
 
       // 4) 새 상품 생성
       setMsg("새 상품 생성 중...");
@@ -5068,13 +5073,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
       const newNo = createRes.product.product_no;
       const newCode = createRes.product.product_code;
 
-      // 5) 추가 이미지 등록
-      if(extraImages.length>0){
-        setMsg("추가 이미지 등록 중...");
-        const imgList = extraImages.map((img)=>({image_url:typeof img==="string"?img:img.image_url||img.url||""})).filter((i)=>i.image_url);
-        if(imgList.length>0) await c24Api({action:"addImages",productNo:newNo,payload:{image_type:"DETAIL_IMAGE_EXTRA",images:imgList}});
-      }
-
+      // 5) 생성 완료
       setCreated({no:newNo, code:newCode});
       setMsg(`✅ 상품 생성 완료! 번호: ${newNo} / 코드: ${newCode}`);
     } catch(e){
