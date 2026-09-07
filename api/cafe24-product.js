@@ -104,24 +104,37 @@ export default async function handler(req, res) {
 
     } else if (action === 'copyProduct') {
       // 카페24 관리자 세션으로 상품 복사
-      const { sessionId, productNo: pNo } = req.body;
-      if (!sessionId) return res.json({ error: 'sessionId required' });
+      const { cookieStr, productNo: pNo } = req.body;
+      if (!cookieStr) return res.json({ error: 'cookieStr required' });
       const formData = new URLSearchParams();
       formData.append('product_no[]', pNo || '743');
       const r = await fetch(`https://slowrocket.cafe24.com/exec/admin/shop1/product/ProductManageCopy`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Cookie': `ECSESSID=${sessionId}`,
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'Cookie': cookieStr,
+          'Origin': 'https://slowrocket.cafe24.com',
           'Referer': 'https://slowrocket.cafe24.com/disp/admin/shop1/product/productmanage',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36',
           'X-Requested-With': 'XMLHttpRequest',
+          'Accept': '*/*',
+          'Accept-Language': 'ko-KR,ko;q=0.9',
+          'sec-fetch-dest': 'empty',
+          'sec-fetch-mode': 'cors',
+          'sec-fetch-site': 'same-origin',
         },
         body: formData.toString(),
       });
       const text = await r.text();
-      console.log('copyProduct status:', r.status, text.slice(0, 300));
-      let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
+      console.log('copyProduct status:', r.status, text.slice(0, 500));
+      // 응답에서 product_no 추출 시도
+      let d;
+      try { d = JSON.parse(text); } catch(e) {
+        // HTML 응답에서 product_no 추출
+        const m = text.match(/product_no['":\s]+(\d+)/);
+        if(m) d = { product_no: parseInt(m[1]) };
+        else d = { raw: text.slice(0, 500) };
+      }
       return res.status(r.status).json(d);
 
     } else {

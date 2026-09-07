@@ -4996,7 +4996,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
 
   const [ytName, setYtName] = React.useState("");
   const [dateRange, setDateRange] = React.useState("");
-  const [sessionId, setSessionId] = React.useState("");
+  const [cookieStr, setCookieStr] = React.useState("");
   const [pasteText, setPasteText] = React.useState("");
   const [msg, setMsg] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -5021,7 +5021,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
 
   const handleCreate = async () => {
     if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
-    if(!sessionId){setMsg("❌ 카페24 세션 ID를 입력해주세요 (F12 → Application → Cookies → ECSESSID)");return;}
+    if(!cookieStr){setMsg("❌ 카페24 쿠키를 입력해주세요");return;}
     if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
     setSending(true);setCreated(null);
     const logs=[];
@@ -5030,7 +5030,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
     try {
       // 1) 관리자 세션으로 P0000BCP 복사
       step("1/3 상품 복사 중...");
-      const copyRes = await c24Api({action:"copyProduct", sessionId, productNo:BASE_PRODUCT_NO});
+      const copyRes = await c24Api({action:"copyProduct", cookieStr, productNo:BASE_PRODUCT_NO});
       console.log("copyRes:", JSON.stringify(copyRes).slice(0,200));
 
       // 복사 응답에서 새 상품번호 추출
@@ -5084,16 +5084,16 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
           style={{width:"100%",height:80,fontSize:12,border:"1px solid var(--line2)",borderRadius:8,padding:"9px 12px",resize:"vertical",fontFamily:"inherit"}} />
       </div>
 
-      {/* 카페24 세션 ID */}
+      {/* 카페24 쿠키 */}
       <div className="panel" style={{padding:18,marginBottom:14,border:"1.5px solid #F7B731",background:"#FFFBF0"}}>
         <label style={{fontWeight:700,fontSize:13,display:"block",marginBottom:6}}>
-          🔑 카페24 세션 ID
-          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>F12 → Application → Cookies → slowrocket.cafe24.com → ECSESSID 값</span>
+          🔑 카페24 쿠키
+          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>F12 → Network → ProductManageCopy → Headers → cookie 값 전체</span>
         </label>
-        <input value={sessionId} onChange={(e)=>setSessionId(e.target.value.trim())}
-          placeholder="jct9i7rd3e1p5jtabor3r00jvgdvlbb5"
-          style={{width:"100%",fontSize:12,border:"1px solid var(--line2)",borderRadius:7,padding:"7px 10px",fontFamily:"monospace"}} />
-        <div style={{fontSize:11,color:"var(--ink3)",marginTop:5}}>⚠ 브라우저 종료 시 만료 — 매번 새로 입력 필요</div>
+        <textarea value={cookieStr} onChange={(e)=>setCookieStr(e.target.value.trim())}
+          placeholder="is_new_pro_mode=T; ECSESSID=xxx; PHPSESSID=xxx; ..."
+          style={{width:"100%",height:70,fontSize:11,border:"1px solid var(--line2)",borderRadius:7,padding:"7px 10px",fontFamily:"monospace",resize:"vertical"}} />
+        <div style={{fontSize:11,color:"var(--ink3)",marginTop:5}}>⚠ 브라우저 종료 시 만료 — 매번 새로 붙여넣기 필요</div>
       </div>
 
       {/* 입력 폼 */}
