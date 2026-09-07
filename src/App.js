@@ -4995,7 +4995,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
 
   const [ytName, setYtName] = React.useState("");
   const [dateRange, setDateRange] = React.useState("");
-  const [targetProductNo, setTargetProductNo] = React.useState("");
+  const [targetProductCode, setTargetProductCode] = React.useState("");
   const [pasteText, setPasteText] = React.useState("");
   const [msg, setMsg] = React.useState("");
   const [sending, setSending] = React.useState(false);
