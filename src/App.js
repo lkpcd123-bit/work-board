@@ -5024,39 +5024,56 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
     setSending(true);setCreated(null);
 
     try {
-      // 1) 기본 상품 전체 정보 조회
-      setMsg("기본 상품 조회 중...");
+      // 1) 기본 상품(P0000BCP) 전체 정보 조회
+      setMsg("기본 상품 정보 조회 중...");
       const base = await c24GetProduct(BASE_PRODUCT_NO);
       if(!base){setMsg("❌ 기본 상품 조회 실패");setSending(false);return;}
 
-      // 2) 상세설명에 DEPTH3 HTML 삽입
+      // 2) 상세설명 DEPTH3 HTML 삽입
       let desc = base.description||"";
       if(desc.includes('id="opt-depth3-spec"'))
         desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
       else desc = DEPTH3_HTML+"\n"+desc;
 
-      // 3) 새 상품 생성 (기본 상품 정보 기반)
+      // 3) 이미지 정보 추출
+      const mainImage = base.detail_image||base.list_image||"";
+      const listImage = base.list_image||"";
+      const tinyImage = base.tiny_image||"";
+      const smallImage = base.small_image||"";
+      const extraImages = base.detail_image_extra||base.additional_images||[];
+
+      // 4) 새 상품 생성
       setMsg("새 상품 생성 중...");
       const createPayload = {
         product_name: productName,
         summary_description: summaryDesc,
         description: desc,
-        display: "F",
-        selling: "F",
+        display: "T",
+        selling: "T",
+        category: [{category_no:247,recommend:"F",new:"F"}],
         price: base.price,
         retail_price: base.retail_price,
         supply_price: base.supply_price,
-        product_weight: base.product_weight,
-        category: base.category||[],
+        product_weight: base.product_weight||"0.00",
         tax_type: base.tax_type||"A",
         product_type: base.product_type||"P",
+        detail_image: mainImage,
+        list_image: listImage,
+        tiny_image: tinyImage,
+        small_image: smallImage,
       };
 
       const createRes = await c24Api({action:"create", payload:createPayload});
-      console.log("createRes:", JSON.stringify(createRes).slice(0,300));
       if(!createRes.product){setMsg("❌ 상품 생성 실패: "+JSON.stringify(createRes));setSending(false);return;}
       const newNo = createRes.product.product_no;
       const newCode = createRes.product.product_code;
+
+      // 5) 추가 이미지 등록
+      if(extraImages.length>0){
+        setMsg("추가 이미지 등록 중...");
+        const imgList = extraImages.map((img)=>({image_url:typeof img==="string"?img:img.image_url||img.url||""})).filter((i)=>i.image_url);
+        if(imgList.length>0) await c24Api({action:"addImages",productNo:newNo,payload:{image_type:"DETAIL_IMAGE_EXTRA",images:imgList}});
+      }
 
       setCreated({no:newNo, code:newCode});
       setMsg(`✅ 상품 생성 완료! 번호: ${newNo} / 코드: ${newCode}`);

@@ -22,8 +22,8 @@ export default async function handler(req, res) {
 
     } else if (action === 'get') {
       const no = parseInt(productNo, 10);
-      // embed=options,variants,categories 로 카테고리 정보도 함께 조회
-      const r = await fetch(`${BASE}/products/${no}?embed=options,variants`, { headers });
+      // 이미지 포함 조회
+      const r = await fetch(`${BASE}/products/${no}`, { headers });
       const d = await r.json();
       res.status(r.status).json(d);
 
@@ -44,10 +44,21 @@ export default async function handler(req, res) {
         body: JSON.stringify({ shop_no: 1, request: payload }),
       });
       const text = await r.text();
-      console.log('CREATE status:', r.status, 'body:', text.slice(0, 600));
+      console.log('CREATE status:', r.status, text.slice(0, 800));
       let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
-      // 201 Created or 200 OK 모두 허용
       res.status(200).json(d);
+
+    } else if (action === 'addImages') {
+      // 생성된 상품에 추가 이미지 등록
+      const no = parseInt(productNo, 10);
+      const r = await fetch(`${BASE}/products/${no}/images`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ shop_no: 1, request: payload }),
+      });
+      const text = await r.text();
+      console.log('ADD IMAGES status:', r.status, text.slice(0, 400));
+      let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
+      res.status(r.status).json(d);
 
     } else if (action === 'uploadImage') {
       if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
