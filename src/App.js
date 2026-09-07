@@ -5040,28 +5040,29 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
       const uploadImg = async (url) => {
         if(!url) return "";
         const r = await c24Api({action:"uploadImageFromUrl", imageUrl:url});
-        return r?.images?.[0]?.path||r?.images?.[0]?.image_path||r?.images?.[0]?.url||"";
+        const path = r?.images?.[0]?.path||r?.images?.[0]?.image_path||r?.images?.[0]?.url||"";
+        if(!path) console.log("이미지 업로드 실패:", JSON.stringify(r));
+        return path;
       };
       const mainImage = await uploadImg(base.detail_image||"");
       const listImage = await uploadImg(base.list_image||"");
       const tinyImage = await uploadImg(base.tiny_image||"");
       const smallImage = await uploadImg(base.small_image||"");
+      const imgUploaded = [mainImage,listImage,tinyImage,smallImage].filter(Boolean).length;
+      setMsg(`이미지 ${imgUploaded}/4 업로드 완료. 상품 생성 중...`);
 
       // 4) 이미지 없이 상품 먼저 생성
-      setMsg("새 상품 생성 중...");
       const createPayload = {
         product_name: productName,
         summary_description: summaryDesc,
         description: desc,
         display: "T",
         selling: "T",
-        category: [{category_no:247,recommend:"F",new:"F"}],
         price: base.price,
         retail_price: base.retail_price,
         supply_price: base.supply_price,
         product_weight: base.product_weight||"0.00",
         tax_type: base.tax_type||"A",
-        product_type: base.product_type||"P",
       };
 
       const createRes = await c24Api({action:"create", payload:createPayload});
@@ -5069,16 +5070,25 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
       const newNo = createRes.product.product_no;
       const newCode = createRes.product.product_code;
 
-      // 5) 이미지 별도 PUT 업데이트
-      if(mainImage||listImage||tinyImage||smallImage){
+      // 5) 이미지 PUT 업데이트
+      if(imgUploaded>0){
         setMsg("이미지 등록 중...");
         const imgPayload = {};
         if(mainImage) imgPayload.detail_image = mainImage;
         if(listImage) imgPayload.list_image = listImage;
         if(tinyImage) imgPayload.tiny_image = tinyImage;
         if(smallImage) imgPayload.small_image = smallImage;
-        await c24Api({action:"update", productNo:newNo, payload:imgPayload});
+        const imgRes = await c24Api({action:"update", productNo:newNo, payload:imgPayload});
+        if(!imgRes.product) setMsg(`⚠ 이미지 등록 실패: ${JSON.stringify(imgRes)} (상품은 생성됨)`);
+      } else {
+        setMsg("⚠ 이미지 업로드 실패 — 이미지 없이 상품 생성됨");
       }
+
+      // 6) 카테고리 별도 등록
+      setMsg("카테고리 설정 중...");
+      await c24Api({action:"update", productNo:newNo, payload:{
+        category:[{category_no:247,recommend:"F",new:"F"}]
+      }});
 
       // 5) 생성 완료
       setCreated({no:newNo, code:newCode});
