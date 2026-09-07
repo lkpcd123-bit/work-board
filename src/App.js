@@ -3529,9 +3529,9 @@ function Board() {
                           </td>
                           <td style={{textAlign:"center"}}>
                             {(()=>{
-                              const plan=inboundPlans.find((p)=>p.sku===item.sku&&p.channel===stockTab&&p.status!=="입고 완료");
+                              const plan=item.sku?inboundPlans.find((p)=>p.sku&&p.sku===item.sku&&p.channel===stockTab&&p.status!=="입고 완료"):null;
                               if(plan)return<span style={{fontSize:12,color:"#0C66E4",fontWeight:700}}>{plan.expectedDate||"날짜 미정"}<br/><span style={{fontSize:10,color:"var(--ink3)",fontWeight:400}}>{plan.status}</span></span>;
-                              return canEdit?<button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer"}} onClick={()=>{setInboundDraft({productName:item.name,sku:item.sku,channel:stockTab,expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고등록</button>:"-";
+                              return canEdit?<button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer"}} onClick={()=>{setInboundDraft({productName:item.name,sku:item.sku||"",channel:stockTab,expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고등록</button>:"-";
                             })()}
                           </td>
                           <td style={{textAlign:"center"}}>
