@@ -4996,7 +4996,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
 
   const [ytName, setYtName] = React.useState("");
   const [dateRange, setDateRange] = React.useState("");
-  const [cookieStr, setCookieStr] = React.useState("");
+  const [targetProductNo, setTargetProductNo] = React.useState("");
   const [pasteText, setPasteText] = React.useState("");
   const [msg, setMsg] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -5021,36 +5021,23 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
 
   const handleCreate = async () => {
     if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
-    if(!cookieStr){setMsg("❌ 카페24 쿠키를 입력해주세요");return;}
+    if(!targetProductNo){setMsg("❌ 복사된 상품번호를 입력해주세요");return;}
     if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
     setSending(true);setCreated(null);
-    const logs=[];
-    const step=(msg)=>{setMsg(msg);};
 
     try {
-      // 1) 관리자 세션으로 P0000BCP 복사
-      step("1/3 상품 복사 중...");
-      const copyRes = await c24Api({action:"copyProduct", cookieStr, productNo:BASE_PRODUCT_NO});
-      console.log("copyRes:", JSON.stringify(copyRes).slice(0,200));
+      const newNo = parseInt(targetProductNo.trim(), 10);
+      if(!newNo){setMsg("❌ 상품번호가 올바르지 않습니다");setSending(false);return;}
 
-      // 복사 응답에서 새 상품번호 추출
-      let newNo = copyRes?.product_no || copyRes?.result?.product_no || copyRes?.data?.product_no;
-      if(!newNo && copyRes?.raw) {
-        const m = copyRes.raw.match(/"product_no"\s*:\s*(\d+)/);
-        if(m) newNo = parseInt(m[1]);
-      }
-      if(!newNo){setMsg("❌ 복사 실패: "+JSON.stringify(copyRes).slice(0,300));setSending(false);return;}
-      logs.push("✔ 복사 완료 (no."+newNo+")");
-
-      // 2) 복사된 상품 코드 조회
-      step("2/3 상품 정보 조회 중...");
+      // 1) 복사된 상품 조회
+      setMsg("1/2 상품 조회 중...");
       const newProduct = await c24GetProduct(newNo);
-      const newCode = newProduct?.product_code || "알수없음";
-      logs.push("✔ 코드: "+newCode);
+      if(!newProduct){setMsg("❌ 상품 조회 실패 — 번호를 확인해주세요");setSending(false);return;}
+      const newCode = newProduct.product_code||"";
 
-      // 3) 상품명 + 간략설명 수정
-      step("3/3 상품명/설명 수정 중...");
-      let desc = newProduct?.description||"";
+      // 2) 상품명 + 간략설명 + 상세설명 수정
+      setMsg("2/2 상품 정보 수정 중...");
+      let desc = newProduct.description||"";
       if(desc.includes('id="opt-depth3-spec"'))
         desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
       else desc = DEPTH3_HTML+"\n"+desc;
@@ -5060,10 +5047,12 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
         summary_description: summaryDesc,
         description: desc,
       }});
-      updRes.product ? logs.push("✔ 수정 완료") : logs.push("⚠ 수정 실패: "+JSON.stringify(updRes).slice(0,100));
+
+      if(!updRes.product){setMsg("❌ 수정 실패: "+JSON.stringify(updRes).slice(0,200));setSending(false);return;}
 
       setCreated({no:newNo, code:newCode});
-      setMsg("✅ 완료! "+logs.join(" | "));
+      setTargetProductNo("");
+      setMsg("✅ 완료! "+newCode+" (no."+newNo+") 상품명/설명 수정됨");
 
     } catch(e){
       setMsg("❌ 오류: "+e.message);
@@ -5084,16 +5073,18 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
           style={{width:"100%",height:80,fontSize:12,border:"1px solid var(--line2)",borderRadius:8,padding:"9px 12px",resize:"vertical",fontFamily:"inherit"}} />
       </div>
 
-      {/* 카페24 쿠키 */}
-      <div className="panel" style={{padding:18,marginBottom:14,border:"1.5px solid #F7B731",background:"#FFFBF0"}}>
+      {/* 복사된 상품번호 입력 */}
+      <div className="panel" style={{padding:18,marginBottom:14,border:"1.5px solid #0C66E4",background:"#E9F2FF"}}>
         <label style={{fontWeight:700,fontSize:13,display:"block",marginBottom:6}}>
-          🔑 카페24 쿠키
-          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>F12 → Network → ProductManageCopy → Headers → cookie 값 전체</span>
+          📦 복사된 상품번호
+          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>카페24에서 P0000BCP 복사 후 새 상품번호 입력</span>
         </label>
-        <textarea value={cookieStr} onChange={(e)=>setCookieStr(e.target.value.trim())}
-          placeholder="is_new_pro_mode=T; ECSESSID=xxx; PHPSESSID=xxx; ..."
-          style={{width:"100%",height:70,fontSize:11,border:"1px solid var(--line2)",borderRadius:7,padding:"7px 10px",fontFamily:"monospace",resize:"vertical"}} />
-        <div style={{fontSize:11,color:"var(--ink3)",marginTop:5}}>⚠ 브라우저 종료 시 만료 — 매번 새로 붙여넣기 필요</div>
+        <input value={targetProductNo} onChange={(e)=>setTargetProductNo(e.target.value.trim())}
+          placeholder="예: 760"
+          style={{width:"100%",fontSize:14,border:"1px solid var(--line2)",borderRadius:7,padding:"9px 12px",fontFamily:"monospace",fontWeight:700}} />
+        <div style={{fontSize:11,color:"#0C66E4",marginTop:6}}>
+          카페24 관리자 → 상품 목록 → P0000BCP 체크 → 복사 → 새 상품의 URL에서 product_no 숫자 확인
+        </div>
       </div>
 
       {/* 입력 폼 */}
