@@ -1865,7 +1865,7 @@ function Board() {
     if(weekdays<1)weekdays=1;
     return Math.round((prev.stock-latest.stock)/weekdays);
   };
-  const NAVER_KEEP_SKUS=new Set(["NS1uPBOcsQM1MT","NS1vpdLRzsy8Xr","NS1vf86aATxYqZ","NS1uPBO2exBRia","NS1uPBOJrgQhYF","NS1vfsnpPCxncZ","NS1uPBNotHhmLJ","NS1vpdMwo7GMGg","NS1uPBP1uITAvC","NS1wfXZeeKDZK5","NS1vpdMajlycY5","NS1uPBMhiRJLcT","NS1vpdKMb0EHPS","NS1vf85vJ0gaCk","NS1uZ5gbN1DYgz","NS1vCCaENFVoHW","NS1vpdLykuN57H","NS1vf87gHK12ua","NS1vf7i4FBUwVF","NS1vf87BDpVYh7","NS1vf7hOtYoah7","NS1wfXZfzJe2wn","NS1vCCZIMYAdxL","NS1vf88E4xCOjU","NS1uPBMG0OxYHu","NS1vf7ibqnFnqJ","NS1vpdL6IsADzi","NS1uPBNex4R4Wk","NS1uPBLUnWSDV7"]);
+  const NAVER_KEEP_SKUS=new Set(["NS1uPBOcsQM1MT","NS1vpdLRzsy8Xr","NS1vf86aATxYqZ","NS1uPBO2exBRia","NS1uPBOJrgQhYF","NS1vfsnpPCxncZ","NS1uPBNotHhmLJ","NS1vpdMwo7GMGg","NS1uPBP1uITAvC","NS1wfXZeeKDZK5","NS1vpdMajlycY5","NS1vpdKMb0EHPS","NS1vf85vJ0gaCk","NS1uZ5gbN1DYgz","NS1vCCaENFVoHW","NS1vpdLykuN57H","NS1vf87gHK12ua","NS1vf7i4FBUwVF","NS1vf87BDpVYh7","NS1vf7hOtYoah7","NS1wfXZfzJe2wn","NS1vCCZIMYAdxL","NS1vf88E4xCOjU","NS1uPBMG0OxYHu","NS1vf7ibqnFnqJ","NS1vpdL6IsADzi","NS1uPBNex4R4Wk","NS1uPBLUnWSDV7"]);
   const parseStockExcel=async(file,channel)=>{
     const buf=await file.arrayBuffer();
     const wb=XLSX.read(buf,{type:'array'});
@@ -1895,7 +1895,7 @@ function Board() {
       const items=Object.values(skuMap).map((item)=>({...item,date:today}));
       // 기존 히스토리 병합 — existing 순서 기준으로 정렬 유지
       const existing=(data.stockData||{}).naver||[];
-      // 1) 기존에 있던 항목은 기존 순서 그대로, 재고만 업데이트
+      // 1) 기존에 있던 항목은 기존 순서 그대로, 재고만 업데이트 (업로드에 없으면 0으로)
       const orderedMerged=existing.map((e)=>{
         const newItem=skuMap[e.id];
         const prevHistory=e.history||[];
@@ -1903,7 +1903,9 @@ function Board() {
           return{...e,stock:newItem.stock,date:today,
             history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:newItem.stock}].slice(-30)};
         }
-        return e; // 이번 업로드에 없어도 기존 항목 유지
+        // 이번 업로드에 없는 항목 → 재고 0으로 기록
+        return{...e,stock:0,date:today,
+          history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:0}].slice(-30)};
       });
       // 2) 기존에 없던 새 항목은 맨 뒤에 추가
       const existingIds=new Set(existing.map((e)=>e.id));
