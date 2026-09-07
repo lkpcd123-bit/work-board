@@ -1895,8 +1895,10 @@ function Board() {
       const items=Object.values(skuMap).map((item)=>({...item,date:today}));
       // 기존 히스토리 병합 — existing 순서 기준으로 정렬 유지
       const existing=(data.stockData||{}).naver||[];
+      // NAVER_KEEP_SKUS에 없는 항목은 기존 목록에서도 완전 제거
+      const filteredExisting=existing.filter((e)=>NAVER_KEEP_SKUS.has(e.id));
       // 1) 기존에 있던 항목은 기존 순서 그대로, 재고만 업데이트 (업로드에 없으면 0으로)
-      const orderedMerged=existing.map((e)=>{
+      const orderedMerged=filteredExisting.map((e)=>{
         const newItem=skuMap[e.id];
         const prevHistory=e.history||[];
         if(newItem){
@@ -1908,7 +1910,7 @@ function Board() {
           history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:0}].slice(-30)};
       });
       // 2) 기존에 없던 새 항목은 맨 뒤에 추가
-      const existingIds=new Set(existing.map((e)=>e.id));
+      const existingIds=new Set(filteredExisting.map((e)=>e.id));
       const newItems=items.filter((item)=>!existingIds.has(item.id)).map((item)=>({
         ...item,history:[{date:today,stock:item.stock}]
       }));
