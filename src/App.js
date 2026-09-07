@@ -851,6 +851,7 @@ const ALL_TABS=[
   {id:"ai",label:"AI비서"},
   {id:"cafe24",label:"상품스케줄"},
   {id:"stock",label:"재고관리"},
+  {id:"ytlink",label:"유튜브링크"},
   {id:"team",label:"팀·설정"},
 ];
 export default function App() {
@@ -4255,6 +4256,10 @@ function Board() {
       </div>
       )}
 
+      {view==="ytlink"&&(
+        <YtLinkView c24Api={c24Api} c24TokenValid={c24TokenValid} c24SearchByCode={c24SearchByCode} c24GetProduct={c24GetProduct} />
+      )}
+
       {view==="team"&&(<>
         <div className="panel"><h3>팀원과 권한</h3><p className="sub">관리자/멤버/뷰어 3단계.</p>
           {data.members.length===0&&<div className="empty">팀원이 없습니다</div>}
@@ -4979,6 +4984,183 @@ function Board() {
             <button className="btn ghost" onClick={()=>setDraft(null)}>닫기</button>
             <button className="btn" onClick={saveDraft} style={{background:"#0C66E4",color:"#fff"}}>저장</button>         </div>
         </div></div>
+      )}
+    </div>
+  );
+}
+
+// ── 유튜브 비밀링크 상품 자동생성 ────────────────────────────────
+function YtLinkView({c24Api, c24TokenValid, c24SearchByCode, c24GetProduct}) {
+  const BASE_CODE = "P0000BCP";
+  const BASE_PRODUCT_NO = 743;
+
+  // 옵션 구성 (고정)
+  const OPTION_TEMPLATES = [
+    { label:"1번 옵션 (6개+파우치 7포)", variantCode:"P0000BCI000C", nameTemplate:"{🔥{이름} PICK!🔥}[6개+파우치 7포] 대용량 쉐이크 6개 {🎁사은품🎁 파우치 7포 증정} ((d3))" },
+    { label:"2번 옵션 (대용량 3개)",      variantCode:"P0000BCI000A", nameTemplate:"대용량 쉐이크 3개" },
+    { label:"3번 옵션 (대용량 1개)",      variantCode:"P0000BCI000B", nameTemplate:"대용량 쉐이크 1개" },
+  ];
+
+  const DEPTH3_HTML = `<div id="opt-depth3-spec" style="display:none !important;">
+\t<!--
+        [STEP3 개별화] 샘플
+        <p code="옵션 코드">내용1,내용2,내용3</p>
+    -->
+
+\t<p code="P0000BCI000C">딸기맛 파우치 7포,초코맛 파우치 7포,말차맛 파우치 7포,쿠키앤크림맛 파우치 7포,스윗콘플레이크맛 파우치 7포,곡물맛 파우치 7포, 티라미수&amp;마카다미아맛 45g x 7포, 트리플베리요거트맛 45g x 7포</p>
+
+
+</div>`;
+
+  const [ytName, setYtName] = React.useState("");
+  const [dateRange, setDateRange] = React.useState("");
+  const [category, setCategory] = React.useState("유튜브 비밀 링크");
+  const [price, setPrice] = React.useState("19,733");
+  const [discount, setDiscount] = React.useState("63");
+  const [msg, setMsg] = React.useState("");
+  const [sending, setSending] = React.useState(false);
+  const [preview, setPreview] = React.useState(null);
+
+  const fill = (tmpl) => tmpl
+    .replace(/{이름}/g, ytName)
+    .replace(/{날짜}/g, dateRange)
+    .replace(/{가격}/g, price)
+    .replace(/{할인율}/g, discount);
+
+  const productName = `[${ytName} 전용 비밀링크] 단백질쉐이크 대용량 10종`;
+  const summaryDesc = `<strong>🧡${ytName} 전용 비밀링크!</strong> ~최대 특가 ${discount}% SALE!🧡<br>\n✔︎ 📢${dateRange} 단, 7일간만! <br>\n✔︎ 최저가 링크!  <strong> 한 통 당 최대 ${price}원💵</strong> <br>\n✔︎ 현재 페이지에서만 구매 가능한 혜택😱<br>\n✔︎ 단백질 쉐이크 유목민 정.착.템!<br>`;
+
+  const makePreview = () => {
+    if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
+    setPreview({
+      productName,
+      summaryDesc,
+      options: OPTION_TEMPLATES.map((o)=>({...o, name: fill(o.nameTemplate)})),
+    });
+    setMsg("");
+  };
+
+  const handleCreate = async () => {
+    if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
+    if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요 — 상품스케줄 탭에서 로그인하세요");return;}
+    setSending(true);
+
+    try {
+      // 1) 기본 상품 상세 조회
+      setMsg("기본 상품 조회 중...");
+      const base = await c24GetProduct(BASE_PRODUCT_NO);
+      if(!base){setMsg("❌ 기본 상품 조회 실패");setSending(false);return;}
+
+      // 2) 기존 상세설명에 DEPTH3 HTML 삽입
+      let desc = base.description || "";
+      // 기존 depth3 교체 또는 앞에 삽입
+      if(desc.includes('id="opt-depth3-spec"')){
+        desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
+      } else {
+        desc = DEPTH3_HTML + "\n" + desc;
+      }
+
+      // 3) 새 상품 생성
+      setMsg("새 상품 생성 중...");
+      const createPayload = {
+        product_name: productName,
+        summary_description: summaryDesc,
+        description: desc,
+        display: "F", // 진열 안 함 (확인 후 진열)
+        selling: "F", // 판매 안 함
+        product_code: "", // 자동 생성
+        category_no: base.category_no,
+        price: base.price,
+        retail_price: base.retail_price,
+        supply_price: base.supply_price,
+        product_weight: base.product_weight,
+      };
+
+      const created = await c24Api({action:"create", payload: createPayload});
+      if(!created.product){setMsg("❌ 상품 생성 실패: "+JSON.stringify(created));setSending(false);return;}
+
+      const newNo = created.product.product_no;
+      const newCode = created.product.product_code;
+      setMsg(`✅ 상품 생성 완료! 상품번호: ${newNo} / 코드: ${newCode}`);
+
+      // 4) 결과 표시
+      setPreview((p)=>p?{...p, created:{no:newNo, code:newCode}}:null);
+
+    } catch(e){
+      setMsg("❌ 오류: "+e.message);
+    }
+    setSending(false);
+  };
+
+  return (
+    <div style={{maxWidth:700,margin:"0 auto",padding:"24px 16px"}}>
+      <h2 style={{fontSize:18,fontWeight:800,marginBottom:20}}>🎬 유튜브 비밀링크 상품 자동생성</h2>
+
+      {/* 입력 폼 */}
+      <div className="panel" style={{padding:20,marginBottom:16}}>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div className="fld">
+            <label>유튜버명 <span style={{color:"var(--ink3)",fontWeight:400,fontSize:11}}>(예: 카나미누)</span></label>
+            <input value={ytName} onChange={(e)=>setYtName(e.target.value)} placeholder="카나미누" />
+          </div>
+          <div className="fld">
+            <label>날짜 <span style={{color:"var(--ink3)",fontWeight:400,fontSize:11}}>(예: 09/07(토) ~ 09/14(토))</span></label>
+            <input value={dateRange} onChange={(e)=>setDateRange(e.target.value)} placeholder="09/07(토) ~ 09/14(토)" />
+          </div>
+          <div style={{display:"flex",gap:12}}>            <div className="fld" style={{flex:1}}>
+              <label>가격 <span style={{color:"var(--ink3)",fontWeight:400,fontSize:11}}>(통당 최대 가격)</span></label>
+              <input value={price} onChange={(e)=>setPrice(e.target.value)} placeholder="19,733" />
+            </div>
+            <div className="fld" style={{flex:1}}>
+              <label>할인율 <span style={{color:"var(--ink3)",fontWeight:400,fontSize:11}}>(%)</span></label>
+              <input value={discount} onChange={(e)=>setDiscount(e.target.value)} placeholder="63" />
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+            <button className="btn ghost" onClick={makePreview}>👁 미리보기</button>
+            <button className="btn-save" style={{background:"#1F845A"}} disabled={sending} onClick={handleCreate}>
+              {sending?"생성 중...":"🚀 카페24에 상품 생성"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 메시지 */}
+      {msg&&<div style={{padding:"10px 14px",borderRadius:9,marginBottom:14,
+        background:msg.startsWith("✅")?"#DCFFF1":msg.includes("중")?"#E9F2FF":"#FFECEB",
+        color:msg.startsWith("✅")?"#1F845A":msg.includes("중")?"#0C66E4":"#CA3521",
+        fontSize:13,fontWeight:500}}>{msg}
+        {preview?.created&&<div style={{marginTop:6}}>
+          <a href={`https://slowrocket.cafe24.com/disp/admin/shop1/product/ProductRegister?product_no=${preview.created.no}`}
+            target="_blank" rel="noreferrer" style={{color:"#0C66E4",fontWeight:700}}>
+            → 카페24 상품 편집 바로가기
+          </a>
+        </div>}
+      </div>}
+
+      {/* 미리보기 */}
+      {preview&&(
+        <div className="panel" style={{padding:20}}>
+          <div style={{fontWeight:800,fontSize:14,marginBottom:14,color:"#0C66E4"}}>미리보기</div>
+          <div className="fld" style={{marginBottom:12}}>
+            <label>상품명</label>
+            <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:13,fontFamily:"inherit"}}>{preview.productName}</div>
+          </div>
+          <div className="fld" style={{marginBottom:12}}>
+            <label>상품 간략설명</label>
+            <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:12,lineHeight:1.7,whiteSpace:"pre-wrap"}} dangerouslySetInnerHTML={{__html:preview.summaryDesc}} />
+          </div>
+          <div className="fld">
+            <label>옵션명</label>
+            {preview.options.map((o,i)=>(
+              <div key={i} style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:12,marginBottom:6}}>
+                <span style={{fontSize:11,color:"var(--ink3)",fontWeight:700,marginRight:8}}>{o.label}</span>
+                <span>{o.name}</span>
+                <span style={{marginLeft:10,fontSize:11,color:"#0C66E4"}}>({o.variantCode})</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
