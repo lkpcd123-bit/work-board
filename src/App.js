@@ -474,7 +474,7 @@ const CSS = `
 .cmeta{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11.5px;color:var(--ink3);flex-wrap:wrap;font-weight:600;}
 .cmeta .ch{color:var(--ch);font-weight:700;}
 .ctitle{font-size:16px;font-weight:700;line-height:1.45;margin-bottom:9px;word-break:keep-all;color:var(--ink);}
-.card.done .ctitle{color:var(--ink3);}
+.card.done .ctitle{color:var(--ink3);text-decoration:line-through;}
 .ctags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
 .tag{font-size:11.5px;font-weight:600;background:#E9F2FF;color:#0055CC;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;}
 .cbar{height:6px;background:#DFE1E6;border-radius:3px;margin-bottom:8px;overflow:hidden;}
@@ -617,7 +617,7 @@ const CSS = `
 .ccell.sel{border-color:var(--pri);border-width:2px;}
 .iss,.issrow{display:flex;align-items:flex-start;gap:11px;padding:10px 0;border-bottom:1px solid var(--line);}
 .issrow{background:var(--card);border-radius:8px;box-shadow:var(--sh);border:none;padding:13px 15px;margin-bottom:8px;align-items:center;}
-.iss.done .isstext,.issrow.done .isstext{color:var(--ink3);}
+.iss.done .isstext,.issrow.done .isstext{color:var(--ink3);text-decoration:line-through;}
 .issck{width:22px;height:22px;border:2px solid var(--line2);border-radius:5px;background:var(--card);font-size:12px;color:var(--ok);flex-shrink:0;padding:0;display:flex;align-items:center;justify-content:center;font-weight:900;}
 .issck:hover{border-color:var(--ok);}
 .iss.done .issck,.issrow.done .issck{background:#E3FCEF;border-color:var(--ok);}
@@ -728,7 +728,7 @@ const CSS = `
 .ckbox.sm{width:18px;height:18px;font-size:10px;}
 .ckbox:disabled{opacity:.5;}
 .cktitle{font-size:14px;font-weight:700;line-height:1.4;word-break:keep-all;margin-bottom:4px;}
-.ckrow.done .cktitle{color:var(--ink3);}
+.ckrow.done .cktitle{text-decoration:line-through;color:var(--ink3);}
 .cktitle.red{color:#E2445C;}
 .ckmeta{display:flex;gap:5px;flex-wrap:wrap;font-size:12.5px;color:var(--ink3);font-weight:600;}
 .ckmeta.red{color:#E2445C;font-weight:800;}
@@ -1012,7 +1012,23 @@ function Board() {
 
   const load = useCallback(async (silent) => {
     if (!silent) setSaveState("loading");
-    try { const snap=await getDoc(BOARD_REF()); if(snap.exists()){const p=snap.data();if(p&&Array.isArray(p.tasks))setData((prev)=>mergeData(p,prev));} } catch(e) {}
+    try {
+      const snap=await getDoc(BOARD_REF());
+      if(snap.exists()){
+        const p=snap.data();
+        if(p&&Array.isArray(p.tasks)){
+          const merged=mergeData(p,emptyData());
+          // SKU 필터 적용
+          if(merged.stockData){
+            merged.stockData={
+              naver:(merged.stockData.naver||[]).filter((e)=>NAVER_KEEP_SKUS.has(e.id)),
+              coupang:(merged.stockData.coupang||[]).filter((e)=>COUPANG_KEEP_SKUS.has(e.id)),
+            };
+          }
+          setData(merged);
+        }
+      }
+    } catch(e) {}
     if (!silent) setSaveState("idle");
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -3187,7 +3203,7 @@ function Board() {
                               {late&&<span className="mdwarn" title={`${Math.abs(d)}일 지연`}>!</span>}
                               {t.status==="done"&&<span className="mdok">✓</span>}
                               <input type="date" className="mdplain" value={t.due||""} disabled={!canEdit}
-                                style={t.status==="done"?{color:"var(--ink3)"}:late?{color:"#E2445C",fontWeight:700}:{}}
+                                style={t.status==="done"?{textDecoration:"line-through",color:"var(--ink3)"}:late?{color:"#E2445C",fontWeight:700}:{}}
                                 onChange={(e)=>patch(t,"due",e.target.value)} />
                             </div>
                           </td>
