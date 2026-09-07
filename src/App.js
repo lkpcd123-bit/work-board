@@ -4996,6 +4996,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
 
   const [ytName, setYtName] = React.useState("");
   const [dateRange, setDateRange] = React.useState("");
+  const [sessionId, setSessionId] = React.useState("");
   const [pasteText, setPasteText] = React.useState("");
   const [msg, setMsg] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -5020,115 +5021,49 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
 
   const handleCreate = async () => {
     if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
+    if(!sessionId){setMsg("❌ 카페24 세션 ID를 입력해주세요 (F12 → Application → Cookies → ECSESSID)");return;}
     if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
     setSending(true);setCreated(null);
     const logs=[];
-    const step=(msg)=>{setMsg(msg);logs.push(msg);};
-    const ok=(label)=>logs.push("✔ "+label);
-    const warn=(label,d)=>logs.push("⚠ "+label+": "+JSON.stringify(d).slice(0,80));
+    const step=(msg)=>{setMsg(msg);};
 
     try {
-      // 1) 기본 상품 전체 조회
-      step("1/6 기본 상품 조회 중...");
-      const base = await c24GetProduct(BASE_PRODUCT_NO);
-      if(!base){setMsg("❌ 기본 상품 조회 실패");setSending(false);return;}
-      ok("기본 상품 조회");
+      // 1) 관리자 세션으로 P0000BCP 복사
+      step("1/3 상품 복사 중...");
+      const copyRes = await c24Api({action:"copyProduct", sessionId, productNo:BASE_PRODUCT_NO});
+      console.log("copyRes:", JSON.stringify(copyRes).slice(0,200));
 
-      // 2) 상세설명 DEPTH3 삽입
-      let desc = base.description||"";
+      // 복사 응답에서 새 상품번호 추출
+      let newNo = copyRes?.product_no || copyRes?.result?.product_no || copyRes?.data?.product_no;
+      if(!newNo && copyRes?.raw) {
+        const m = copyRes.raw.match(/"product_no"\s*:\s*(\d+)/);
+        if(m) newNo = parseInt(m[1]);
+      }
+      if(!newNo){setMsg("❌ 복사 실패: "+JSON.stringify(copyRes).slice(0,300));setSending(false);return;}
+      logs.push("✔ 복사 완료 (no."+newNo+")");
+
+      // 2) 복사된 상품 코드 조회
+      step("2/3 상품 정보 조회 중...");
+      const newProduct = await c24GetProduct(newNo);
+      const newCode = newProduct?.product_code || "알수없음";
+      logs.push("✔ 코드: "+newCode);
+
+      // 3) 상품명 + 간략설명 수정
+      step("3/3 상품명/설명 수정 중...");
+      let desc = newProduct?.description||"";
       if(desc.includes('id="opt-depth3-spec"'))
         desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/,DEPTH3_HTML);
       else desc = DEPTH3_HTML+"\n"+desc;
 
-      // 3) 상품 생성 (텍스트 필드만)
-      step("2/6 상품 생성 중...");
-      const basePayload = {
+      const updRes = await c24Api({action:"update", productNo:newNo, payload:{
         product_name: productName,
         summary_description: summaryDesc,
         description: desc,
-        price: base.price,
-        retail_price: base.retail_price,
-        supply_price: base.supply_price,
-        product_weight: base.product_weight||"0.00",
-        tax_type: base.tax_type||"A",
-        display: "T",
-        selling: "T",
-        manufacturer_code: base.manufacturer_code,
-        brand_code: base.brand_code,
-        supplier_code: base.supplier_code,
-        trend_code: base.trend_code,
-        product_condition: base.product_condition||"N",
-        adult_certification: base.adult_certification||"F",
-        buy_unit: base.buy_unit||1,
-        minimum_quantity: base.minimum_quantity||1,
-      };
-      const createRes = await c24Api({action:"create", payload:basePayload});
-      if(!createRes.product){setMsg("❌ 상품 생성 실패: "+JSON.stringify(createRes).slice(0,200));setSending(false);return;}
-      const newNo = createRes.product.product_no;
-      const newCode = createRes.product.product_code;
-      ok("상품 생성 ("+newCode+")");
-
-      // 4) 카테고리 설정
-      step("3/6 카테고리 설정 중...");
-      const catRes = await c24Api({action:"setCategory", productNo:newNo, payload:{category_no:247}});
-      catRes.category ? ok("카테고리 설정") : warn("카테고리", catRes);
-
-      // 5) 이미지 업로드 + 적용
-      step("4/6 이미지 업로드 중...");
-      const uploadImg = async (url, label) => {
-        if(!url) return "";
-        const r = await c24Api({action:"uploadImageFromUrl", imageUrl:url});
-        const path = r?.images?.[0]?.path||r?.images?.[0]?.image_path||r?.images?.[0]?.url||"";
-        path ? ok(label+" 업로드") : warn(label, r);
-        return path;
-      };
-      const det = await uploadImg(base.detail_image||"", "대표이미지");
-      const lst = await uploadImg(base.list_image||"", "목록이미지");
-      const tin = await uploadImg(base.tiny_image||"", "썸네일");
-      const sml = await uploadImg(base.small_image||"", "작은이미지");
-      const imgPayload={};
-      if(det)imgPayload.detail_image=det;
-      if(lst)imgPayload.list_image=lst;
-      if(tin)imgPayload.tiny_image=tin;
-      if(sml)imgPayload.small_image=sml;
-      if(Object.keys(imgPayload).length>0){
-        const ir = await c24Api({action:"update", productNo:newNo, payload:imgPayload});
-        ir.product ? ok("이미지 등록") : warn("이미지 등록", ir);
-      }
-
-      // 6) 배송비 설정 복사
-      step("5/6 배송 설정 중...");
-      const shipRes = await c24Api({action:"getShipping", productNo:BASE_PRODUCT_NO});
-      if(shipRes.shipping){
-        const sp = shipRes.shipping;
-        const shipPayload = {
-          shipping_method: sp.shipping_method,
-          shipping_fee_type: sp.shipping_fee_type,
-          shipping_area: sp.shipping_area,
-          shipping_period: sp.shipping_period,
-          shipping_scope: sp.shipping_scope,
-          prepaid_shipping_fee: sp.prepaid_shipping_fee,
-        };
-        const sr = await c24Api({action:"update", productNo:newNo, payload:shipPayload});
-        sr.product ? ok("배송 설정") : warn("배송 설정", sr);
-      }
-
-      // 7) 옵션 복사
-      step("6/6 옵션 복사 중...");
-      const optRes = await c24Api({action:"getOptions", productNo:BASE_PRODUCT_NO});
-      if(optRes.options&&optRes.options.length>0){
-        const opts = optRes.options.map((o)=>({
-          option_name: o.option_name,
-          option_value: o.option_value,
-          required_option: o.required_option||"T",
-        }));
-        const or = await c24Api({action:"createOptions", productNo:newNo, payload:{options:opts}});
-        or.options ? ok("옵션 복사") : warn("옵션 복사", or);
-      } else { ok("옵션 없음"); }
+      }});
+      updRes.product ? logs.push("✔ 수정 완료") : logs.push("⚠ 수정 실패: "+JSON.stringify(updRes).slice(0,100));
 
       setCreated({no:newNo, code:newCode});
-      const warns = logs.filter(l=>l.startsWith("⚠"));
-      setMsg(warns.length>0 ? "✅ 완료! "+warns.join(" | ") : "✅ 모든 항목 완료!");
+      setMsg("✅ 완료! "+logs.join(" | "));
 
     } catch(e){
       setMsg("❌ 오류: "+e.message);
@@ -5147,6 +5082,18 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct}) {
         <textarea value={pasteText} onChange={(e)=>{setPasteText(e.target.value);parsePaste(e.target.value);}}
           placeholder={"유튜버명: 카나미누\n날짜: 09/07(토) ~ 09/14(토)"}
           style={{width:"100%",height:80,fontSize:12,border:"1px solid var(--line2)",borderRadius:8,padding:"9px 12px",resize:"vertical",fontFamily:"inherit"}} />
+      </div>
+
+      {/* 카페24 세션 ID */}
+      <div className="panel" style={{padding:18,marginBottom:14,border:"1.5px solid #F7B731",background:"#FFFBF0"}}>
+        <label style={{fontWeight:700,fontSize:13,display:"block",marginBottom:6}}>
+          🔑 카페24 세션 ID
+          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>F12 → Application → Cookies → slowrocket.cafe24.com → ECSESSID 값</span>
+        </label>
+        <input value={sessionId} onChange={(e)=>setSessionId(e.target.value.trim())}
+          placeholder="jct9i7rd3e1p5jtabor3r00jvgdvlbb5"
+          style={{width:"100%",fontSize:12,border:"1px solid var(--line2)",borderRadius:7,padding:"7px 10px",fontFamily:"monospace"}} />
+        <div style={{fontSize:11,color:"var(--ink3)",marginTop:5}}>⚠ 브라우저 종료 시 만료 — 매번 새로 입력 필요</div>
       </div>
 
       {/* 입력 폼 */}

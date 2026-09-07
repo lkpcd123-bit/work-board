@@ -102,6 +102,28 @@ export default async function handler(req, res) {
       });
       return res.status(r.status).json(await j(r));
 
+    } else if (action === 'copyProduct') {
+      // 카페24 관리자 세션으로 상품 복사
+      const { sessionId, productNo: pNo } = req.body;
+      if (!sessionId) return res.json({ error: 'sessionId required' });
+      const formData = new URLSearchParams();
+      formData.append('product_no[]', pNo || '743');
+      const r = await fetch(`https://slowrocket.cafe24.com/exec/admin/shop1/product/ProductManageCopy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Cookie': `ECSESSID=${sessionId}`,
+          'Referer': 'https://slowrocket.cafe24.com/disp/admin/shop1/product/productmanage',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: formData.toString(),
+      });
+      const text = await r.text();
+      console.log('copyProduct status:', r.status, text.slice(0, 300));
+      let d; try { d = JSON.parse(text); } catch(e) { d = { raw: text }; }
+      return res.status(r.status).json(d);
+
     } else {
       return res.status(400).json({ error: `Invalid action: ${action}` });
     }
@@ -110,3 +132,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+// 추가: 관리자 세션으로 상품 복사
