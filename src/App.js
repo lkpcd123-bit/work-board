@@ -1029,17 +1029,18 @@ function Board() {
         const r=snap.data();
         if(r&&(r.updatedAt||0)>(dataRef.current.updatedAt||0)){
           const merged=mergeData(r,dataRef.current);
-          // NAVER_KEEP_SKUS에 없는 항목 자동 제거
-          if(merged.stockData?.naver){
-            merged.stockData={...merged.stockData,
-              naver:merged.stockData.naver.filter((e)=>NAVER_KEEP_SKUS.has(e.id))};
+          if(merged.stockData){
+            merged.stockData={
+              naver:(merged.stockData.naver||[]).filter((e)=>NAVER_KEEP_SKUS.has(e.id)),
+              coupang:(merged.stockData.coupang||[]).filter((e)=>COUPANG_KEEP_SKUS.has(e.id)),
+            };
           }
           setData(merged);
         }
       }
     });
     return ()=>unsub();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const commit = useCallback(async (mutator, logEntries) => {
     busyRef.current=true; setSaveState("saving");
@@ -1880,6 +1881,7 @@ function Board() {
     return Math.round((prev.stock-latest.stock)/weekdays);
   };
   const NAVER_KEEP_SKUS=new Set(["NS1uPBOcsQM1MT","NS1vpdLRzsy8Xr","NS1vf86aATxYqZ","NS1uPBO2exBRia","NS1uPBOJrgQhYF","NS1vfsnpPCxncZ","NS1uPBNotHhmLJ","NS1vpdMwo7GMGg","NS1uPBP1uITAvC","NS1wfXZeeKDZK5","NS1vpdMajlycY5","NS1vpdKMb0EHPS","NS1vf85vJ0gaCk","NS1uZ5gbN1DYgz","NS1vCCaENFVoHW","NS1vpdLykuN57H","NS1vf87gHK12ua","NS1vf7i4FBUwVF","NS1vf87BDpVYh7","NS1vf7hOtYoah7","NS1wfXZfzJe2wn","NS1vCCZIMYAdxL","NS1vf88E4xCOjU","NS1uPBMG0OxYHu","NS1vf7ibqnFnqJ","NS1vpdL6IsADzi","NS1uPBNex4R4Wk","NS1uPBLUnWSDV7"]);
+  const COUPANG_KEEP_SKUS=new Set(["70646963","70867985","69981721","72573108","72583287","72583187","72583693","70649996","70649822","73242551","72584751","70649974","70649928","72583070","64809040"]);
   const parseStockExcel=async(file,channel)=>{
     const buf=await file.arrayBuffer();
     const wb=XLSX.read(buf,{type:'array'});
@@ -1939,26 +1941,44 @@ function Board() {
       alert(`✅ 네이버 재고 업로드 완료 (${items.length}개 SKU)`);
 
     }else{
-      // 쿠팡: 기존 범용 파서
-      const rows=XLSX.utils.sheet_to_json(ws,{defval:""});
-      const items=rows.map((r)=>({
-        id:r['상품코드']||r['SKU ID']||r['SKU']||r['product_code']||String(Math.random()),
-        name:r['상품명']||r['SKU 명']||r['name']||"",
-        sku:r['상품코드']||r['SKU ID']||r['SKU']||"",
-        stock:parseInt(r['현재고']||r['재고수량']||r['판매가능 재고수량']||r['stock']||0,10),
-        date:today,
-      }));
+      // 쿠팡: D열=SKU ID, E열=상품명, F열=옵션명, H열=판매가능재고
+      // 헤더 2행, 데이터 3행부터
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:"",header:1});
+      let headerIdx=rows.findIndex((r)=>r[0]==="No."||r[3]==="SKU ID"||String(r[0]).trim()==="No.");
+      if(headerIdx<0)headerIdx=1; // 기본 2행 헤더
+      const skuMap={};
+      for(let i=headerIdx+1;i<rows.length;i++){
+        const r=rows[i];
+        if(!r[0])continue; // 빈 행 스킵
+        const skuId=String(r[3]||"").trim();
+        if(!skuId||!COUPANG_KEEP_SKUS.has(skuId))continue;
+        const stock=parseInt(r[7]||0,10)||0;
+        const name=`${String(r[4]||"").trim()} ${String(r[5]||"").trim()}`.trim();
+        if(skuMap[skuId]){skuMap[skuId].stock+=stock;}
+        else{skuMap[skuId]={id:skuId,sku:skuId,name,stock};}
+      }
+      const items=Object.values(skuMap).map((item)=>({...item,date:today}));
       const existing=(data.stockData||{}).coupang||[];
-      const merged=items.map((item)=>{
-        const hist=existing.find((e)=>e.id===item.id);
-        const prevHistory=hist?.history||[];
-        return{...item,history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:item.stock}].slice(-30)};
+      const filteredExisting=existing.filter((e)=>COUPANG_KEEP_SKUS.has(e.id));
+      const orderedMerged=filteredExisting.map((e)=>{
+        const newItem=skuMap[e.id];
+        const prevHistory=e.history||[];
+        if(newItem){
+          return{...e,stock:newItem.stock,name:newItem.name,date:today,
+            history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:newItem.stock}].slice(-30)};
+        }
+        return{...e,stock:0,date:today,
+          history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:0}].slice(-30)};
       });
-      const existingNotInNew=existing.filter((e)=>!items.some((i)=>i.id===e.id));
-      commit((d)=>({...d,stockData:{...(d.stockData||{}),coupang:[...merged,...existingNotInNew]},updatedAt:Date.now()}),[]);
+      const existingIds=new Set(filteredExisting.map((e)=>e.id));
+      const newItems=items.filter((item)=>!existingIds.has(item.id)).map((item)=>({
+        ...item,history:[{date:today,stock:item.stock}]
+      }));
+      const finalMerged=[...orderedMerged,...newItems];
+      commit((d)=>({...d,stockData:{...(d.stockData||{}),coupang:finalMerged},updatedAt:Date.now()}),[]);
       const alerts=items.filter((item)=>{const safe=stockSafe[`coupang_${item.id}`];return safe&&item.stock<safe;});
       if(alerts.length){
-        const newReq=alerts.map((item)=>({id:uid(),channel:"coupang",productName:item.name,sku:item.sku,currentStock:item.stock,safeStock:stockSafe[`coupang_${item.id}`],createdAt:Date.now(),done:false}));
+        const newReq=alerts.map((item)=>({id:uid(),channel:"coupang",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`coupang_${item.id}`],createdAt:Date.now(),done:false}));
         commit((d)=>({...d,reorderRequests:[...(d.reorderRequests||[]).filter((r)=>!alerts.some((a)=>r.sku===a.sku&&r.channel==="coupang")),...newReq],updatedAt:Date.now()}),[]);
       }
       alert(`✅ 쿠팡 재고 업로드 완료 (${items.length}개 SKU)`);
@@ -3364,11 +3384,11 @@ function Board() {
                 <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
                   <div>
                     <div style={{fontWeight:800,fontSize:14}}>{p.productName}</div>
-                    <div style={{fontSize:12,color:"var(--ink3)",marginTop:3,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+                    <div style={{fontSize:12,color:"var(--ink3)",marginTop:3,display:"flex",gap:12}}>
                       <span>{p.channel==="naver"?"🟢 네이버":"🔵 쿠팡"}</span>
                       {p.sku&&<span>SKU: {p.sku}</span>}
                       {p.qty&&<span>수량: <b>{p.qty}</b>개</span>}
-                      {p.expectedDate&&<span style={{background:"#E9F2FF",color:"#0C66E4",borderRadius:6,padding:"2px 8px",fontWeight:800,fontSize:12}}>📅 {p.expectedDate}</span>}
+                      {p.expectedDate&&<span>예정일: <b>{p.expectedDate}</b></span>}
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6}}>
@@ -3553,13 +3573,7 @@ function Board() {
                           <td style={{textAlign:"center"}}>
                             {(()=>{
                               const plan=item.sku?inboundPlans.find((p)=>p.sku&&p.sku===item.sku&&p.channel===stockTab&&p.status!=="입고 완료"):null;
-                              if(plan)return(
-                                <div style={{textAlign:"center"}}>
-                                  {plan.expectedDate&&<div style={{fontSize:12,fontWeight:800,color:"#0C66E4",background:"#E9F2FF",borderRadius:6,padding:"2px 8px",marginBottom:3,display:"inline-block"}}>📅 {plan.expectedDate}</div>}
-                                  {!plan.expectedDate&&<div style={{fontSize:11,color:"var(--ink3)"}}>날짜 미정</div>}
-                                  <div style={{fontSize:10,color:"var(--ink3)"}}>{plan.status}</div>
-                                </div>
-                              );
+                              if(plan)return<span style={{fontSize:12,color:"#0C66E4",fontWeight:700}}>{plan.expectedDate||"날짜 미정"}<br/><span style={{fontSize:10,color:"var(--ink3)",fontWeight:400}}>{plan.status}</span></span>;
                               return canEdit?<button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer"}} onClick={()=>{setInboundDraft({productName:item.name,sku:item.sku||"",channel:stockTab,expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고등록</button>:"-";
                             })()}
                           </td>
