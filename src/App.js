@@ -1023,9 +1023,23 @@ function Board() {
   }, [load]);
 
   useEffect(() => {
-    const unsub=onSnapshot(BOARD_REF(),(snap)=>{ if(busyRef.current)return; if(snap.exists()){const r=snap.data();if(r&&(r.updatedAt||0)>(dataRef.current.updatedAt||0))setData(mergeData(r,dataRef.current));}});
+    const unsub=onSnapshot(BOARD_REF(),(snap)=>{
+      if(busyRef.current)return;
+      if(snap.exists()){
+        const r=snap.data();
+        if(r&&(r.updatedAt||0)>(dataRef.current.updatedAt||0)){
+          const merged=mergeData(r,dataRef.current);
+          // NAVER_KEEP_SKUS에 없는 항목 자동 제거
+          if(merged.stockData?.naver){
+            merged.stockData={...merged.stockData,
+              naver:merged.stockData.naver.filter((e)=>NAVER_KEEP_SKUS.has(e.id))};
+          }
+          setData(merged);
+        }
+      }
+    });
     return ()=>unsub();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const commit = useCallback(async (mutator, logEntries) => {
     busyRef.current=true; setSaveState("saving");
@@ -3350,11 +3364,11 @@ function Board() {
                 <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
                   <div>
                     <div style={{fontWeight:800,fontSize:14}}>{p.productName}</div>
-                    <div style={{fontSize:12,color:"var(--ink3)",marginTop:3,display:"flex",gap:12}}>
+                    <div style={{fontSize:12,color:"var(--ink3)",marginTop:3,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
                       <span>{p.channel==="naver"?"🟢 네이버":"🔵 쿠팡"}</span>
                       {p.sku&&<span>SKU: {p.sku}</span>}
                       {p.qty&&<span>수량: <b>{p.qty}</b>개</span>}
-                      {p.expectedDate&&<span>예정일: <b>{p.expectedDate}</b></span>}
+                      {p.expectedDate&&<span style={{background:"#E9F2FF",color:"#0C66E4",borderRadius:6,padding:"2px 8px",fontWeight:800,fontSize:12}}>📅 {p.expectedDate}</span>}
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6}}>
@@ -3539,7 +3553,13 @@ function Board() {
                           <td style={{textAlign:"center"}}>
                             {(()=>{
                               const plan=item.sku?inboundPlans.find((p)=>p.sku&&p.sku===item.sku&&p.channel===stockTab&&p.status!=="입고 완료"):null;
-                              if(plan)return<span style={{fontSize:12,color:"#0C66E4",fontWeight:700}}>{plan.expectedDate||"날짜 미정"}<br/><span style={{fontSize:10,color:"var(--ink3)",fontWeight:400}}>{plan.status}</span></span>;
+                              if(plan)return(
+                                <div style={{textAlign:"center"}}>
+                                  {plan.expectedDate&&<div style={{fontSize:12,fontWeight:800,color:"#0C66E4",background:"#E9F2FF",borderRadius:6,padding:"2px 8px",marginBottom:3,display:"inline-block"}}>📅 {plan.expectedDate}</div>}
+                                  {!plan.expectedDate&&<div style={{fontSize:11,color:"var(--ink3)"}}>날짜 미정</div>}
+                                  <div style={{fontSize:10,color:"var(--ink3)"}}>{plan.status}</div>
+                                </div>
+                              );
                               return canEdit?<button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer"}} onClick={()=>{setInboundDraft({productName:item.name,sku:item.sku||"",channel:stockTab,expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고등록</button>:"-";
                             })()}
                           </td>
