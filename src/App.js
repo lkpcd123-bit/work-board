@@ -474,7 +474,6 @@ const CSS = `
 .cmeta{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11.5px;color:var(--ink3);flex-wrap:wrap;font-weight:600;}
 .cmeta .ch{color:var(--ch);font-weight:700;}
 .ctitle{font-size:16px;font-weight:700;line-height:1.45;margin-bottom:9px;word-break:keep-all;color:var(--ink);}
-.card.done .ctitle{text-decoration:line-through;}
 .ctags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
 .tag{font-size:11.5px;font-weight:600;background:#E9F2FF;color:#0055CC;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;}
 .cbar{height:6px;background:#DFE1E6;border-radius:3px;margin-bottom:8px;overflow:hidden;}
