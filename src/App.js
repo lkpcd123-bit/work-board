@@ -736,6 +736,8 @@ const CSS = `
 .ckexp:hover{color:var(--pri);}
 .cksubs{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px;padding-left:33px;}
 .cksub{display:flex;align-items:center;gap:8px;font-size:13px;}
+.cksubsubs{margin-left:24px;padding-left:12px;border-left:2px solid var(--line2);display:flex;flex-direction:column;gap:5px;margin-top:5px;margin-bottom:5px;}
+.cksubsub{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink3);}
 @media(max-width:1100px){.ckcols{grid-template-columns:1fr;}}
 
 /* ══ AI 비서 ══ */
@@ -1230,6 +1232,7 @@ function Board() {
   };
   const clearCkItem=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크 해제",detail:""}]);};
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
+  const toggleSubSub=(c,subId,subsubId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,subsubs:(s.subsubs||[]).map((y)=>y.id===subsubId?{...y,done:!y.done}:y)}:s),updatedAt:Date.now()}:x)}),[]);};
 
   /* ── AI 비서 ── */
 
@@ -2626,10 +2629,22 @@ function Board() {
                         {isCL&&exp&&subs.length>0&&(
                           <div className="cksubs">
                             {subs.map((s)=>(
-                              <div key={s.id} className="cksub">
-                                <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"✓":""}</button>
-                                <span style={{textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
-                              </div>
+                              <React.Fragment key={s.id}>
+                                <div className="cksub">
+                                  <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"✓":""}</button>
+                                  <span style={{textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
+                                </div>
+                                {(s.subsubs||[]).length>0&&(
+                                  <div className="cksubsubs">
+                                    {(s.subsubs||[]).map((ss)=>(
+                                      <div key={ss.id} className="cksubsub">
+                                        <button className={"ckbox sm"+(ss.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSubSub(c,s.id,ss.id)}>{ss.done?"✓":""}</button>
+                                        <span style={{textDecoration:ss.done?"line-through":"none",color:ss.done?"var(--ink3)":"inherit"}}>{ss.text}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </React.Fragment>
                             ))}
                           </div>
                         )}
