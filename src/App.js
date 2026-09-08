@@ -474,7 +474,7 @@ const CSS = `
 .cmeta{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11.5px;color:var(--ink3);flex-wrap:wrap;font-weight:600;}
 .cmeta .ch{color:var(--ch);font-weight:700;}
 .ctitle{font-size:16px;font-weight:700;line-height:1.45;margin-bottom:9px;word-break:keep-all;color:var(--ink);}
-.card.done .ctitle{color:var(--ink3);text-decoration:line-through;}
+.card.done .ctitle{text-decoration:line-through;}
 .ctags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
 .tag{font-size:11.5px;font-weight:600;background:#E9F2FF;color:#0055CC;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;}
 .cbar{height:6px;background:#DFE1E6;border-radius:3px;margin-bottom:8px;overflow:hidden;}
@@ -1217,7 +1217,7 @@ function Board() {
   };
   const [ckDrag, setCkDrag] = useState(null);
   const [ckSubDrag, setCkSubDrag] = useState(null);
-  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);if(willDone)setConfirmBox({kind:"archiveCk",ckId:c.id,ckTitle:c.title});};
+  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);};
   const reorderCk=(tab,fromId,toId)=>{if(!canEdit||fromId===toId)return;const ordered=ckByTab(tab).filter((x)=>!x.done);const fi=ordered.findIndex((x)=>x.id===fromId);const ti=ordered.findIndex((x)=>x.id===toId);if(fi<0||ti<0)return;const arr=[...ordered];const[moved]=arr.splice(fi,1);arr.splice(ti,0,moved);const now=Date.now();commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>{const pos=arr.findIndex((a)=>a.id===x.id);return pos>=0?{...x,order:pos,updatedAt:now}:x;})}),[])};
   const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크항목 삭제",detail:""}]);setCkDraft(null);};
   const duplicateCk=(c)=>{
