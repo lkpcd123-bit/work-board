@@ -995,6 +995,7 @@ function Board() {
   const [dateTo, setDateTo] = useState("");
   const [issueDetail, setIssueDetail] = useState(null);
   const [ckDraft, setCkDraft] = useState(null);
+  const [ckExpand, setCkExpand] = useState({});
   const [listDateFrom, setListDateFrom] = useState("");
   const [listDateTo, setListDateTo] = useState("");
   const [issueFilter, setIssueFilter] = useState("open");
@@ -2598,6 +2599,7 @@ function Board() {
                   {items.map((c)=>{
                     const dd=dayDiff(c.due);const over=dd!==null&&dd<0&&!c.done;
                     const subs=c.subs||[];const subDone=subs.filter((s)=>s.done).length;
+                    const exp=ckExpand[c.id]!==false;
                     return (
                       <div key={c.id} draggable={canEdit&&!c.done}
                         onDragStart={(e)=>{setCkDrag(c.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",c.id);}catch(err){}}}
@@ -2617,10 +2619,11 @@ function Board() {
                             </div>
                             <div className="ckunderline" />
                           </div>
+                          {isCL&&subs.length>0&&<button className="ckexp" onClick={(e)=>{e.stopPropagation();setCkExpand({...ckExpand,[c.id]:!exp});}}>{exp?"▲":"▼"}</button>}
                           {isCL&&(c.subs||[]).some((s)=>s.done)&&<button className="riedit" onClick={(e)=>{e.stopPropagation();clearCkItem(c);}}>체크 해제</button>}
                           {canEdit&&<button className="riedit" onClick={(e)=>{e.stopPropagation();duplicateCk(c);}}>복사</button>}
                         </div>
-                        {isCL&&subs.length>0&&(
+                        {isCL&&exp&&subs.length>0&&(
                           <div className="cksubs">
                             {subs.map((s)=>(
                               <div key={s.id} className="cksub">
