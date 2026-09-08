@@ -474,7 +474,6 @@ const CSS = `
 .cmeta{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11.5px;color:var(--ink3);flex-wrap:wrap;font-weight:600;}
 .cmeta .ch{color:var(--ch);font-weight:700;}
 .ctitle{font-size:16px;font-weight:700;line-height:1.45;margin-bottom:9px;word-break:keep-all;color:var(--ink);}
-.card.done .ctitle{color:var(--ink3);text-decoration:line-through;}
 .ctags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
 .tag{font-size:11.5px;font-weight:600;background:#E9F2FF;color:#0055CC;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;}
 .cbar{height:6px;background:#DFE1E6;border-radius:3px;margin-bottom:8px;overflow:hidden;}
@@ -835,7 +834,7 @@ const CSS = `
 `;
 
 const NAVER_KEEP_SKUS=new Set(["NS1uPBOcsQM1MT","NS1vpdLRzsy8Xr","NS1vf86aATxYqZ","NS1uPBO2exBRia","NS1uPBOJrgQhYF","NS1vfsnpPCxncZ","NS1uPBNotHhmLJ","NS1vpdMwo7GMGg","NS1uPBP1uITAvC","NS1wfXZeeKDZK5","NS1vpdMajlycY5","NS1vpdKMb0EHPS","NS1vf85vJ0gaCk","NS1uZ5gbN1DYgz","NS1vCCaENFVoHW","NS1vpdLykuN57H","NS1vf87gHK12ua","NS1vf7i4FBUwVF","NS1vf87BDpVYh7","NS1vf7hOtYoah7","NS1wfXZfzJe2wn","NS1vCCZIMYAdxL","NS1vf88E4xCOjU","NS1uPBMG0OxYHu","NS1vf7ibqnFnqJ","NS1vpdL6IsADzi","NS1uPBNex4R4Wk","NS1uPBLUnWSDV7"]);
-const COUPANG_KEEP_SKUS=new Set(["70646963","70867985","69981721","72573108","72583287","72583187","72583693","70649996","70649822","73242551","72584751","70649974","70649928","72583070","64809040"]);
+const COUPANG_KEEP_SKUS=new Set(["70646963","70867985","69981721","72573108","72583287","72583187","72583693","70649996","70649822","73242551","72584751","70649974","70649928","72583070","64809040","79698189","79698894"]);
 const ALL_TABS=[
   {id:"board",label:"보드"},
   {id:"routine",label:"반복업무"},
@@ -1217,7 +1216,7 @@ function Board() {
   };
   const [ckDrag, setCkDrag] = useState(null);
   const [ckSubDrag, setCkSubDrag] = useState(null);
-  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);if(willDone)setConfirmBox({kind:"archiveCk",ckId:c.id,ckTitle:c.title});};
+  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);};
   const reorderCk=(tab,fromId,toId)=>{if(!canEdit||fromId===toId)return;const ordered=ckByTab(tab).filter((x)=>!x.done);const fi=ordered.findIndex((x)=>x.id===fromId);const ti=ordered.findIndex((x)=>x.id===toId);if(fi<0||ti<0)return;const arr=[...ordered];const[moved]=arr.splice(fi,1);arr.splice(ti,0,moved);const now=Date.now();commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>{const pos=arr.findIndex((a)=>a.id===x.id);return pos>=0?{...x,order:pos,updatedAt:now}:x;})}),[])};
   const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크항목 삭제",detail:""}]);setCkDraft(null);};
   const duplicateCk=(c)=>{
@@ -4991,7 +4990,6 @@ function Board() {
 // ── 유튜브 비밀링크 상품 자동생성 ────────────────────────────────
 function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
 
-
   const [ytName, setYtName] = React.useState("");
   const [dateRange, setDateRange] = React.useState("");
   const [targetProductCode, setTargetProductCode] = React.useState("");
@@ -5043,9 +5041,9 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
       setMsg("variants: "+JSON.stringify(variants).slice(0,200));
       await new Promise(r=>setTimeout(r,2000)); // 2초 표시
 
-      // 옵션1 품목코드 자동 추출 (PICK이 들어간 옵션)
-      const opt1 = variants.find(v=>(v.option_value||"").includes("PICK"));
-      const opt1Code = opt1?.variant_code||opt1?.code||"";
+      // 옵션1 품목코드 자동 추출 (PICK이 들어간 옵션) — 필드명에 의존하지 않고 값 전체를 스캔
+      const opt1 = variants.find(v => Object.values(v||{}).some(val => typeof val==="string" && val.includes("PICK")));
+      const opt1Code = opt1?.variant_code || opt1?.code || opt1?.option_code || opt1?.custom_variant_code || opt1?.item_code || "";
       const opt1Name_new = `{🔥${ytName} PICK!🔥}[6개+파우치 7포] 대용량 쉐이크 6개 {🎁사은품🎁 파우치 7포 증정} ((d3))`;
 
       // 4) 상세설명 - opt1Code로 교체
@@ -5062,7 +5060,7 @@ function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
       setMsg("4/4 상품 수정 중...");
       const updRes = await c24Api({action:"update", productNo:newNo, payload:{
         product_name: `[${ytName} 전용 비밀링크] 단백질쉐이크 대용량 10종`,
-        summary_description: `<strong>🧡${ytName} 전용 비밀링크!</strong> ~최대 특가 63% SALE!🧡<br>\n✔︎ 📢${dateRange} 단, 7일간만! <br>\n✔︎ 최저가 링크!  <strong> 한 통 당 최대 19,733원💵</strong> <br>\n✔︎ 현재 페이지에서만 구매 가능한 혜택😱<br>\n✔︎ 단백질 쉐이크 유목민 정.착.템!<br>`,
+        simple_description: `<strong>🧡${ytName} 전용 비밀링크!</strong> ~최대 특가 63% SALE!🧡<br>\n✔︎ 📢${dateRange} 단, 7일간만! <br>\n✔︎ 최저가 링크!  <strong> 한 통 당 최대 19,733원💵</strong> <br>\n✔︎ 현재 페이지에서만 구매 가능한 혜택😱<br>\n✔︎ 단백질 쉐이크 유목민 정.착.템!<br>`,
         description: desc,
       }});
       if(!updRes.product){setMsg("❌ 상품 수정 실패: "+JSON.stringify(updRes).slice(0,200));setSending(false);return;}
