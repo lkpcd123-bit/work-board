@@ -65,6 +65,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
         const [scDraft,setScDraft]=React.useState(null);
         const [scCopyOpen,setScCopyOpen]=React.useState(false);
         const [scCopyTarget,setScCopyTarget]=React.useState("월");
+        const [scViewMode,setScViewMode]=React.useState("circle");
         
         const copyToDay=(targetDay)=>{
           const src=scBlocks[scDay]||[];
@@ -87,6 +88,38 @@ function ScheduleView({uid, saveBlocks: _save}) {
         const toMin=(h,m)=>h*60+m;
         const blockTop=(h,m)=>((toMin(h,m)-toMin(START_H,START_M))/totalMin)*100;
         const blockH=(sh,sm,eh,em)=>((toMin(eh,em)-toMin(sh,sm))/totalMin)*100;
+
+        // ── 원형(24시간 시계방향) 차트용 헬퍼 ──
+        const CX=170,CY=170,R_OUT=150,R_IN=95;
+        const polarXY=(r,angleDeg)=>{
+          const rad=angleDeg*Math.PI/180;
+          return {x:CX+r*Math.sin(rad), y:CY-r*Math.cos(rad)};
+        };
+        const ringSlicePath=(rOuter,rInner,startAngle,endAngle)=>{
+          let a1=startAngle,a2=endAngle;
+          if(a2<=a1)a2=a1+0.01;
+          const large=(a2-a1)>180?1:0;
+          const p1=polarXY(rOuter,a1),p2=polarXY(rOuter,a2),p3=polarXY(rInner,a2),p4=polarXY(rInner,a1);
+          return `M ${p1.x} ${p1.y} A ${rOuter} ${rOuter} 0 ${large} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${rInner} ${rInner} 0 ${large} 0 ${p4.x} ${p4.y} Z`;
+        };
+        const minToAngle=(min)=>(min/1440)*360;
+        const handleRingClick=(e)=>{
+          const svg=e.currentTarget;
+          const rect=svg.getBoundingClientRect();
+          const scale=340/rect.width;
+          const px=(e.clientX-rect.left)*scale, py=(e.clientY-rect.top)*scale;
+          const dx=px-CX, dy=py-CY;
+          const dist=Math.sqrt(dx*dx+dy*dy);
+          if(dist<R_IN-15||dist>R_OUT+15)return;
+          let angleDeg=Math.atan2(dx,-dy)*180/Math.PI;
+          if(angleDeg<0)angleDeg+=360;
+          let snapped=Math.round((angleDeg/360*1440)/30)*30;
+          if(snapped>=1440)snapped=0;
+          const sh=Math.floor(snapped/60),sm=snapped%60;
+          let endMin=snapped+60;const eh=endMin>=1440?23:Math.floor(endMin/60),em=endMin>=1440?59:endMin%60;
+          setScDraft({id:null,title:"",sh,sm,eh,em,color:COLORS[blocks.length%COLORS.length],memo:""});
+          setScAddOpen(true);
+        };
 
         const todayDate=(day)=>{
           const d=new Date();
@@ -118,7 +151,14 @@ function ScheduleView({uid, saveBlocks: _save}) {
             ))}
           </div>
 
+          {/* 보기 전환 */}
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            <button onClick={()=>setScViewMode("bar")} style={{padding:"6px 14px",borderRadius:8,border:"1px solid var(--line)",fontSize:12,fontWeight:700,cursor:"pointer",background:scViewMode==="bar"?"#0C66E4":"var(--card)",color:scViewMode==="bar"?"#fff":"var(--ink2)"}}>막대형</button>
+            <button onClick={()=>setScViewMode("circle")} style={{padding:"6px 14px",borderRadius:8,border:"1px solid var(--line)",fontSize:12,fontWeight:700,cursor:"pointer",background:scViewMode==="circle"?"#0C66E4":"var(--card)",color:scViewMode==="circle"?"#fff":"var(--ink2)"}}>🕐 원형(24시간)</button>
+          </div>
+
           <div style={{display:"flex",gap:16}}>
+            {scViewMode==="bar"&&(<>
             {/* 시간 눈금 + 블록 */}
             <div style={{flex:1,position:"relative",background:"var(--card)",borderRadius:12,boxShadow:"var(--sh)",padding:"0 0 0 56px",minHeight:520,overflow:"hidden"}}>
               {/* 시간 눈금 */}
@@ -146,7 +186,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
                 const top=blockTop(b.sh,b.sm);
                 const h=blockH(b.sh,b.sm,b.eh,b.em);
                 return(
-                  <div key={b.id} style={{position:"absolute",left:60,right:8,top:`${top}%`,height:`${h}%`,background:b.color||"#0C66E4",borderRadius:7,padding:"6px 10px",cursor:"pointer",overflow:"hidden",boxSizing:"border-box",minHeight:24,zIndex:2}}
+                  <div key={b.id} style={{position:"absolute",left:60,right:8,top:`${top}%`,height:`${h}%`,background:b.color||"#0C66E4",borderRadius:7,padding:"10px 14px",cursor:"pointer",overflow:"hidden",boxSizing:"border-box",minHeight:24,zIndex:2}}
                     onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
                     <div style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.title}</div>
                     {h>5&&<div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>}
@@ -166,6 +206,51 @@ function ScheduleView({uid, saveBlocks: _save}) {
                   setScAddOpen(true);
                 }} />
             </div>
+            </>)}
+            {scViewMode==="circle"&&(
+              <div style={{flex:1,background:"var(--card)",borderRadius:12,boxShadow:"var(--sh)",padding:16,display:"flex",alignItems:"center",justifyContent:"center",minHeight:520}}>
+                <svg viewBox="0 0 340 340" style={{width:"100%",maxWidth:400,height:"auto"}} onClick={handleRingClick}>
+                  {/* 배경 링(빈 시간대, 클릭으로 추가) */}
+                  <path d={ringSlicePath(R_OUT,R_IN,0,360)} fill="var(--bg)" stroke="var(--line)" strokeWidth={1} />
+                  {/* 시간 눈금 */}
+                  {Array.from({length:24},(_,h)=>{
+                    const angle=minToAngle(h*60);
+                    const isLabel=h%2===0;
+                    const p1=polarXY(R_IN-2,angle),p2=polarXY(isLabel?R_OUT+10:R_OUT+4,angle);
+                    const lp=polarXY(R_OUT+22,angle);
+                    return(
+                      <g key={h}>
+                        <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="var(--ink3)" strokeWidth={isLabel?1.5:1} opacity={isLabel?0.6:0.3} />
+                        {isLabel&&<text x={lp.x} y={lp.y} fontSize={10} fill="var(--ink3)" textAnchor="middle" dominantBaseline="middle">{h}</text>}
+                      </g>
+                    );
+                  })}
+                  {/* 일정 블록 (원형 슬라이스) */}
+                  {blocks.map((b)=>{
+                    const a1=minToAngle(toMin(b.sh,b.sm)),a2=minToAngle(toMin(b.eh,b.em));
+                    const mid=polarXY((R_OUT+R_IN)/2,(a1+(a2>a1?a2:a2+360))/2);
+                    return(
+                      <g key={b.id} style={{cursor:"pointer"}} onClick={(e)=>{e.stopPropagation();setScDraft({...b});setScAddOpen(true);}}>
+                        <path d={ringSlicePath(R_OUT,R_IN,a1,a2>a1?a2:a2+360)} fill={b.color||"#0C66E4"} stroke="var(--card)" strokeWidth={2} />
+                        <text x={mid.x} y={mid.y} fontSize={10} fontWeight={700} fill="#fff" textAnchor="middle" dominantBaseline="middle">{b.title.length>6?b.title.slice(0,6)+"…":b.title}</text>
+                      </g>
+                    );
+                  })}
+                  {/* 현재 시각 표시 */}
+                  {scDay===defaultDay&&(()=>{
+                    const now=new Date();const angle=minToAngle(toMin(now.getHours(),now.getMinutes()));
+                    const p1=polarXY(R_IN-8,angle),p2=polarXY(R_OUT+8,angle),dot=polarXY(R_OUT+8,angle);
+                    return(
+                      <g pointerEvents="none">
+                        <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#CA3521" strokeWidth={2} />
+                        <circle cx={dot.x} cy={dot.y} r={4} fill="#CA3521" />
+                      </g>
+                    );
+                  })()}
+                  <text x={CX} y={CY} fontSize={13} fontWeight={700} fill="var(--ink2)" textAnchor="middle" dominantBaseline="middle">{scDay}요일</text>
+                </svg>
+              </div>
+            )}
             {/* 사이드 */}
             <div style={{width:160,flexShrink:0}}>
               <button className="btn-save" style={{width:"100%",marginBottom:8}} onClick={()=>{setScDraft({id:null,title:"",sh:9,sm:30,eh:10,em:30,color:COLORS[0],memo:""});setScAddOpen(true);}}>+ 일정 추가</button>
@@ -173,7 +258,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
               <div style={{fontSize:12,color:"var(--ink3)",marginBottom:8,fontWeight:700}}>{scDay}요일 일정 ({blocks.length})</div>
               {blocks.length===0&&<div style={{fontSize:12,color:"var(--ink3)"}}>일정이 없습니다</div>}
               {[...blocks].sort((a,b)=>toMin(a.sh,a.sm)-toMin(b.sh,b.sm)).map((b)=>(
-                <div key={b.id} style={{background:b.color,borderRadius:7,padding:"7px 10px",marginBottom:6,cursor:"pointer"}} onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
+                <div key={b.id} style={{background:b.color,borderRadius:7,padding:"10px 14px",marginBottom:10,cursor:"pointer"}} onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
                   <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{b.title}</div>
                   <div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>
                 </div>
@@ -736,6 +821,8 @@ const CSS = `
 .ckexp:hover{color:var(--pri);}
 .cksubs{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px;padding-left:33px;}
 .cksub{display:flex;align-items:center;gap:8px;font-size:13px;}
+.cksubsubs{margin-left:24px;padding-left:12px;border-left:2px solid var(--line2);display:flex;flex-direction:column;gap:5px;margin-top:5px;margin-bottom:5px;}
+.cksubsub{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink3);}
 @media(max-width:1100px){.ckcols{grid-template-columns:1fr;}}
 
 /* ══ AI 비서 ══ */
@@ -1230,6 +1317,7 @@ function Board() {
   };
   const clearCkItem=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크 해제",detail:""}]);};
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
+  const toggleSubSub=(c,subId,subsubId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,subsubs:(s.subsubs||[]).map((y)=>y.id===subsubId?{...y,done:!y.done}:y)}:s),updatedAt:Date.now()}:x)}),[]);};
 
   /* ── AI 비서 ── */
 
@@ -2599,7 +2687,7 @@ function Board() {
                   {items.map((c)=>{
                     const dd=dayDiff(c.due);const over=dd!==null&&dd<0&&!c.done;
                     const subs=c.subs||[];const subDone=subs.filter((s)=>s.done).length;
-                    const exp=ckExpand[c.id];
+                    const exp=ckExpand[c.id]!==false;
                     return (
                       <div key={c.id} draggable={canEdit&&!c.done}
                         onDragStart={(e)=>{setCkDrag(c.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",c.id);}catch(err){}}}
@@ -2626,10 +2714,22 @@ function Board() {
                         {isCL&&exp&&subs.length>0&&(
                           <div className="cksubs">
                             {subs.map((s)=>(
-                              <div key={s.id} className="cksub">
-                                <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"✓":""}</button>
-                                <span style={{textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
-                              </div>
+                              <React.Fragment key={s.id}>
+                                <div className="cksub">
+                                  <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"✓":""}</button>
+                                  <span style={{textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
+                                </div>
+                                {(s.subsubs||[]).length>0&&(
+                                  <div className="cksubsubs">
+                                    {(s.subsubs||[]).map((ss)=>(
+                                      <div key={ss.id} className="cksubsub">
+                                        <button className={"ckbox sm"+(ss.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSubSub(c,s.id,ss.id)}>{ss.done?"✓":""}</button>
+                                        <span style={{textDecoration:ss.done?"line-through":"none",color:ss.done?"var(--ink3)":"inherit"}}>{ss.text}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </React.Fragment>
                             ))}
                           </div>
                         )}
@@ -3750,7 +3850,7 @@ function Board() {
 
           {/* 서브탭 */}
           <div style={{display:"flex",gap:0,borderBottom:"2px solid var(--line)",marginBottom:0}}>
-            {[{id:"schedule",label:"📅 스케줄"},{id:"editor",label:"✏️ 상품 편집기"},{id:"ytlink",label:"🎬 유튜브링크"}].map((t)=>(
+            {[{id:"schedule",label:"📅 스케줄"},{id:"editor",label:"✏️ 상품 편집기"}].map((t)=>(
               <button key={t.id} onClick={()=>setC24SubTab(t.id)}
                 style={{padding:"10px 18px",border:"none",cursor:"pointer",fontSize:13,fontWeight:c24SubTab===t.id?800:500,
                   background:"none",color:c24SubTab===t.id?"#0C66E4":"var(--ink3)",
@@ -4249,10 +4349,6 @@ function Board() {
               </div>
             )}
           </div>
-        )}
-
-        {c24SubTab==="ytlink"&&(
-          <YtLinkPanel c24Api={c24Api} c24TokenValid={c24TokenValid} c24GetProduct={c24GetProduct} c24SearchByCode={c24SearchByCode} />
         )}
 
       </div>
@@ -4987,183 +5083,3 @@ function Board() {
   );
 }
 
-// ── 유튜브 비밀링크 상품 자동생성 ────────────────────────────────
-function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
-
-  const [ytName, setYtName] = React.useState("");
-  const [dateRange, setDateRange] = React.useState("");
-  const [targetProductCode, setTargetProductCode] = React.useState("");
-  const [optionCode, setOptionCode] = React.useState("");
-  const [pasteText, setPasteText] = React.useState("");
-  const [msg, setMsg] = React.useState("");
-  const [sending, setSending] = React.useState(false);
-  const [preview, setPreview] = React.useState(null);
-  const [created, setCreated] = React.useState(null);
-
-  const parsePaste = (text) => {
-    const nameMatch = text.match(/유튜버명[:：]\s*(.+)/);
-    const dateMatch = text.match(/날짜[:：]\s*(.+)/);
-    if(nameMatch) setYtName(nameMatch[1].trim());
-    if(dateMatch) setDateRange(dateMatch[1].trim());
-  };
-
-  const productName = ytName ? `[${ytName} 전용 비밀링크] 단백질쉐이크 대용량 10종` : "";
-  const summaryDesc = `<strong>🧡${ytName} 전용 비밀링크!</strong> ~최대 특가 63% SALE!🧡<br>\n✔︎ 📢${dateRange} 단, 7일간만! <br>\n✔︎ 최저가 링크!  <strong> 한 통 당 최대 19,733원💵</strong> <br>\n✔︎ 현재 페이지에서만 구매 가능한 혜택😱<br>\n✔︎ 단백질 쉐이크 유목민 정.착.템!<br>`;
-  const opt1Name = `{🔥${ytName} PICK!🔥}[6개+파우치 7포] 대용량 쉐이크 6개 {🎁사은품🎁 파우치 7포 증정} ((d3))`;
-
-  const makePreview = () => {
-    if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
-    setPreview(true);setMsg("");
-  };
-
-  const handleCreate = async () => {
-    if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
-    if(!targetProductCode){setMsg("❌ 복사된 상품코드를 입력해주세요");return;}
-    if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
-    setSending(true);setCreated(null);
-    try {
-      // 1) 상품코드 → product_no
-      setMsg("1/4 상품 조회 중...");
-      const found = await c24SearchByCode(targetProductCode.trim().toUpperCase());
-      if(!found){setMsg("❌ 상품을 찾을 수 없습니다");setSending(false);return;}
-      const newNo = found.product_no;
-      const newCode = found.product_code||targetProductCode;
-      if(!newNo){setMsg("❌ product_no 없음");setSending(false);return;}
-
-      // 2) 상세 조회
-      setMsg("2/4 상세 정보 조회 중...");
-      const detail = await c24GetProduct(newNo);
-
-      // 3) variants 조회 - 옵션코드 자동 추출
-      setMsg("3/4 옵션 조회 중...");
-      const varRes = await c24Api({action:"getVariants", productNo:newNo});
-      const variants = varRes?.variants||[];
-      setMsg("variants: "+JSON.stringify(variants).slice(0,200));
-      await new Promise(r=>setTimeout(r,2000)); // 2초 표시
-
-      // 옵션1 품목코드 자동 추출 (PICK이 들어간 옵션)
-      const opt1 = variants.find(v=>(v.option_value||"").includes("PICK"));
-      const opt1Code = opt1?.variant_code||opt1?.code||"";
-      const opt1Name_new = `{🔥${ytName} PICK!🔥}[6개+파우치 7포] 대용량 쉐이크 6개 {🎁사은품🎁 파우치 7포 증정} ((d3))`;
-
-      // 4) 상세설명 - opt1Code로 교체
-      let desc = detail?.description||"";
-      if(opt1Code){
-        desc = desc.replace(/code="[A-Z0-9]+"/g, `code="${opt1Code}"`);
-      }
-      const depth3 = `<div id="opt-depth3-spec" style="display:none !important;">\n\t<!--\n        [STEP3 개별화] 샘플\n        <p code="옵션 코드">내용1,내용2,내용3</p>\n    -->\n\t<p code="${opt1Code||'P0000BCI000C'}">딸기맛 파우치 7포,초코맛 파우치 7포,말차맛 파우치 7포,쿠키앤크림맛 파우치 7포,스윗콘플레이크맛 파우치 7포,곡물맛 파우치 7포, 티라미수&amp;마카다미아맛 45g x 7포, 트리플베리요거트맛 45g x 7포</p>\n</div>`;
-      if(desc.includes('id="opt-depth3-spec"'))
-        desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/, depth3);
-      else desc = depth3+"\n"+desc;
-
-      // 5) 상품명 + 간략설명 + 상세설명 수정
-      setMsg("4/4 상품 수정 중...");
-      const updRes = await c24Api({action:"update", productNo:newNo, payload:{
-        product_name: `[${ytName} 전용 비밀링크] 단백질쉐이크 대용량 10종`,
-        summary_description: `<strong>🧡${ytName} 전용 비밀링크!</strong> ~최대 특가 63% SALE!🧡<br>\n✔︎ 📢${dateRange} 단, 7일간만! <br>\n✔︎ 최저가 링크!  <strong> 한 통 당 최대 19,733원💵</strong> <br>\n✔︎ 현재 페이지에서만 구매 가능한 혜택😱<br>\n✔︎ 단백질 쉐이크 유목민 정.착.템!<br>`,
-        description: desc,
-      }});
-      if(!updRes.product){setMsg("❌ 상품 수정 실패: "+JSON.stringify(updRes).slice(0,200));setSending(false);return;}
-
-      // 6) 옵션명 수정 (PICK 들어간 것만)
-      let optUpdated=0;
-      if(opt1&&opt1Code){
-        const vr = await c24Api({action:"updateVariant", productNo:newNo, variantCode:opt1Code, payload:{option_value:opt1Name_new}});
-        if(vr.variant) optUpdated=1;
-        else setMsg("⚠ 옵션수정 응답: "+JSON.stringify(vr).slice(0,150));
-      }
-
-      setCreated({no:newNo, code:newCode});
-      setTargetProductCode("");
-      setMsg(`✅ 완료! ${newCode} — 상품명/설명 수정, 옵션 ${optUpdated}개 수정 (opt1: ${opt1Code||"없음"})`);
-    } catch(e){
-      setMsg("❌ 오류: "+e.message);
-    }
-    setSending(false);
-  };
-
-  return (
-    <div style={{maxWidth:680,margin:"0 auto",padding:"0 0 40px"}}>
-      {/* 붙여넣기 공간 */}
-      <div className="panel" style={{padding:18,marginBottom:14}}>
-        <label style={{fontWeight:700,fontSize:13,display:"block",marginBottom:8}}>
-          📋 정보 붙여넣기
-          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>유튜버명/날짜를 붙여넣으면 자동 입력</span>
-        </label>
-        <textarea value={pasteText} onChange={(e)=>{setPasteText(e.target.value);parsePaste(e.target.value);}}
-          placeholder={"유튜버명: 카나미누\n날짜: 09/07(토) ~ 09/14(토)"}
-          style={{width:"100%",height:80,fontSize:12,border:"1px solid var(--line2)",borderRadius:8,padding:"9px 12px",resize:"vertical",fontFamily:"inherit"}} />
-      </div>
-
-      {/* 복사된 상품번호 입력 */}
-      <div className="panel" style={{padding:18,marginBottom:14,border:"1.5px solid #0C66E4",background:"#E9F2FF"}}>
-        <label style={{fontWeight:700,fontSize:13,display:"block",marginBottom:6}}>
-          📦 복사된 상품번호
-          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>카페24에서 P0000BCP 복사 후 새 상품번호 입력</span>
-        </label>
-        <input value={targetProductCode} onChange={(e)=>setTargetProductCode(e.target.value.trim())}
-          placeholder="예: 760"
-          style={{width:"100%",fontSize:14,border:"1px solid var(--line2)",borderRadius:7,padding:"9px 12px",fontFamily:"monospace",fontWeight:700}} />
-        <div style={{fontSize:11,color:"#0C66E4",marginTop:6}}>
-          카페24 관리자 → 상품 목록 → P0000BCP 체크 → 복사 → 새 상품의 URL에서 product_no 숫자 확인
-        </div>
-      </div>
-
-      {/* 입력 폼 */}
-      <div className="panel" style={{padding:18,marginBottom:14}}>
-        <div style={{display:"flex",gap:12,marginBottom:12}}>
-          <div className="fld" style={{flex:1}}>
-            <label>유튜버명 <span style={{color:"#CA3521",fontSize:11}}>*</span></label>
-            <input value={ytName} onChange={(e)=>setYtName(e.target.value)} placeholder="카나미누" />
-          </div>
-          <div className="fld" style={{flex:2}}>
-            <label>날짜 <span style={{color:"#CA3521",fontSize:11}}>*</span></label>
-            <input value={dateRange} onChange={(e)=>setDateRange(e.target.value)} placeholder="09/07(토) ~ 09/14(토)" />
-          </div>
-        </div>
-        <div className="fld" style={{marginBottom:12}}>
-          <label>옵션 1번 품목코드 <span style={{color:"var(--ink3)",fontSize:11}}>(선택 — 입력하면 상세설명 HTML의 code 값 자동 교체)</span></label>
-          <input value={optionCode} onChange={(e)=>setOptionCode(e.target.value.trim().toUpperCase())}
-            placeholder="예: P0000BDQ000C"
-            style={{fontFamily:"monospace",textTransform:"uppercase"}} />
-        </div>
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-          <button className="btn ghost" onClick={makePreview}>👁 미리보기</button>
-          <button className="btn-save" style={{background:"#1F845A",padding:"9px 24px"}} disabled={sending} onClick={handleCreate}>
-            {sending?"생성 중...":"🚀 카페24에 상품 생성"}
-          </button>
-        </div>
-      </div>
-
-      {/* 메시지 */}
-      {msg&&<div style={{padding:"10px 14px",borderRadius:9,marginBottom:12,
-        background:msg.startsWith("✅")?"#DCFFF1":msg.includes("중")?"#E9F2FF":"#FFECEB",
-        color:msg.startsWith("✅")?"#1F845A":msg.includes("중")?"#0C66E4":"#CA3521",fontSize:13}}>
-        {msg}
-        {created&&<div style={{marginTop:6}}>
-          <a href={`https://slowrocket.cafe24.com/disp/admin/shop1/product/ProductRegister?product_no=${created.no}`}
-            target="_blank" rel="noreferrer" style={{color:"#0C66E4",fontWeight:700,textDecoration:"underline"}}>
-            → 카페24 상품 편집 바로가기 ({created.code})
-          </a>
-        </div>}
-      </div>}
-
-      {/* 미리보기 */}
-      {preview&&ytName&&dateRange&&<div className="panel" style={{padding:18}}>
-        <div style={{fontWeight:800,fontSize:13,color:"#0C66E4",marginBottom:14}}>미리보기</div>
-        <div style={{marginBottom:10}}>
-          <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:4}}>상품명</div>
-          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:13}}>{productName}</div>
-        </div>
-        <div style={{marginBottom:10}}>
-          <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:4}}>상품 간략설명</div>
-          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:12,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:summaryDesc}} />
-        </div>
-        <div>
-          <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:4}}>1번 옵션명</div>
-          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:12}}>{opt1Name}</div>
-        </div>
-      </div>}
-    </div>
-  );
-}
