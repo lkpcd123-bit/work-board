@@ -808,7 +808,10 @@ const CSS = `
 .ckrow.dragging{opacity:.4;cursor:grabbing;box-shadow:0 0 0 2px var(--pri),var(--sh);}
 .ckrowmain{display:flex;align-items:flex-start;gap:11px;}
 .ckbox{width:22px;height:22px;border:2px solid #8F959C;border-radius:6px;background:#fff;font-size:12px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;}
-.ccklist{display:flex;flex-direction:column;gap:4px;margin-bottom:9px;}
+.ccklist{display:flex;flex-direction:column;gap:4px;}
+.ccklist-wrap{margin-bottom:9px;}
+.ccktoggle{background:none;border:none;color:var(--ink3);font-size:10.5px;cursor:pointer;padding:0 0 4px;display:block;}
+.ccktoggle:hover{color:var(--pri);}
 .ccklitem{display:flex;align-items:center;gap:6px;font-size:12px;}
 .ccklitem .ckbox.sm{width:15px;height:15px;font-size:9px;border-radius:4px;}
 .ckbox:hover{border-color:var(--ok);background:#F5FBF7;}
@@ -1005,6 +1008,7 @@ function Board() {
   const [riIssueSubEditId, setRiIssueSubEditId] = useState(null);
   const [riQuickIssueId, setRiQuickIssueId] = useState(null);
   const [riQuickIssueText, setRiQuickIssueText] = useState("");
+  const [cardCkHidden, setCardCkHidden] = useState({});
   const [memoQuery, setMemoQuery] = useState("");
   const [memoCatFilter, setMemoCatFilter] = useState("전체");
   const [memoDraft, setMemoDraft] = useState(null);
@@ -2257,13 +2261,18 @@ function Board() {
           return <div className="cbar" title={`진행률 ${pct}%`}><i style={{width:pct+"%"}} /></div>;
         })()}
         {ck.length>0&&(
-          <div className="ccklist" onClick={(e)=>e.stopPropagation()}>
-            {ck.map((c)=>(
-              <div key={c.id} className="ccklitem">
-                <button className={"ckbox sm"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCardCk(t,c.id)}>{c.done?"✓":""}</button>
-                <span style={{textDecoration:c.done?"line-through":"none",color:c.done?"var(--ink3)":"inherit"}}>{c.text}</span>
+          <div className="ccklist-wrap">
+            <button className="ccktoggle" onClick={(e)=>{e.stopPropagation();setCardCkHidden({...cardCkHidden,[t.id]:!cardCkHidden[t.id]});}}>{cardCkHidden[t.id]?`체크리스트 보기 (${ckDone}/${ck.length})`:"체크리스트 숨김"}</button>
+            {!cardCkHidden[t.id]&&(
+              <div className="ccklist" onClick={(e)=>e.stopPropagation()}>
+                {ck.map((c)=>(
+                  <div key={c.id} className="ccklitem">
+                    <button className={"ckbox sm"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCardCk(t,c.id)}>{c.done?"✓":""}</button>
+                    <span style={{textDecoration:c.done?"line-through":"none",color:c.done?"var(--ink3)":"inherit"}}>{c.text}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
         <div className="cfoot">
