@@ -1013,6 +1013,7 @@ function Board() {
   const [riQuickIssueId, setRiQuickIssueId] = useState(null);
   const [riQuickIssueText, setRiQuickIssueText] = useState("");
   const [cardCkHidden, setCardCkHidden] = useState({});
+  const [edUrlInput, setEdUrlInput] = useState("");
   const [memoQuery, setMemoQuery] = useState("");
   const [memoCatFilter, setMemoCatFilter] = useState("전체");
   const [memoDraft, setMemoDraft] = useState(null);
@@ -1844,6 +1845,21 @@ function Board() {
     setEdMsg(`✅ ${newImgs.length}장 업로드 완료`);
   };
 
+  // 링크(URL)로 마스터 이미지 추가 — 용량 제한 없이 카페24가 서버에서 직접 가져옴
+  const addMasterImageFromUrl=async(url)=>{
+    const u=(url||"").trim();
+    if(!u){setEdMsg("❌ 이미지 링크를 입력하세요");return;}
+    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요 — 이미지를 저장하려면 먼저 로그인하세요");return;}
+    setEdMsg('링크에서 이미지 가져오는 중...');
+    const cur=(data.edMasterImages||{})[edCat]||[];
+    const upR=await c24Api({action:'uploadImageFromUrl',imageUrl:u});
+    const resultUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+    if(!resultUrl){setEdMsg("❌ 링크 업로드 실패: "+JSON.stringify(upR));return;}
+    const fname=u.split('/').pop().split('?')[0]||'img.jpg';
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,{id:uid(),url:resultUrl,name:decodeURIComponent(fname),createdAt:Date.now()}]},updatedAt:Date.now()}),[]);
+    setEdMsg(`✅ 링크에서 이미지 추가 완료`);
+  };
+
   const replaceMasterImage=async(idx,file)=>{
     if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
     setEdMsg(`${idx+1}번 이미지 교체 중...`);
@@ -1857,6 +1873,22 @@ function Board() {
     commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
     setEdChanged((prev)=>({...prev,[idx]:true}));
     setEdMsg(`✅ ${idx+1}번 이미지 교체 완료`);
+  };
+
+  const replaceMasterImageFromUrl=async(idx,url)=>{
+    const u=(url||"").trim();
+    if(!u)return;
+    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
+    setEdMsg(`${idx+1}번 이미지 링크로 교체 중...`);
+    const upR=await c24Api({action:'uploadImageFromUrl',imageUrl:u});
+    const resultUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+    if(!resultUrl){setEdMsg("❌ 업로드 실패: "+JSON.stringify(upR));return;}
+    const fname=decodeURIComponent(u.split('/').pop().split('?')[0]||'img.jpg');
+    const imgs=[...((data.edMasterImages||{})[edCat]||[])];
+    imgs[idx]={...imgs[idx],url:resultUrl,name:fname,updatedAt:Date.now()};
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+    setEdChanged((prev)=>({...prev,[idx]:true}));
+    setEdMsg(`✅ ${idx+1}번 이미지 링크로 교체 완료`);
   };
 
   const sendImages=async(imgIdxs)=>{
@@ -4363,6 +4395,10 @@ function Board() {
                           e.target.value="";
                         }} />
                       </label>
+                      <button style={{fontSize:11,color:"#0C66E4",fontWeight:700,border:"1px solid #0C66E4",borderRadius:5,padding:"3px 10px",background:"none",cursor:"pointer"}} onClick={async()=>{
+                        const u=window.prompt("교체할 이미지 링크(URL)를 입력하세요");
+                        if(u)await replaceMasterImageFromUrl(i,u);
+                      }}>🔗 링크로 교체</button>
                       <button style={{fontSize:11,color:"var(--danger)",fontWeight:700,border:"1px solid var(--danger)",borderRadius:5,padding:"3px 10px",background:"none",cursor:"pointer"}} onClick={()=>{
                         const imgs=((data.edMasterImages||{})[edCat]||[]).filter((_,j)=>j!==i);
                         commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
@@ -4393,6 +4429,13 @@ function Board() {
                     e.target.value="";
                   }} />
                 </label>
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <input value={edUrlInput} onChange={(e)=>setEdUrlInput(e.target.value)}
+                    placeholder="🔗 이미지 링크(URL)로 추가 — 큰 파일은 카페24 디자인>파일업로더에 올린 뒤 링크를 붙여넣으세요"
+                    style={{flex:1,fontSize:12,border:"1px solid var(--line2)",borderRadius:7,padding:"8px 10px"}}
+                    onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;e.preventDefault();addMasterImageFromUrl(edUrlInput);setEdUrlInput("");}} />
+                  <button className="btn ghost" style={{fontSize:12,padding:"5px 14px",flexShrink:0}} onClick={()=>{addMasterImageFromUrl(edUrlInput);setEdUrlInput("");}}>추가</button>
+                </div>
 
                 {/* 전송 버튼 */}
                 {(((data.edMasterImages||{})[edCat]||[]).length>0||edSummary[edCat])&&(
