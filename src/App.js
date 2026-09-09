@@ -608,6 +608,10 @@ const CSS = `
 /* ── 모달 ── */
 .mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:center;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:50;}
 .modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:0;display:flex;flex-direction:column;max-height:90vh;}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;border-bottom:1px solid var(--line);}
+.modal-head h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.02em;}
+.modal-head .x{background:none;border:none;cursor:pointer;color:var(--ink3);font-size:28px;line-height:1;padding:0;width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:8px;}
+.modal-head .x:hover{background:var(--bg);color:var(--danger);}
 .modal h2{font-size:19px;font-weight:800;margin:0;padding:24px 28px 18px;border-bottom:1px solid var(--line);letter-spacing:-.02em;}
 .modal-body{flex:1;overflow-y:auto;padding:24px 28px;}
 .modal-foot{padding:18px 28px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;}
