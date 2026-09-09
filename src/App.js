@@ -314,7 +314,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
             <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setScAddOpen(false)}>
               <div className="modal" style={{maxWidth:380}} onClick={(e)=>e.stopPropagation()}>
                 <div className="modal-head"><h3>{scDraft.id?"일정 수정":"일정 추가"}</h3><button className="x" onClick={()=>setScAddOpen(false)}>×</button></div>
-                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:14}}>
+                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:22,padding:"20px 4px"}}>
                   <div className="fld"><label>제목</label><input value={scDraft.title} onChange={(e)=>setScDraft({...scDraft,title:e.target.value})} placeholder="회의, 업무, 점심..." autoFocus /></div>
                   <div className="r3">
                     <div className="fld"><label>시작</label>
@@ -413,7 +413,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -422,6 +422,7 @@ function mergeData(r,l) {
   const mm2=new Map(); [...(r.monthlies||[]),...(l.monthlies||[])].forEach(t=>{const p=mm2.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mm2.set(t.id,t);});
   const ri=new Map(); [...(r.rItems||[]),...(l.rItems||[])].forEach(t=>{const p=ri.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))ri.set(t.id,t);});
   const mi=new Map(); [...(r.memoItems||[]),...(l.memoItems||[])].forEach(t=>{const p=mi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mi.set(t.id,t);});
+  const rpi=new Map(); [...(r.reportItems||[]),...(l.reportItems||[])].forEach(t=>{const p=rpi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))rpi.set(t.id,t);});
   const mmi=new Map(); [...(r.mindmaps||[]),...(l.mindmaps||[])].forEach(t=>{const p=mmi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mmi.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
@@ -431,7 +432,7 @@ function mergeData(r,l) {
   const c24Map=new Map(); [...(r.cafe24_schedules||[]),...(l.cafe24_schedules||[])].forEach(t=>{const p=c24Map.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))c24Map.set(t.id,t);});
   const notifMap=new Map(); [...(r.notifications||[]),...(l.notifications||[])].forEach(t=>{const p=notifMap.get(t.id);if(!p||(t.updatedAt||t.ts||0)>=(p.updatedAt||p.ts||0))notifMap.set(t.id,t);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],mindmaps:[...mmi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
+  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],reportItems:[...rpi.values()],mindmaps:[...mmi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
     routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
     colLabels:((l.colLabelsUpdatedAt||0)>=(r.colLabelsUpdatedAt||0)?l.colLabels:r.colLabels)||{},colLabelsUpdatedAt:Math.max(l.colLabelsUpdatedAt||0,r.colLabelsUpdatedAt||0),
     log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),
@@ -807,6 +808,9 @@ const CSS = `
 .ckrow.dragging{opacity:.4;cursor:grabbing;box-shadow:0 0 0 2px var(--pri),var(--sh);}
 .ckrowmain{display:flex;align-items:flex-start;gap:11px;}
 .ckbox{width:22px;height:22px;border:2px solid #8F959C;border-radius:6px;background:#fff;font-size:12px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.ccklist{display:flex;flex-direction:column;gap:4px;margin-bottom:9px;}
+.ccklitem{display:flex;align-items:center;gap:6px;font-size:12px;}
+.ccklitem .ckbox.sm{width:15px;height:15px;font-size:9px;border-radius:4px;}
 .ckbox:hover{border-color:var(--ok);background:#F5FBF7;}
 .ckbox.on{background:var(--ok);border-color:var(--ok);color:#fff;}
 .ckbox.sm{width:18px;height:18px;font-size:10px;}
@@ -928,6 +932,7 @@ const ALL_TABS=[
   {id:"monthly",label:"월간 업무"},
   {id:"checklist",label:"체크리스트"},
   {id:"memo",label:"메모"},
+  {id:"report",label:"일보고"},
   {id:"mindmap",label:"마인드맵"},
   {id:"ref",label:"래퍼런스"},
   {id:"schedule",label:"시간표"},
@@ -1007,6 +1012,13 @@ function Board() {
   const [memoDrag, setMemoDrag] = useState(null);
   const [memoSubText, setMemoSubText] = useState({});
   const [memoSubEditId, setMemoSubEditId] = useState(null);
+  const [reportQuery, setReportQuery] = useState("");
+  const [reportCatFilter, setReportCatFilter] = useState("전체");
+  const [reportDraft, setReportDraft] = useState(null);
+  const [reportExpand, setReportExpand] = useState({});
+  const [reportDrag, setReportDrag] = useState(null);
+  const [reportSubText, setReportSubText] = useState({});
+  const [reportSubEditId, setReportSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const [notifBoxOpen, setNotifBoxOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
@@ -1144,7 +1156,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]},edMasterImages:remote.edMasterImages||{보틀:[],대용량:[],파우치:[]},edSavedSummaries:Array.isArray(remote.edSavedSummaries)?remote.edSavedSummaries:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],reportItems:Array.isArray(remote.reportItems)?remote.reportItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]},edMasterImages:remote.edMasterImages||{보틀:[],대용량:[],파우치:[]},edSavedSummaries:Array.isArray(remote.edSavedSummaries)?remote.edSavedSummaries:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -1246,6 +1258,7 @@ function Board() {
   };
 
   const moveTask=(task,statusId)=>{if(!canEdit||task.status===statusId)return;const now=Date.now();const logs=[mkLog("상태 변경",task,`${cols.find((c)=>c.id===task.status)?.label} -> ${cols.find((c)=>c.id===statusId)?.label}`)];let spawn=null;if(statusId==="done"&&task.repeat&&task.repeat!=="none"){spawn={...task,id:uid(),status:"todo",due:nextDue(task.due,task.repeat),checklist:(task.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}commit((d)=>{let tasks=d.tasks.map((t)=>t.id===task.id?{...t,status:statusId,updatedAt:now,updatedBy:me,doneAt:statusId==="done"?(t.doneAt||now):null}:t);if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);if(statusId==="done"&&task.status!=="done"){}};
+  const toggleCardCk=(t,ckId)=>{if(!canEdit)return;commit((d)=>({...d,tasks:d.tasks.map((x)=>x.id===t.id?{...x,checklist:(x.checklist||[]).map((c)=>c.id===ckId?{...c,done:!c.done}:c),updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("체크 항목",t,"토글")]);};
   const removeTask=(task)=>{commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,deleted:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("업무 삭제",task)]);setDraft(null);};
   const setArchivedFlag=(task,flag)=>commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,archived:flag,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog(flag?"아카이브":"아카이브 해제",task)]);
   const archiveDone=()=>{const targets=live.filter((t)=>t.status==="done");if(!targets.length){setConfirmBox(null);return;}const ids=new Set(targets.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.map((t)=>ids.has(t.id)?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("완료 일괄 보관",null,`${targets.length}건`)]);setConfirmBox(null);};
@@ -1622,6 +1635,63 @@ function Board() {
   };
   const removeMemoSub=(memoId,subId)=>{
     commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
+  };
+
+  /* ── 일보고 (메모와 동일 구조) ── */
+  const reportItems=useMemo(()=>(data.reportItems||[]).filter((x)=>!x.deleted),[data.reportItems]);
+  const reportCatNames=useMemo(()=>[...new Set(reportItems.map((x)=>x.cat).filter(Boolean))].sort(),[reportItems]);
+  const reportSubNames=useMemo(()=>(cat)=>[...new Set(reportItems.filter((x)=>x.cat===cat).map((x)=>x.sub).filter(Boolean))].sort(),[reportItems]);
+  const reportFiltered=useMemo(()=>{
+    let list=reportItems;
+    if(reportCatFilter!=="전체")list=list.filter((x)=>(x.cat||"미분류")===reportCatFilter);
+    const q=reportQuery.trim().toLowerCase();
+    if(q)list=list.filter((x)=>`${x.cat||""} ${x.sub||""} ${x.title||""} ${x.text||""} ${(x.subs||[]).map((s)=>s.text).join(" ")}`.toLowerCase().includes(q));
+    return list.slice().sort((a,b)=>(a.order??999)-(b.order??999));
+  },[reportItems,reportCatFilter,reportQuery]);
+  const reportCatOptions=useMemo(()=>["전체",...new Set(reportItems.map((x)=>x.cat||"미분류"))],[reportItems]);
+  const saveReport=()=>{
+    const text=(reportDraft.text||"").trim();
+    if(!text){alert("일보고 내용을 입력하세요.");return;}
+    const now=Date.now();
+    if(reportDraft.id){
+      commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportDraft.id?{...x,cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,updatedAt:now}:x)}),[mkLog("일보고 수정",null,text.slice(0,30))]);
+    }else{
+      const rec={id:uid(),cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,subs:[],createdAt:now,updatedAt:now,createdBy:me};
+      commit((d)=>({...d,reportItems:[...(d.reportItems||[]),rec]}),[mkLog("일보고 생성",null,text.slice(0,30))]);
+    }
+    setReportDraft(null);
+  };
+  const removeReport=(m)=>{commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("일보고 삭제",null,(m.text||"").slice(0,30))]);setReportDraft(null);};
+  const duplicateReport=(m)=>{
+    const now=Date.now();
+    const copy={id:uid(),cat:m.cat,sub:m.sub,title:m.title?m.title+" (복사)":"",text:m.text,subs:[],order:null,createdAt:now,updatedAt:now,createdBy:me};
+    commit((d)=>({...d,reportItems:[...(d.reportItems||[]),copy]}),[mkLog("일보고 복사",null,(copy.text||"").slice(0,30))]);
+  };
+  const reorderReport=(fromId,toId)=>{
+    if(!canEdit||fromId===toId)return;
+    const arr=[...reportFiltered];
+    const fi=arr.findIndex((x)=>x.id===fromId);
+    const ti=arr.findIndex((x)=>x.id===toId);
+    if(fi<0||ti<0)return;
+    const [moved]=arr.splice(fi,1);
+    arr.splice(ti,0,moved);
+    const now=Date.now();
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>{
+      const pos=arr.findIndex((a)=>a.id===x.id);
+      return pos>=0?{...x,order:pos,updatedAt:now}:x;
+    })}),[]);
+  };
+  const addReportSub=(reportId,text)=>{
+    const t=text.trim();if(!t)return;
+    const sub={id:uid(),text:t,author:me||"익명",ts:Date.now()};
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:[...(x.subs||[]),sub],updatedAt:Date.now()}:x)}),[]);
+  };
+  const editReportSub=(reportId,subId,text)=>{
+    const t=text.trim();if(!t)return;
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,text:t,edited:true}:s),updatedAt:Date.now()}:x)}),[]);
+  };
+  const removeReportSub=(reportId,subId)=>{
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
   };
 
   /* ── 마인드맵 (계층형) ── */
@@ -2186,6 +2256,16 @@ function Board() {
           const pct=t.progress!=null&&t.progress>0?t.progress:(ck.length?Math.round(ckDone/ck.length*100):0);
           return <div className="cbar" title={`진행률 ${pct}%`}><i style={{width:pct+"%"}} /></div>;
         })()}
+        {ck.length>0&&(
+          <div className="ccklist" onClick={(e)=>e.stopPropagation()}>
+            {ck.map((c)=>(
+              <div key={c.id} className="ccklitem">
+                <button className={"ckbox sm"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCardCk(t,c.id)}>{c.done?"✓":""}</button>
+                <span style={{textDecoration:c.done?"line-through":"none",color:c.done?"var(--ink3)":"inherit"}}>{c.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="cfoot">
           <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
             {t.owner?<span className={"ownerchip"+(t.owner===me?" me":"")}>{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
@@ -2281,7 +2361,7 @@ function Board() {
       </div>
       <div className="tabs">
         {visibleTabs.map((t)=>{
-          const badgeMap={board:live.length,routine:rItems.filter((it)=>!(it.checkins||{})[riDate]).length,monthly:mlyByMonth(mlyDate).filter((m)=>!m.done).length,checklist:checkitems.filter((c)=>!c.done).length,memo:memoItems.length,issue:allIssues.filter((i)=>!i.resolved).length,archive:archived.length};
+          const badgeMap={board:live.length,routine:rItems.filter((it)=>!(it.checkins||{})[riDate]).length,monthly:mlyByMonth(mlyDate).filter((m)=>!m.done).length,checklist:checkitems.filter((c)=>!c.done).length,memo:memoItems.length,report:reportItems.length,issue:allIssues.filter((i)=>!i.resolved).length,archive:archived.length};
           const n=badgeMap[t.id]??null;
           return(
           <button key={t.id}
@@ -3153,6 +3233,76 @@ function Board() {
                         <textarea className="hinput" placeholder="하위 항목 입력 (Enter 추가, Shift+Enter 줄바꿈)"
                           value={memoSubText[m.id]||""} onChange={(e)=>setMemoSubText({...memoSubText,[m.id]:e.target.value})}
                           onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addMemoSub(m.id,memoSubText[m.id]||"");setMemoSubText({...memoSubText,[m.id]:""});}} />
+                      </div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {view==="report"&&(
+        <div>
+          <div className="panel" style={{padding:14,marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <div style={{fontSize:14,fontWeight:800}}>일보고</div>
+              {canEdit&&<button className="btn-save" onClick={()=>setReportDraft({cat:"",sub:"",title:"",text:""})}>+ 일보고 추가</button>}
+            </div>
+            <div style={{display:"flex",gap:7,marginTop:12,flexWrap:"wrap"}}>
+              <input className="inp" style={{flex:1,minWidth:160}} placeholder="검색 (분류·제목·내용·하위항목)" value={reportQuery} onChange={(e)=>setReportQuery(e.target.value)} />
+              <select className="sel" value={reportCatFilter} onChange={(e)=>setReportCatFilter(e.target.value)}>
+                {reportCatOptions.map((c)=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {reportFiltered.length===0&&<div className="empty">{reportQuery||reportCatFilter!=="전체"?"조건에 맞는 일보고가 없습니다":"일보고가 없습니다. + 일보고 추가로 시작하세요."}</div>}
+
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {reportFiltered.map((m)=>{
+              const expanded=!!reportExpand[m.id];
+              return (
+                <div key={m.id} draggable={canEdit}
+                  onDragStart={(e)=>{setReportDrag(m.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",m.id);}catch(err){}}}
+                  onDragOver={(e)=>{e.preventDefault();e.dataTransfer.dropEffect="move";}}
+                  onDrop={()=>{if(reportDrag)reorderReport(reportDrag,m.id);setReportDrag(null);}}
+                  onDragEnd={()=>setReportDrag(null)}
+                  className={"memocard"+(reportDrag===m.id?" dragging":"")}>
+                  <div className="memohead">
+                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>
+                      {(m.cat||m.sub)&&<div className="memopath">{[m.cat,m.sub].filter(Boolean).join(" > ")}</div>}
+                      {m.title&&<div className="memotitle">{m.title}</div>}
+                      <div className="memotext">{m.text}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <button className="riedit" onClick={()=>setReportExpand({...reportExpand,[m.id]:!expanded})}>{(m.subs||[]).length>0?`하위 ${(m.subs||[]).length}`:"+하위"}</button>
+                      {canEdit&&<button className="riedit" onClick={()=>duplicateReport(m)}>복사</button>}
+                      {canEdit&&<button className="riedit" onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>수정</button>}
+                    </div>
+                  </div>
+                  {expanded&&(
+                    <div className="memosubs">
+                      {(m.subs||[]).length===0&&<span className="hint">하위 항목이 없습니다</span>}
+                      {(m.subs||[]).map((s)=>(
+                        <div key={s.id} className="cmt">
+                          <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}{s.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                          {reportSubEditId===s.id
+                            ? <textarea className="hinput" defaultValue={s.text} autoFocus style={{width:"100%",marginTop:4}}
+                                onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editReportSub(m.id,s.id,e.target.value);setReportSubEditId(null);}}
+                                onBlur={(e)=>{editReportSub(m.id,s.id,e.target.value);setReportSubEditId(null);}} />
+                            : <p>{s.text}</p>}
+                          {canEdit&&reportSubEditId!==s.id&&<div style={{display:"flex",gap:10}}>
+                            <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setReportSubEditId(s.id)}>수정</button>
+                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeReportSub(m.id,s.id)}>삭제</button>
+                          </div>}
+                        </div>
+                      ))}
+                      {canEdit&&<div className="addrow">
+                        <textarea className="hinput" placeholder="하위 항목 입력 (Enter 추가, Shift+Enter 줄바꿈)"
+                          value={reportSubText[m.id]||""} onChange={(e)=>setReportSubText({...reportSubText,[m.id]:e.target.value})}
+                          onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addReportSub(m.id,reportSubText[m.id]||"");setReportSubText({...reportSubText,[m.id]:""});}} />
                       </div>}
                     </div>
                   )}
@@ -4632,6 +4782,31 @@ function Board() {
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setMemoDraft(null)}>닫기</button>
             <button className="btn-save" onClick={saveMemo}>저장</button>
+          </div>
+        </div></div>
+      )}
+
+      {reportDraft&&(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setReportDraft(null)}><div className="modal">
+          <h2>{reportDraft.id?"일보고 수정":"새 일보고"}</h2>
+          <div className="modal-body">
+            <div className="r3">
+              <div className="fld"><label>대분류 (선택)</label><input list="report-cats" value={reportDraft.cat||""} onChange={(e)=>setReportDraft({...reportDraft,cat:e.target.value})} placeholder="예) 마케팅" />
+                <datalist id="report-cats">{reportCatNames.map((c)=><option key={c} value={c} />)}</datalist>
+              </div>
+              <div className="fld"><label>중분류 (선택)</label><input list="report-subs" value={reportDraft.sub||""} onChange={(e)=>setReportDraft({...reportDraft,sub:e.target.value})} placeholder="예) 브랜드검색" />
+                <datalist id="report-subs">{reportSubNames(reportDraft.cat||"").map((s)=><option key={s} value={s} />)}</datalist>
+              </div>
+              <div className="fld"><label>소분류 (선택)</label><input value={reportDraft.title||""} onChange={(e)=>setReportDraft({...reportDraft,title:e.target.value})} placeholder="예) 키워드 아이디어" /></div>
+            </div>
+            <div className="fld"><label>내용</label><textarea autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} placeholder="일보고 내용을 입력하세요" style={{minHeight:100}} /></div>
+          </div>
+          <div className="modal-foot">
+            {reportDraft.id&&<button className="del" onClick={()=>removeReport(reportDraft)}>삭제</button>}
+            {reportDraft.id&&<button className="btn ghost" onClick={()=>duplicateReport(reportDraft)}>복사</button>}
+            <span className="spacer" />
+            <button className="btn ghost" onClick={()=>setReportDraft(null)}>닫기</button>
+            <button className="btn-save" onClick={saveReport}>저장</button>
           </div>
         </div></div>
       )}
