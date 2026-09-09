@@ -65,6 +65,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
         const [scDraft,setScDraft]=React.useState(null);
         const [scCopyOpen,setScCopyOpen]=React.useState(false);
         const [scCopyTarget,setScCopyTarget]=React.useState("월");
+        const [scViewMode,setScViewMode]=React.useState("circle");
         
         const copyToDay=(targetDay)=>{
           const src=scBlocks[scDay]||[];
@@ -87,6 +88,38 @@ function ScheduleView({uid, saveBlocks: _save}) {
         const toMin=(h,m)=>h*60+m;
         const blockTop=(h,m)=>((toMin(h,m)-toMin(START_H,START_M))/totalMin)*100;
         const blockH=(sh,sm,eh,em)=>((toMin(eh,em)-toMin(sh,sm))/totalMin)*100;
+
+        // ── 원형(24시간 시계방향) 차트용 헬퍼 ──
+        const CX=170,CY=170,R_OUT=150,R_IN=95;
+        const polarXY=(r,angleDeg)=>{
+          const rad=angleDeg*Math.PI/180;
+          return {x:CX+r*Math.sin(rad), y:CY-r*Math.cos(rad)};
+        };
+        const ringSlicePath=(rOuter,rInner,startAngle,endAngle)=>{
+          let a1=startAngle,a2=endAngle;
+          if(a2<=a1)a2=a1+0.01;
+          const large=(a2-a1)>180?1:0;
+          const p1=polarXY(rOuter,a1),p2=polarXY(rOuter,a2),p3=polarXY(rInner,a2),p4=polarXY(rInner,a1);
+          return `M ${p1.x} ${p1.y} A ${rOuter} ${rOuter} 0 ${large} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${rInner} ${rInner} 0 ${large} 0 ${p4.x} ${p4.y} Z`;
+        };
+        const minToAngle=(min)=>(min/1440)*360;
+        const handleRingClick=(e)=>{
+          const svg=e.currentTarget;
+          const rect=svg.getBoundingClientRect();
+          const scale=340/rect.width;
+          const px=(e.clientX-rect.left)*scale, py=(e.clientY-rect.top)*scale;
+          const dx=px-CX, dy=py-CY;
+          const dist=Math.sqrt(dx*dx+dy*dy);
+          if(dist<R_IN-15||dist>R_OUT+15)return;
+          let angleDeg=Math.atan2(dx,-dy)*180/Math.PI;
+          if(angleDeg<0)angleDeg+=360;
+          let snapped=Math.round((angleDeg/360*1440)/30)*30;
+          if(snapped>=1440)snapped=0;
+          const sh=Math.floor(snapped/60),sm=snapped%60;
+          let endMin=snapped+60;const eh=endMin>=1440?23:Math.floor(endMin/60),em=endMin>=1440?59:endMin%60;
+          setScDraft({id:null,title:"",sh,sm,eh,em,color:COLORS[blocks.length%COLORS.length],memo:""});
+          setScAddOpen(true);
+        };
 
         const todayDate=(day)=>{
           const d=new Date();
@@ -118,7 +151,14 @@ function ScheduleView({uid, saveBlocks: _save}) {
             ))}
           </div>
 
+          {/* 보기 전환 */}
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            <button onClick={()=>setScViewMode("bar")} style={{padding:"6px 14px",borderRadius:8,border:"1px solid var(--line)",fontSize:12,fontWeight:700,cursor:"pointer",background:scViewMode==="bar"?"#0C66E4":"var(--card)",color:scViewMode==="bar"?"#fff":"var(--ink2)"}}>막대형</button>
+            <button onClick={()=>setScViewMode("circle")} style={{padding:"6px 14px",borderRadius:8,border:"1px solid var(--line)",fontSize:12,fontWeight:700,cursor:"pointer",background:scViewMode==="circle"?"#0C66E4":"var(--card)",color:scViewMode==="circle"?"#fff":"var(--ink2)"}}>🕐 원형(24시간)</button>
+          </div>
+
           <div style={{display:"flex",gap:16}}>
+            {scViewMode==="bar"&&(<>
             {/* 시간 눈금 + 블록 */}
             <div style={{flex:1,position:"relative",background:"var(--card)",borderRadius:12,boxShadow:"var(--sh)",padding:"0 0 0 56px",minHeight:520,overflow:"hidden"}}>
               {/* 시간 눈금 */}
@@ -146,7 +186,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
                 const top=blockTop(b.sh,b.sm);
                 const h=blockH(b.sh,b.sm,b.eh,b.em);
                 return(
-                  <div key={b.id} style={{position:"absolute",left:60,right:8,top:`${top}%`,height:`${h}%`,background:b.color||"#0C66E4",borderRadius:7,padding:"6px 10px",cursor:"pointer",overflow:"hidden",boxSizing:"border-box",minHeight:24,zIndex:2}}
+                  <div key={b.id} style={{position:"absolute",left:60,right:8,top:`${top}%`,height:`${h}%`,background:b.color||"#0C66E4",borderRadius:7,padding:"10px 14px",cursor:"pointer",overflow:"hidden",boxSizing:"border-box",minHeight:24,zIndex:2}}
                     onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
                     <div style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.title}</div>
                     {h>5&&<div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>}
@@ -166,6 +206,51 @@ function ScheduleView({uid, saveBlocks: _save}) {
                   setScAddOpen(true);
                 }} />
             </div>
+            </>)}
+            {scViewMode==="circle"&&(
+              <div style={{flex:1,background:"var(--card)",borderRadius:12,boxShadow:"var(--sh)",padding:16,display:"flex",alignItems:"center",justifyContent:"center",minHeight:520}}>
+                <svg viewBox="0 0 340 340" style={{width:"100%",maxWidth:400,height:"auto"}} onClick={handleRingClick}>
+                  {/* 배경 링(빈 시간대, 클릭으로 추가) */}
+                  <path d={ringSlicePath(R_OUT,R_IN,0,360)} fill="var(--bg)" stroke="var(--line)" strokeWidth={1} />
+                  {/* 시간 눈금 */}
+                  {Array.from({length:24},(_,h)=>{
+                    const angle=minToAngle(h*60);
+                    const isLabel=h%2===0;
+                    const p1=polarXY(R_IN-2,angle),p2=polarXY(isLabel?R_OUT+10:R_OUT+4,angle);
+                    const lp=polarXY(R_OUT+22,angle);
+                    return(
+                      <g key={h}>
+                        <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="var(--ink3)" strokeWidth={isLabel?1.5:1} opacity={isLabel?0.6:0.3} />
+                        {isLabel&&<text x={lp.x} y={lp.y} fontSize={10} fill="var(--ink3)" textAnchor="middle" dominantBaseline="middle">{h}</text>}
+                      </g>
+                    );
+                  })}
+                  {/* 일정 블록 (원형 슬라이스) */}
+                  {blocks.map((b)=>{
+                    const a1=minToAngle(toMin(b.sh,b.sm)),a2=minToAngle(toMin(b.eh,b.em));
+                    const mid=polarXY((R_OUT+R_IN)/2,(a1+(a2>a1?a2:a2+360))/2);
+                    return(
+                      <g key={b.id} style={{cursor:"pointer"}} onClick={(e)=>{e.stopPropagation();setScDraft({...b});setScAddOpen(true);}}>
+                        <path d={ringSlicePath(R_OUT,R_IN,a1,a2>a1?a2:a2+360)} fill={b.color||"#0C66E4"} stroke="var(--card)" strokeWidth={2} />
+                        <text x={mid.x} y={mid.y} fontSize={10} fontWeight={700} fill="#fff" textAnchor="middle" dominantBaseline="middle">{b.title.length>6?b.title.slice(0,6)+"…":b.title}</text>
+                      </g>
+                    );
+                  })}
+                  {/* 현재 시각 표시 */}
+                  {scDay===defaultDay&&(()=>{
+                    const now=new Date();const angle=minToAngle(toMin(now.getHours(),now.getMinutes()));
+                    const p1=polarXY(R_IN-8,angle),p2=polarXY(R_OUT+8,angle),dot=polarXY(R_OUT+8,angle);
+                    return(
+                      <g pointerEvents="none">
+                        <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#CA3521" strokeWidth={2} />
+                        <circle cx={dot.x} cy={dot.y} r={4} fill="#CA3521" />
+                      </g>
+                    );
+                  })()}
+                  <text x={CX} y={CY} fontSize={13} fontWeight={700} fill="var(--ink2)" textAnchor="middle" dominantBaseline="middle">{scDay}요일</text>
+                </svg>
+              </div>
+            )}
             {/* 사이드 */}
             <div style={{width:160,flexShrink:0}}>
               <button className="btn-save" style={{width:"100%",marginBottom:8}} onClick={()=>{setScDraft({id:null,title:"",sh:9,sm:30,eh:10,em:30,color:COLORS[0],memo:""});setScAddOpen(true);}}>+ 일정 추가</button>
@@ -173,7 +258,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
               <div style={{fontSize:12,color:"var(--ink3)",marginBottom:8,fontWeight:700}}>{scDay}요일 일정 ({blocks.length})</div>
               {blocks.length===0&&<div style={{fontSize:12,color:"var(--ink3)"}}>일정이 없습니다</div>}
               {[...blocks].sort((a,b)=>toMin(a.sh,a.sm)-toMin(b.sh,b.sm)).map((b)=>(
-                <div key={b.id} style={{background:b.color,borderRadius:7,padding:"7px 10px",marginBottom:6,cursor:"pointer"}} onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
+                <div key={b.id} style={{background:b.color,borderRadius:7,padding:"10px 14px",marginBottom:10,cursor:"pointer"}} onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
                   <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{b.title}</div>
                   <div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>
                 </div>
@@ -227,9 +312,9 @@ function ScheduleView({uid, saveBlocks: _save}) {
           {/* 일정 추가/수정 모달 */}
           {scAddOpen&&scDraft&&(
             <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setScAddOpen(false)}>
-              <div className="modal" style={{maxWidth:380}} onClick={(e)=>e.stopPropagation()}>
+              <div className="modal" style={{maxWidth:420}} onClick={(e)=>e.stopPropagation()}>
                 <div className="modal-head"><h3>{scDraft.id?"일정 수정":"일정 추가"}</h3><button className="x" onClick={()=>setScAddOpen(false)}>×</button></div>
-                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:14}}>
+                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:22,padding:"22px 24px"}}>
                   <div className="fld"><label>제목</label><input value={scDraft.title} onChange={(e)=>setScDraft({...scDraft,title:e.target.value})} placeholder="회의, 업무, 점심..." autoFocus /></div>
                   <div className="r3">
                     <div className="fld"><label>시작</label>
@@ -328,7 +413,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -337,6 +422,7 @@ function mergeData(r,l) {
   const mm2=new Map(); [...(r.monthlies||[]),...(l.monthlies||[])].forEach(t=>{const p=mm2.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mm2.set(t.id,t);});
   const ri=new Map(); [...(r.rItems||[]),...(l.rItems||[])].forEach(t=>{const p=ri.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))ri.set(t.id,t);});
   const mi=new Map(); [...(r.memoItems||[]),...(l.memoItems||[])].forEach(t=>{const p=mi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mi.set(t.id,t);});
+  const rpi=new Map(); [...(r.reportItems||[]),...(l.reportItems||[])].forEach(t=>{const p=rpi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))rpi.set(t.id,t);});
   const mmi=new Map(); [...(r.mindmaps||[]),...(l.mindmaps||[])].forEach(t=>{const p=mmi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mmi.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
@@ -346,7 +432,7 @@ function mergeData(r,l) {
   const c24Map=new Map(); [...(r.cafe24_schedules||[]),...(l.cafe24_schedules||[])].forEach(t=>{const p=c24Map.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))c24Map.set(t.id,t);});
   const notifMap=new Map(); [...(r.notifications||[]),...(l.notifications||[])].forEach(t=>{const p=notifMap.get(t.id);if(!p||(t.updatedAt||t.ts||0)>=(p.updatedAt||p.ts||0))notifMap.set(t.id,t);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],mindmaps:[...mmi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
+  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],reportItems:[...rpi.values()],mindmaps:[...mmi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
     routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
     colLabels:((l.colLabelsUpdatedAt||0)>=(r.colLabelsUpdatedAt||0)?l.colLabels:r.colLabels)||{},colLabelsUpdatedAt:Math.max(l.colLabelsUpdatedAt||0,r.colLabelsUpdatedAt||0),
     log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),
@@ -522,6 +608,10 @@ const CSS = `
 /* ── 모달 ── */
 .mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:center;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:50;}
 .modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:0;display:flex;flex-direction:column;max-height:90vh;}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;border-bottom:1px solid var(--line);}
+.modal-head h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.02em;}
+.modal-head .x{background:none;border:none;cursor:pointer;color:var(--ink3);font-size:28px;line-height:1;padding:0;width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:8px;}
+.modal-head .x:hover{background:var(--bg);color:var(--danger);}
 .modal h2{font-size:19px;font-weight:800;margin:0;padding:24px 28px 18px;border-bottom:1px solid var(--line);letter-spacing:-.02em;}
 .modal-body{flex:1;overflow-y:auto;padding:24px 28px;}
 .modal-foot{padding:18px 28px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;}
@@ -722,6 +812,12 @@ const CSS = `
 .ckrow.dragging{opacity:.4;cursor:grabbing;box-shadow:0 0 0 2px var(--pri),var(--sh);}
 .ckrowmain{display:flex;align-items:flex-start;gap:11px;}
 .ckbox{width:22px;height:22px;border:2px solid #8F959C;border-radius:6px;background:#fff;font-size:12px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.ccklist{display:flex;flex-direction:column;gap:4px;}
+.ccklist-wrap{margin-bottom:9px;}
+.ccktoggle{background:none;border:none;color:var(--ink3);font-size:10.5px;cursor:pointer;padding:0 0 4px;display:block;}
+.ccktoggle:hover{color:var(--pri);}
+.ccklitem{display:flex;align-items:center;gap:6px;font-size:12px;}
+.ccklitem .ckbox.sm{width:15px;height:15px;font-size:9px;border-radius:4px;}
 .ckbox:hover{border-color:var(--ok);background:#F5FBF7;}
 .ckbox.on{background:var(--ok);border-color:var(--ok);color:#fff;}
 .ckbox.sm{width:18px;height:18px;font-size:10px;}
@@ -843,6 +939,7 @@ const ALL_TABS=[
   {id:"monthly",label:"월간 업무"},
   {id:"checklist",label:"체크리스트"},
   {id:"memo",label:"메모"},
+  {id:"report",label:"일보고"},
   {id:"mindmap",label:"마인드맵"},
   {id:"ref",label:"래퍼런스"},
   {id:"schedule",label:"시간표"},
@@ -915,6 +1012,8 @@ function Board() {
   const [riIssueSubEditId, setRiIssueSubEditId] = useState(null);
   const [riQuickIssueId, setRiQuickIssueId] = useState(null);
   const [riQuickIssueText, setRiQuickIssueText] = useState("");
+  const [cardCkHidden, setCardCkHidden] = useState({});
+  const [edUrlInput, setEdUrlInput] = useState("");
   const [memoQuery, setMemoQuery] = useState("");
   const [memoCatFilter, setMemoCatFilter] = useState("전체");
   const [memoDraft, setMemoDraft] = useState(null);
@@ -922,6 +1021,13 @@ function Board() {
   const [memoDrag, setMemoDrag] = useState(null);
   const [memoSubText, setMemoSubText] = useState({});
   const [memoSubEditId, setMemoSubEditId] = useState(null);
+  const [reportQuery, setReportQuery] = useState("");
+  const [reportCatFilter, setReportCatFilter] = useState("전체");
+  const [reportDraft, setReportDraft] = useState(null);
+  const [reportExpand, setReportExpand] = useState({});
+  const [reportDrag, setReportDrag] = useState(null);
+  const [reportSubText, setReportSubText] = useState({});
+  const [reportSubEditId, setReportSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const [notifBoxOpen, setNotifBoxOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
@@ -1059,7 +1165,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]},edMasterImages:remote.edMasterImages||{보틀:[],대용량:[],파우치:[]},edSavedSummaries:Array.isArray(remote.edSavedSummaries)?remote.edSavedSummaries:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],reportItems:Array.isArray(remote.reportItems)?remote.reportItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]},edMasterImages:remote.edMasterImages||{보틀:[],대용량:[],파우치:[]},edSavedSummaries:Array.isArray(remote.edSavedSummaries)?remote.edSavedSummaries:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -1161,6 +1267,7 @@ function Board() {
   };
 
   const moveTask=(task,statusId)=>{if(!canEdit||task.status===statusId)return;const now=Date.now();const logs=[mkLog("상태 변경",task,`${cols.find((c)=>c.id===task.status)?.label} -> ${cols.find((c)=>c.id===statusId)?.label}`)];let spawn=null;if(statusId==="done"&&task.repeat&&task.repeat!=="none"){spawn={...task,id:uid(),status:"todo",due:nextDue(task.due,task.repeat),checklist:(task.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}commit((d)=>{let tasks=d.tasks.map((t)=>t.id===task.id?{...t,status:statusId,updatedAt:now,updatedBy:me,doneAt:statusId==="done"?(t.doneAt||now):null}:t);if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);if(statusId==="done"&&task.status!=="done"){}};
+  const toggleCardCk=(t,ckId)=>{if(!canEdit)return;commit((d)=>({...d,tasks:d.tasks.map((x)=>x.id===t.id?{...x,checklist:(x.checklist||[]).map((c)=>c.id===ckId?{...c,done:!c.done}:c),updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("체크 항목",t,"토글")]);};
   const removeTask=(task)=>{commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,deleted:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("업무 삭제",task)]);setDraft(null);};
   const setArchivedFlag=(task,flag)=>commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,archived:flag,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog(flag?"아카이브":"아카이브 해제",task)]);
   const archiveDone=()=>{const targets=live.filter((t)=>t.status==="done");if(!targets.length){setConfirmBox(null);return;}const ids=new Set(targets.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.map((t)=>ids.has(t.id)?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("완료 일괄 보관",null,`${targets.length}건`)]);setConfirmBox(null);};
@@ -1539,6 +1646,63 @@ function Board() {
     commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
   };
 
+  /* ── 일보고 (메모와 동일 구조) ── */
+  const reportItems=useMemo(()=>(data.reportItems||[]).filter((x)=>!x.deleted),[data.reportItems]);
+  const reportCatNames=useMemo(()=>[...new Set(reportItems.map((x)=>x.cat).filter(Boolean))].sort(),[reportItems]);
+  const reportSubNames=useMemo(()=>(cat)=>[...new Set(reportItems.filter((x)=>x.cat===cat).map((x)=>x.sub).filter(Boolean))].sort(),[reportItems]);
+  const reportFiltered=useMemo(()=>{
+    let list=reportItems;
+    if(reportCatFilter!=="전체")list=list.filter((x)=>(x.cat||"미분류")===reportCatFilter);
+    const q=reportQuery.trim().toLowerCase();
+    if(q)list=list.filter((x)=>`${x.cat||""} ${x.sub||""} ${x.title||""} ${x.text||""} ${(x.subs||[]).map((s)=>s.text).join(" ")}`.toLowerCase().includes(q));
+    return list.slice().sort((a,b)=>(a.order??999)-(b.order??999));
+  },[reportItems,reportCatFilter,reportQuery]);
+  const reportCatOptions=useMemo(()=>["전체",...new Set(reportItems.map((x)=>x.cat||"미분류"))],[reportItems]);
+  const saveReport=()=>{
+    const text=(reportDraft.text||"").trim();
+    if(!text){alert("일보고 내용을 입력하세요.");return;}
+    const now=Date.now();
+    if(reportDraft.id){
+      commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportDraft.id?{...x,cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,updatedAt:now}:x)}),[mkLog("일보고 수정",null,text.slice(0,30))]);
+    }else{
+      const rec={id:uid(),cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,subs:[],createdAt:now,updatedAt:now,createdBy:me};
+      commit((d)=>({...d,reportItems:[...(d.reportItems||[]),rec]}),[mkLog("일보고 생성",null,text.slice(0,30))]);
+    }
+    setReportDraft(null);
+  };
+  const removeReport=(m)=>{commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("일보고 삭제",null,(m.text||"").slice(0,30))]);setReportDraft(null);};
+  const duplicateReport=(m)=>{
+    const now=Date.now();
+    const copy={id:uid(),cat:m.cat,sub:m.sub,title:m.title?m.title+" (복사)":"",text:m.text,subs:[],order:null,createdAt:now,updatedAt:now,createdBy:me};
+    commit((d)=>({...d,reportItems:[...(d.reportItems||[]),copy]}),[mkLog("일보고 복사",null,(copy.text||"").slice(0,30))]);
+  };
+  const reorderReport=(fromId,toId)=>{
+    if(!canEdit||fromId===toId)return;
+    const arr=[...reportFiltered];
+    const fi=arr.findIndex((x)=>x.id===fromId);
+    const ti=arr.findIndex((x)=>x.id===toId);
+    if(fi<0||ti<0)return;
+    const [moved]=arr.splice(fi,1);
+    arr.splice(ti,0,moved);
+    const now=Date.now();
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>{
+      const pos=arr.findIndex((a)=>a.id===x.id);
+      return pos>=0?{...x,order:pos,updatedAt:now}:x;
+    })}),[]);
+  };
+  const addReportSub=(reportId,text)=>{
+    const t=text.trim();if(!t)return;
+    const sub={id:uid(),text:t,author:me||"익명",ts:Date.now()};
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:[...(x.subs||[]),sub],updatedAt:Date.now()}:x)}),[]);
+  };
+  const editReportSub=(reportId,subId,text)=>{
+    const t=text.trim();if(!t)return;
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,text:t,edited:true}:s),updatedAt:Date.now()}:x)}),[]);
+  };
+  const removeReportSub=(reportId,subId)=>{
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
+  };
+
   /* ── 마인드맵 (계층형) ── */
   const mindmaps=useMemo(()=>(data.mindmaps||[]).filter((m)=>!m.deleted),[data.mindmaps]);
   const mmMakeNode=(text,color)=>({id:uid(),text:text||"노드",color:color||null,children:[],collapsed:false});
@@ -1574,6 +1738,13 @@ function Board() {
   const C24_CLIENT_ID='XUlWW7h7N9claZtHu37zhA';
   const C24_REDIRECT='https://work-board-one.vercel.app';
   const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`];return next.slice(-100);});
+  // 다른 컴퓨터/GitHub Actions가 갱신한 스케줄을 Firestore에서 받아와 반영 (localStorage는 최초 로딩용 캐시일 뿐)
+  useEffect(()=>{
+    if(Array.isArray(data.cafe24_schedules)){
+      setC24Schedules(data.cafe24_schedules);
+      try{localStorage.setItem('c24_schedules',JSON.stringify(data.cafe24_schedules));}catch(e){}
+    }
+  },[data.cafe24_schedules]);
   const c24TokenValid=()=>c24TokenRef.current&&c24Expiry>Date.now();
   // 토큰 state가 바뀔 때 ref도 동기화
   useEffect(()=>{c24TokenRef.current=c24Token;},[c24Token]);
@@ -1681,6 +1852,21 @@ function Board() {
     setEdMsg(`✅ ${newImgs.length}장 업로드 완료`);
   };
 
+  // 링크(URL)로 마스터 이미지 추가 — 용량 제한 없이 카페24가 서버에서 직접 가져옴
+  const addMasterImageFromUrl=async(url)=>{
+    const u=(url||"").trim();
+    if(!u){setEdMsg("❌ 이미지 링크를 입력하세요");return;}
+    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요 — 이미지를 저장하려면 먼저 로그인하세요");return;}
+    setEdMsg('링크에서 이미지 가져오는 중...');
+    const cur=(data.edMasterImages||{})[edCat]||[];
+    const upR=await c24Api({action:'uploadImageFromUrl',imageUrl:u});
+    const resultUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+    if(!resultUrl){setEdMsg("❌ 링크 업로드 실패: "+JSON.stringify(upR));return;}
+    const fname=u.split('/').pop().split('?')[0]||'img.jpg';
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,{id:uid(),url:resultUrl,name:decodeURIComponent(fname),createdAt:Date.now()}]},updatedAt:Date.now()}),[]);
+    setEdMsg(`✅ 링크에서 이미지 추가 완료`);
+  };
+
   const replaceMasterImage=async(idx,file)=>{
     if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
     setEdMsg(`${idx+1}번 이미지 교체 중...`);
@@ -1694,6 +1880,22 @@ function Board() {
     commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
     setEdChanged((prev)=>({...prev,[idx]:true}));
     setEdMsg(`✅ ${idx+1}번 이미지 교체 완료`);
+  };
+
+  const replaceMasterImageFromUrl=async(idx,url)=>{
+    const u=(url||"").trim();
+    if(!u)return;
+    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
+    setEdMsg(`${idx+1}번 이미지 링크로 교체 중...`);
+    const upR=await c24Api({action:'uploadImageFromUrl',imageUrl:u});
+    const resultUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+    if(!resultUrl){setEdMsg("❌ 업로드 실패: "+JSON.stringify(upR));return;}
+    const fname=decodeURIComponent(u.split('/').pop().split('?')[0]||'img.jpg');
+    const imgs=[...((data.edMasterImages||{})[edCat]||[])];
+    imgs[idx]={...imgs[idx],url:resultUrl,name:fname,updatedAt:Date.now()};
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+    setEdChanged((prev)=>({...prev,[idx]:true}));
+    setEdMsg(`✅ ${idx+1}번 이미지 링크로 교체 완료`);
   };
 
   const sendImages=async(imgIdxs)=>{
@@ -1765,6 +1967,9 @@ function Board() {
     setEdSending(false);
   };
   const c24UpdateProduct=async(productNo,payload)=>{
+    const res=await c24Api({action:'update',productNo,payload});
+    if(!res||!res.product)c24AddLog(`❌ 상품 ${productNo} 수정 실패: `+JSON.stringify(res).slice(0,150));
+    return !!(res&&res.product);
   };
   const c24AddSchedule=()=>{
     if(!c24SelProduct){alert('상품을 먼저 선택해주세요.');return;}
@@ -2101,6 +2306,21 @@ function Board() {
           const pct=t.progress!=null&&t.progress>0?t.progress:(ck.length?Math.round(ckDone/ck.length*100):0);
           return <div className="cbar" title={`진행률 ${pct}%`}><i style={{width:pct+"%"}} /></div>;
         })()}
+        {ck.length>0&&(
+          <div className="ccklist-wrap">
+            <button className="ccktoggle" onClick={(e)=>{e.stopPropagation();setCardCkHidden({...cardCkHidden,[t.id]:!cardCkHidden[t.id]});}}>{cardCkHidden[t.id]?`체크리스트 보기 (${ckDone}/${ck.length})`:"체크리스트 숨김"}</button>
+            {!cardCkHidden[t.id]&&(
+              <div className="ccklist" onClick={(e)=>e.stopPropagation()}>
+                {ck.map((c)=>(
+                  <div key={c.id} className="ccklitem">
+                    <button className={"ckbox sm"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCardCk(t,c.id)}>{c.done?"✓":""}</button>
+                    <span style={{textDecoration:c.done?"line-through":"none",color:c.done?"var(--ink3)":"inherit"}}>{c.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="cfoot">
           <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
             {t.owner?<span className={"ownerchip"+(t.owner===me?" me":"")}>{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
@@ -2196,7 +2416,7 @@ function Board() {
       </div>
       <div className="tabs">
         {visibleTabs.map((t)=>{
-          const badgeMap={board:live.length,routine:rItems.filter((it)=>!(it.checkins||{})[riDate]).length,monthly:mlyByMonth(mlyDate).filter((m)=>!m.done).length,checklist:checkitems.filter((c)=>!c.done).length,memo:memoItems.length,issue:allIssues.filter((i)=>!i.resolved).length,archive:archived.length};
+          const badgeMap={board:live.length,routine:rItems.filter((it)=>!(it.checkins||{})[riDate]).length,monthly:mlyByMonth(mlyDate).filter((m)=>!m.done).length,checklist:checkitems.filter((c)=>!c.done).length,memo:memoItems.length,report:reportItems.length,issue:allIssues.filter((i)=>!i.resolved).length,archive:archived.length};
           const n=badgeMap[t.id]??null;
           return(
           <button key={t.id}
@@ -3078,6 +3298,76 @@ function Board() {
         </div>
       )}
 
+      {view==="report"&&(
+        <div>
+          <div className="panel" style={{padding:14,marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <div style={{fontSize:14,fontWeight:800}}>일보고</div>
+              {canEdit&&<button className="btn-save" onClick={()=>setReportDraft({cat:"",sub:"",title:"",text:""})}>+ 일보고 추가</button>}
+            </div>
+            <div style={{display:"flex",gap:7,marginTop:12,flexWrap:"wrap"}}>
+              <input className="inp" style={{flex:1,minWidth:160}} placeholder="검색 (분류·제목·내용·하위항목)" value={reportQuery} onChange={(e)=>setReportQuery(e.target.value)} />
+              <select className="sel" value={reportCatFilter} onChange={(e)=>setReportCatFilter(e.target.value)}>
+                {reportCatOptions.map((c)=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {reportFiltered.length===0&&<div className="empty">{reportQuery||reportCatFilter!=="전체"?"조건에 맞는 일보고가 없습니다":"일보고가 없습니다. + 일보고 추가로 시작하세요."}</div>}
+
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {reportFiltered.map((m)=>{
+              const expanded=!!reportExpand[m.id];
+              return (
+                <div key={m.id} draggable={canEdit}
+                  onDragStart={(e)=>{setReportDrag(m.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",m.id);}catch(err){}}}
+                  onDragOver={(e)=>{e.preventDefault();e.dataTransfer.dropEffect="move";}}
+                  onDrop={()=>{if(reportDrag)reorderReport(reportDrag,m.id);setReportDrag(null);}}
+                  onDragEnd={()=>setReportDrag(null)}
+                  className={"memocard"+(reportDrag===m.id?" dragging":"")}>
+                  <div className="memohead">
+                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>
+                      {(m.cat||m.sub)&&<div className="memopath">{[m.cat,m.sub].filter(Boolean).join(" > ")}</div>}
+                      {m.title&&<div className="memotitle">{m.title}</div>}
+                      <div className="memotext">{m.text}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <button className="riedit" onClick={()=>setReportExpand({...reportExpand,[m.id]:!expanded})}>{(m.subs||[]).length>0?`하위 ${(m.subs||[]).length}`:"+하위"}</button>
+                      {canEdit&&<button className="riedit" onClick={()=>duplicateReport(m)}>복사</button>}
+                      {canEdit&&<button className="riedit" onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>수정</button>}
+                    </div>
+                  </div>
+                  {expanded&&(
+                    <div className="memosubs">
+                      {(m.subs||[]).length===0&&<span className="hint">하위 항목이 없습니다</span>}
+                      {(m.subs||[]).map((s)=>(
+                        <div key={s.id} className="cmt">
+                          <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}{s.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                          {reportSubEditId===s.id
+                            ? <textarea className="hinput" defaultValue={s.text} autoFocus style={{width:"100%",marginTop:4}}
+                                onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editReportSub(m.id,s.id,e.target.value);setReportSubEditId(null);}}
+                                onBlur={(e)=>{editReportSub(m.id,s.id,e.target.value);setReportSubEditId(null);}} />
+                            : <p>{s.text}</p>}
+                          {canEdit&&reportSubEditId!==s.id&&<div style={{display:"flex",gap:10}}>
+                            <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setReportSubEditId(s.id)}>수정</button>
+                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeReportSub(m.id,s.id)}>삭제</button>
+                          </div>}
+                        </div>
+                      ))}
+                      {canEdit&&<div className="addrow">
+                        <textarea className="hinput" placeholder="하위 항목 입력 (Enter 추가, Shift+Enter 줄바꿈)"
+                          value={reportSubText[m.id]||""} onChange={(e)=>setReportSubText({...reportSubText,[m.id]:e.target.value})}
+                          onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addReportSub(m.id,reportSubText[m.id]||"");setReportSubText({...reportSubText,[m.id]:""});}} />
+                      </div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {view==="issue"&&(
         <div>
           <div className="panel"><h3>이슈 모아보기</h3>
@@ -3529,6 +3819,7 @@ function Board() {
                       <th>SKU</th>
                       <th style={{textAlign:"right"}}>현재고</th>
                       <th style={{textAlign:"right"}}>전일대비</th>
+                      <th style={{textAlign:"right"}}>입고</th>
                       <th style={{textAlign:"right"}}>일평균소진</th>
                       <th style={{textAlign:"right"}}>예상소진일</th>
                       <th style={{textAlign:"right"}}>안전재고</th>
@@ -3575,10 +3866,12 @@ function Board() {
                           <td style={{color:"var(--ink3)",fontSize:12}}>{item.sku}</td>
                           <td style={{textAlign:"right",fontWeight:700,fontSize:14}}>{viewStock===null?<span style={{color:"var(--ink3)"}}>-</span>:viewStock.toLocaleString()}</td>
                           <td style={{textAlign:"right"}}>
-                            {delta===null?<span style={{color:"var(--ink3)"}}>-</span>
-                              :delta>0?<span className="stock-delta-up">▲{Math.abs(delta).toLocaleString()}</span>
-                              :delta<0?<span className="stock-delta-down">▼{Math.abs(delta).toLocaleString()}</span>
-                              :<span className="stock-delta-zero">-</span>}
+                            {delta===null||delta>=0?<span style={{color:"var(--ink3)"}}>-</span>
+                              :<span className="stock-delta-down">▼{Math.abs(delta).toLocaleString()}</span>}
+                          </td>
+                          <td style={{textAlign:"right"}}>
+                            {delta===null||delta<=0?<span style={{color:"var(--ink3)"}}>-</span>
+                              :<span className="stock-delta-up">▲{Math.abs(delta).toLocaleString()}</span>}
                           </td>
                           <td style={{textAlign:"right",color:"var(--ink3)"}}>
                             {dailyRate!==null?`${dailyRate.toLocaleString()}개/일`:"-"}
@@ -4115,6 +4408,10 @@ function Board() {
                           e.target.value="";
                         }} />
                       </label>
+                      <button style={{fontSize:11,color:"#0C66E4",fontWeight:700,border:"1px solid #0C66E4",borderRadius:5,padding:"3px 10px",background:"none",cursor:"pointer"}} onClick={async()=>{
+                        const u=window.prompt("교체할 이미지 링크(URL)를 입력하세요");
+                        if(u)await replaceMasterImageFromUrl(i,u);
+                      }}>🔗 링크로 교체</button>
                       <button style={{fontSize:11,color:"var(--danger)",fontWeight:700,border:"1px solid var(--danger)",borderRadius:5,padding:"3px 10px",background:"none",cursor:"pointer"}} onClick={()=>{
                         const imgs=((data.edMasterImages||{})[edCat]||[]).filter((_,j)=>j!==i);
                         commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
@@ -4145,6 +4442,13 @@ function Board() {
                     e.target.value="";
                   }} />
                 </label>
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <input value={edUrlInput} onChange={(e)=>setEdUrlInput(e.target.value)}
+                    placeholder="🔗 이미지 링크(URL)로 추가 — 큰 파일은 카페24 디자인>파일업로더에 올린 뒤 링크를 붙여넣으세요"
+                    style={{flex:1,fontSize:12,border:"1px solid var(--line2)",borderRadius:7,padding:"8px 10px"}}
+                    onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;e.preventDefault();addMasterImageFromUrl(edUrlInput);setEdUrlInput("");}} />
+                  <button className="btn ghost" style={{fontSize:12,padding:"5px 14px",flexShrink:0}} onClick={()=>{addMasterImageFromUrl(edUrlInput);setEdUrlInput("");}}>추가</button>
+                </div>
 
                 {/* 전송 버튼 */}
                 {(((data.edMasterImages||{})[edCat]||[]).length>0||edSummary[edCat])&&(
@@ -4547,6 +4851,31 @@ function Board() {
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setMemoDraft(null)}>닫기</button>
             <button className="btn-save" onClick={saveMemo}>저장</button>
+          </div>
+        </div></div>
+      )}
+
+      {reportDraft&&(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setReportDraft(null)}><div className="modal">
+          <h2>{reportDraft.id?"일보고 수정":"새 일보고"}</h2>
+          <div className="modal-body">
+            <div className="r3">
+              <div className="fld"><label>대분류 (선택)</label><input list="report-cats" value={reportDraft.cat||""} onChange={(e)=>setReportDraft({...reportDraft,cat:e.target.value})} placeholder="예) 마케팅" />
+                <datalist id="report-cats">{reportCatNames.map((c)=><option key={c} value={c} />)}</datalist>
+              </div>
+              <div className="fld"><label>중분류 (선택)</label><input list="report-subs" value={reportDraft.sub||""} onChange={(e)=>setReportDraft({...reportDraft,sub:e.target.value})} placeholder="예) 브랜드검색" />
+                <datalist id="report-subs">{reportSubNames(reportDraft.cat||"").map((s)=><option key={s} value={s} />)}</datalist>
+              </div>
+              <div className="fld"><label>소분류 (선택)</label><input value={reportDraft.title||""} onChange={(e)=>setReportDraft({...reportDraft,title:e.target.value})} placeholder="예) 키워드 아이디어" /></div>
+            </div>
+            <div className="fld"><label>내용</label><textarea autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} placeholder="일보고 내용을 입력하세요" style={{minHeight:100}} /></div>
+          </div>
+          <div className="modal-foot">
+            {reportDraft.id&&<button className="del" onClick={()=>removeReport(reportDraft)}>삭제</button>}
+            {reportDraft.id&&<button className="btn ghost" onClick={()=>duplicateReport(reportDraft)}>복사</button>}
+            <span className="spacer" />
+            <button className="btn ghost" onClick={()=>setReportDraft(null)}>닫기</button>
+            <button className="btn-save" onClick={saveReport}>저장</button>
           </div>
         </div></div>
       )}
