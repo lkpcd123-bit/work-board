@@ -1741,8 +1741,9 @@ function Board() {
   // 다른 컴퓨터/GitHub Actions가 갱신한 스케줄을 Firestore에서 받아와 반영 (localStorage는 최초 로딩용 캐시일 뿐)
   useEffect(()=>{
     if(Array.isArray(data.cafe24_schedules)){
-      setC24Schedules(data.cafe24_schedules);
-      try{localStorage.setItem('c24_schedules',JSON.stringify(data.cafe24_schedules));}catch(e){}
+      const list=data.cafe24_schedules.filter((s)=>!s.deleted);
+      setC24Schedules(list);
+      try{localStorage.setItem('c24_schedules',JSON.stringify(list));}catch(e){}
     }
   },[data.cafe24_schedules]);
   const c24TokenValid=()=>c24TokenRef.current&&c24Expiry>Date.now();
@@ -1980,7 +1981,7 @@ function Board() {
     c24SaveSchedules(next);
     c24AddLog(`✅ 스케줄 등록: #${s.productNo} ${s.productName} | 오픈:${s.openAt||'없음'} | 종료:${s.closeAt||'없음'}`);
   };
-  const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.filter((s)=>s.id!==id));c24AddLog('🗑 스케줄 삭제');};
+  const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.map((s)=>s.id===id?{...s,deleted:true,updatedAt:Date.now()}:s));c24AddLog('🗑 스케줄 삭제');};
   const c24UpdateSchedule=(updated)=>{
     c24SaveSchedules(c24Schedules.map((s)=>s.id===updated.id?{...updated,openDone:false,closeDone:false,error:null}:s));
     c24AddLog(`✏ 스케줄 수정: #${updated.productNo} ${updated.productName}`);
@@ -4241,22 +4242,22 @@ function Board() {
           {/* 수정 모달 */}
           {c24EditSchedule&&(
             <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setC24EditSchedule(null)}>
-              <div className="modal" style={{maxWidth:480}} onClick={(e)=>e.stopPropagation()}>
+              <div className="modal" style={{maxWidth:520}} onClick={(e)=>e.stopPropagation()}>
                 <div className="modal-head"><h3>스케줄 수정</h3><button className="x" onClick={()=>setC24EditSchedule(null)}>×</button></div>
                 <div className="modal-body">
                   <div style={{fontSize:13,fontWeight:700,color:"#0C66E4",marginBottom:14}}>#{c24EditSchedule.productNo} · {c24EditSchedule.productName}</div>
-                  <div className="r3" style={{marginBottom:12}}>
+                  <div className="r2" style={{marginBottom:12}}>
                     <div className="fld"><label>오픈 일시</label><input type="datetime-local" value={c24EditSchedule.openAt||""} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,openAt:e.target.value||null})} /></div>
                     <div className="fld"><label>종료 일시</label><input type="datetime-local" value={c24EditSchedule.closeAt||""} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAt:e.target.value||null})} /></div>
-                    <div className="fld"><label>종료 시 처리</label>
-                      <select value={c24EditSchedule.closeAction} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAction:e.target.value})}>
-                        <option value="soldout">품절처리 (판매중지)</option>
-                        <option value="hide">진열+판매 중지</option>
-                        <option value="selling_off">판매만 중지</option>
-                      </select>
-                    </div>
                   </div>
-                  <div className="r3">
+                  <div className="fld" style={{marginBottom:12}}><label>종료 시 처리</label>
+                    <select value={c24EditSchedule.closeAction} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAction:e.target.value})}>
+                      <option value="soldout">품절처리 (판매중지)</option>
+                      <option value="hide">진열+판매 중지</option>
+                      <option value="selling_off">판매만 중지</option>
+                    </select>
+                  </div>
+                  <div className="r2">
                     <div className="fld"><label>오픈 시 판매상태</label>
                       <select value={c24EditSchedule.openSelling} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,openSelling:e.target.value})}>
                         <option value="T">판매함</option>
@@ -4269,7 +4270,6 @@ function Board() {
                         <option value="F">진열안함</option>
                       </select>
                     </div>
-                    <div className="fld" />
                   </div>
                   <div style={{marginTop:12,padding:"10px 12px",background:"#FFF8E1",borderRadius:8,fontSize:12,color:"#7A5F00"}}>
                     ⚠ 수정하면 오픈·종료 완료 상태가 초기화되어 다시 실행됩니다.
