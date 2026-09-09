@@ -312,9 +312,9 @@ function ScheduleView({uid, saveBlocks: _save}) {
           {/* 일정 추가/수정 모달 */}
           {scAddOpen&&scDraft&&(
             <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setScAddOpen(false)}>
-              <div className="modal" style={{maxWidth:380}} onClick={(e)=>e.stopPropagation()}>
+              <div className="modal" style={{maxWidth:420}} onClick={(e)=>e.stopPropagation()}>
                 <div className="modal-head"><h3>{scDraft.id?"일정 수정":"일정 추가"}</h3><button className="x" onClick={()=>setScAddOpen(false)}>×</button></div>
-                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:22,padding:"20px 4px"}}>
+                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:22,padding:"22px 24px"}}>
                   <div className="fld"><label>제목</label><input value={scDraft.title} onChange={(e)=>setScDraft({...scDraft,title:e.target.value})} placeholder="회의, 업무, 점심..." autoFocus /></div>
                   <div className="r3">
                     <div className="fld"><label>시작</label>
