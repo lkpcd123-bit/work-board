@@ -3809,6 +3809,7 @@ function Board() {
                       <th>SKU</th>
                       <th style={{textAlign:"right"}}>현재고</th>
                       <th style={{textAlign:"right"}}>전일대비</th>
+                      <th style={{textAlign:"right"}}>입고</th>
                       <th style={{textAlign:"right"}}>일평균소진</th>
                       <th style={{textAlign:"right"}}>예상소진일</th>
                       <th style={{textAlign:"right"}}>안전재고</th>
@@ -3855,10 +3856,12 @@ function Board() {
                           <td style={{color:"var(--ink3)",fontSize:12}}>{item.sku}</td>
                           <td style={{textAlign:"right",fontWeight:700,fontSize:14}}>{viewStock===null?<span style={{color:"var(--ink3)"}}>-</span>:viewStock.toLocaleString()}</td>
                           <td style={{textAlign:"right"}}>
-                            {delta===null?<span style={{color:"var(--ink3)"}}>-</span>
-                              :delta>0?<span className="stock-delta-up">▲{Math.abs(delta).toLocaleString()}</span>
-                              :delta<0?<span className="stock-delta-down">▼{Math.abs(delta).toLocaleString()}</span>
-                              :<span className="stock-delta-zero">-</span>}
+                            {delta===null||delta>=0?<span style={{color:"var(--ink3)"}}>-</span>
+                              :<span className="stock-delta-down">▼{Math.abs(delta).toLocaleString()}</span>}
+                          </td>
+                          <td style={{textAlign:"right"}}>
+                            {delta===null||delta<=0?<span style={{color:"var(--ink3)"}}>-</span>
+                              :<span className="stock-delta-up">▲{Math.abs(delta).toLocaleString()}</span>}
                           </td>
                           <td style={{textAlign:"right",color:"var(--ink3)"}}>
                             {dailyRate!==null?`${dailyRate.toLocaleString()}개/일`:"-"}
