@@ -1738,6 +1738,14 @@ function Board() {
   const C24_CLIENT_ID='XUlWW7h7N9claZtHu37zhA';
   const C24_REDIRECT='https://work-board-one.vercel.app';
   const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`];return next.slice(-100);});
+  // 다른 컴퓨터/GitHub Actions가 갱신한 스케줄을 Firestore에서 받아와 반영 (localStorage는 최초 로딩용 캐시일 뿐)
+  useEffect(()=>{
+    if(Array.isArray(data.cafe24_schedules)){
+      const list=data.cafe24_schedules.filter((s)=>!s.deleted);
+      setC24Schedules(list);
+      try{localStorage.setItem('c24_schedules',JSON.stringify(list));}catch(e){}
+    }
+  },[data.cafe24_schedules]);
   const c24TokenValid=()=>c24TokenRef.current&&c24Expiry>Date.now();
   // 토큰 state가 바뀔 때 ref도 동기화
   useEffect(()=>{c24TokenRef.current=c24Token;},[c24Token]);
@@ -1960,6 +1968,9 @@ function Board() {
     setEdSending(false);
   };
   const c24UpdateProduct=async(productNo,payload)=>{
+    const res=await c24Api({action:'update',productNo,payload});
+    if(!res||!res.product)c24AddLog(`❌ 상품 ${productNo} 수정 실패: `+JSON.stringify(res).slice(0,150));
+    return !!(res&&res.product);
   };
   const c24AddSchedule=()=>{
     if(!c24SelProduct){alert('상품을 먼저 선택해주세요.');return;}
@@ -1970,7 +1981,7 @@ function Board() {
     c24SaveSchedules(next);
     c24AddLog(`✅ 스케줄 등록: #${s.productNo} ${s.productName} | 오픈:${s.openAt||'없음'} | 종료:${s.closeAt||'없음'}`);
   };
-  const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.filter((s)=>s.id!==id));c24AddLog('🗑 스케줄 삭제');};
+  const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.map((s)=>s.id===id?{...s,deleted:true,updatedAt:Date.now()}:s));c24AddLog('🗑 스케줄 삭제');};
   const c24UpdateSchedule=(updated)=>{
     c24SaveSchedules(c24Schedules.map((s)=>s.id===updated.id?{...updated,openDone:false,closeDone:false,error:null}:s));
     c24AddLog(`✏ 스케줄 수정: #${updated.productNo} ${updated.productName}`);
@@ -2048,7 +2059,7 @@ function Board() {
   const addRefCat=(name)=>{const t=name.trim();if(!t||refCats.includes(t))return;commit((d)=>({...d,refCats:[...(d.refCats||[]),t],updatedAt:Date.now()}),[]);};
   const deleteRefCat=(name)=>{commit((d)=>({...d,refCats:(d.refCats||[]).filter((c)=>c!==name),updatedAt:Date.now()}),[]);};
   const handleRefImages=async(files)=>{
-    const imgs=await Promise.all(Array.from(files).map((f)=>resizeImage(f,1200,1200,0.85)));
+    const imgs=await Promise.all(Array.from(files).map((f)=>resizeImage(f,1600,1600,0.9)));
     imgs.forEach((src)=>setRefDraft((d)=>({...d,images:[...(d?.images||[]),{id:uid(),src}]})));
   };
 
@@ -3126,13 +3137,13 @@ function Board() {
                 const items=Array.from(e.clipboardData.items||[]);
                 const imgItem=items.find((i)=>i.type.startsWith("image/"));
                 if(!imgItem)return;e.preventDefault();
-                const src=await resizeImage(imgItem.getAsFile(),1200,1200,0.85);
+                const src=await resizeImage(imgItem.getAsFile(),1600,1600,0.9);
                 setRefDraft({title:"",cat:refCats[0]||"",memo:"",images:[{id:uid(),src}],fav:false});
                 setRefAddOpen(true);
               }}
               onDragOver={(e)=>{e.preventDefault();setRefPasteActive(true);}}
               onDragLeave={()=>setRefPasteActive(false)}
-              onDrop={async(e)=>{e.preventDefault();setRefPasteActive(false);const files=Array.from(e.dataTransfer.files).filter((f)=>f.type.startsWith("image/"));if(!files.length)return;const src=await resizeImage(files[0],1200,1200,0.85);setRefDraft({title:"",cat:refCats[0]||"",memo:"",images:[{id:uid(),src}],fav:false});setRefAddOpen(true);}}>
+              onDrop={async(e)=>{e.preventDefault();setRefPasteActive(false);const files=Array.from(e.dataTransfer.files).filter((f)=>f.type.startsWith("image/"));if(!files.length)return;const src=await resizeImage(files[0],1600,1600,0.9);setRefDraft({title:"",cat:refCats[0]||"",memo:"",images:[{id:uid(),src}],fav:false});setRefAddOpen(true);}}>
               📋 여기에 이미지를 <b>Ctrl+V</b> 붙여넣거나 <b>드래그</b>해서 바로 추가하세요
             </div>
           )}
@@ -3140,13 +3151,13 @@ function Board() {
           <div className="refgrid">
             {refFiltered.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",padding:40,color:"var(--ink3)"}}>래퍼런스가 없습니다</div>}
             {refFiltered.map((r)=>(
-              <div key={r.id} className={"refcard"+(r.fav?" fav":"")} onClick={()=>r.images?.[0]&&setLightbox(r.images[0].src)}>
+              <div key={r.id} className={"refcard"+(r.fav?" fav":"")} onClick={()=>r.images?.length&&setLightbox({images:r.images.map((im)=>im.src),index:0})}>
                 {r.images?.[0]
                   ?<img src={r.images[0].src} alt={r.title} />
                   :<div style={{height:140,background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🖼</div>}
                 <div className="refbody">
                   {r.cat&&<div className="refcat">{r.cat}</div>}
-                  <div className="reftitle">{r.title||"제목 없음"}</div>
+                  <div className="reftitle">{r.title||"제목 없음"}{(r.images||[]).length>1&&<span style={{fontSize:11,color:"var(--ink3)",fontWeight:400,marginLeft:6}}>🖼 {r.images.length}</span>}</div>
                   {r.memo&&<div className="refmemo">{r.memo}</div>}
                   <div className="reffoot">
                     <span>{new Date(r.createdAt).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})}</span>
@@ -3171,9 +3182,9 @@ function Board() {
                   <div style={{marginBottom:14}}>
                     <label style={{fontSize:12,fontWeight:700,color:"var(--ink3)",display:"block",marginBottom:6}}>이미지</label>
                     <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:8}}>
-                      {(refDraft.images||[]).map((img)=>(
+                      {(refDraft.images||[]).map((img,imgIdx)=>(
                         <div key={img.id} style={{position:"relative"}}>
-                          <img src={img.src} alt="" style={{width:90,height:70,objectFit:"cover",borderRadius:7,cursor:"pointer",border:"1px solid var(--line)"}} onClick={()=>setLightbox(img.src)} />
+                          <img src={img.src} alt="" style={{width:90,height:70,objectFit:"cover",borderRadius:7,cursor:"pointer",border:"1px solid var(--line)"}} onClick={()=>setLightbox({images:(refDraft.images||[]).map((im)=>im.src),index:imgIdx})} />
                           <button onClick={()=>setRefDraft({...refDraft,images:refDraft.images.filter((x)=>x.id!==img.id)})}
                             style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.6)",color:"#fff",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",fontSize:11,padding:0}}>×</button>
                         </div>
@@ -3186,7 +3197,7 @@ function Board() {
                       </label>
                       <div className="refpaste" style={{flex:1,padding:"8px 12px",fontSize:12}}
                         tabIndex={0}
-                        onPaste={async(e)=>{const items=Array.from(e.clipboardData.items||[]);const imgItem=items.find((i)=>i.type.startsWith("image/"));if(!imgItem)return;e.preventDefault();const src=await resizeImage(imgItem.getAsFile(),1200,1200,0.85);setRefDraft((d)=>({...d,images:[...(d.images||[]),{id:uid(),src}]}));}}
+                        onPaste={async(e)=>{const items=Array.from(e.clipboardData.items||[]);const imgItem=items.find((i)=>i.type.startsWith("image/"));if(!imgItem)return;e.preventDefault();const src=await resizeImage(imgItem.getAsFile(),1600,1600,0.9);setRefDraft((d)=>({...d,images:[...(d.images||[]),{id:uid(),src}]}));}}
                         >Ctrl+V 붙여넣기</div>
                     </div>
                   </div>
@@ -4231,22 +4242,22 @@ function Board() {
           {/* 수정 모달 */}
           {c24EditSchedule&&(
             <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setC24EditSchedule(null)}>
-              <div className="modal" style={{maxWidth:480}} onClick={(e)=>e.stopPropagation()}>
+              <div className="modal" style={{maxWidth:520}} onClick={(e)=>e.stopPropagation()}>
                 <div className="modal-head"><h3>스케줄 수정</h3><button className="x" onClick={()=>setC24EditSchedule(null)}>×</button></div>
                 <div className="modal-body">
                   <div style={{fontSize:13,fontWeight:700,color:"#0C66E4",marginBottom:14}}>#{c24EditSchedule.productNo} · {c24EditSchedule.productName}</div>
-                  <div className="r3" style={{marginBottom:12}}>
+                  <div className="r2" style={{marginBottom:12}}>
                     <div className="fld"><label>오픈 일시</label><input type="datetime-local" value={c24EditSchedule.openAt||""} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,openAt:e.target.value||null})} /></div>
                     <div className="fld"><label>종료 일시</label><input type="datetime-local" value={c24EditSchedule.closeAt||""} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAt:e.target.value||null})} /></div>
-                    <div className="fld"><label>종료 시 처리</label>
-                      <select value={c24EditSchedule.closeAction} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAction:e.target.value})}>
-                        <option value="soldout">품절처리 (판매중지)</option>
-                        <option value="hide">진열+판매 중지</option>
-                        <option value="selling_off">판매만 중지</option>
-                      </select>
-                    </div>
                   </div>
-                  <div className="r3">
+                  <div className="fld" style={{marginBottom:12}}><label>종료 시 처리</label>
+                    <select value={c24EditSchedule.closeAction} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAction:e.target.value})}>
+                      <option value="soldout">품절처리 (판매중지)</option>
+                      <option value="hide">진열+판매 중지</option>
+                      <option value="selling_off">판매만 중지</option>
+                    </select>
+                  </div>
+                  <div className="r2">
                     <div className="fld"><label>오픈 시 판매상태</label>
                       <select value={c24EditSchedule.openSelling} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,openSelling:e.target.value})}>
                         <option value="T">판매함</option>
@@ -4259,7 +4270,6 @@ function Board() {
                         <option value="F">진열안함</option>
                       </select>
                     </div>
-                    <div className="fld" />
                   </div>
                   <div style={{marginTop:12,padding:"10px 12px",background:"#FFF8E1",borderRadius:8,fontSize:12,color:"#7A5F00"}}>
                     ⚠ 수정하면 오픈·종료 완료 상태가 초기화되어 다시 실행됩니다.
@@ -4812,13 +4822,25 @@ function Board() {
         );
       })()}
 
-      {lightbox&&(
+      {lightbox&&(()=>{
+        const isGallery=typeof lightbox==="object"&&lightbox!==null;
+        const images=isGallery?lightbox.images:[lightbox];
+        const idx=isGallery?lightbox.index:0;
+        const src=images[idx];
+        const go=(delta)=>setLightbox({images,index:(idx+delta+images.length)%images.length});
+        return (
         <div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
-          <img src={lightbox} alt="" style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.5)",objectFit:"contain"}} onClick={(e)=>e.stopPropagation()} />
+          <img src={src} alt="" style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.5)",objectFit:"contain"}} onClick={(e)=>e.stopPropagation()} />
+          {images.length>1&&<>
+            <button onClick={(e)=>{e.stopPropagation();go(-1);}} style={{position:"fixed",left:16,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:28,width:48,height:48,borderRadius:"50%",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+            <button onClick={(e)=>{e.stopPropagation();go(1);}} style={{position:"fixed",right:16,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:28,width:48,height:48,borderRadius:"50%",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
+            <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,.5)",color:"#fff",borderRadius:20,padding:"6px 16px",fontSize:13,fontWeight:700}}>{idx+1} / {images.length}</div>
+          </>}
           <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:20,right:24,background:"none",border:"none",color:"#fff",fontSize:32,cursor:"pointer",lineHeight:1}}>×</button>
-          <a href={lightbox} download="image" onClick={(e)=>e.stopPropagation()} style={{position:"fixed",bottom:24,right:24,background:"#0C66E4",color:"#fff",borderRadius:8,padding:"8px 18px",fontSize:13,fontWeight:700,textDecoration:"none"}}>⬇ 다운로드</a>
+          <a href={src} download="image" onClick={(e)=>e.stopPropagation()} style={{position:"fixed",bottom:24,right:24,background:"#0C66E4",color:"#fff",borderRadius:8,padding:"8px 18px",fontSize:13,fontWeight:700,textDecoration:"none"}}>⬇ 다운로드</a>
         </div>
-      )}
+        );
+      })()}
 
       {memoDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMemoDraft(null)}><div className="modal">
