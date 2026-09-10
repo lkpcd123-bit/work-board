@@ -1664,7 +1664,7 @@ function Board() {
     return list.slice().sort((a,b)=>(a.order??999)-(b.order??999));
   },[reportItems,reportCatFilter,reportQuery]);
   const reportCatOptions=useMemo(()=>["전체",...new Set(reportItems.map((x)=>x.cat||"미분류"))],[reportItems]);
-  const saveReport=()=>{
+  const saveReport=(close=true)=>{
     const text=(reportDraft.text||"").trim();
     if(!text){alert("일보고 내용을 입력하세요.");return;}
     const now=Date.now();
@@ -1673,8 +1673,9 @@ function Board() {
     }else{
       const rec={id:uid(),cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,subs:[],createdAt:now,updatedAt:now,createdBy:me};
       commit((d)=>({...d,reportItems:[...(d.reportItems||[]),rec]}),[mkLog("일보고 생성",null,text.slice(0,30))]);
+      if(!close)setReportDraft({...reportDraft,id:rec.id,createdAt:now,updatedAt:now});
     }
-    setReportDraft(null);
+    if(close)setReportDraft(null);
   };
   const removeReport=(m)=>{commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("일보고 삭제",null,(m.text||"").slice(0,30))]);setReportDraft(null);};
   const duplicateReport=(m)=>{
@@ -4921,8 +4922,9 @@ function Board() {
             {reportDraft.id&&<button className="del" onClick={()=>removeReport(reportDraft)}>삭제</button>}
             {reportDraft.id&&<button className="btn ghost" onClick={()=>duplicateReport(reportDraft)}>복사</button>}
             <span className="spacer" />
+            <button className="btn-save" style={{background:"#1F845A"}} onClick={()=>saveReport(false)}>💾 중간 저장</button>
             <button className="btn ghost" onClick={()=>setReportDraft(null)}>닫기</button>
-            <button className="btn-save" onClick={saveReport}>저장</button>
+            <button className="btn-save" onClick={()=>saveReport(true)}>저장</button>
           </div>
         </div></div>
       )}
