@@ -888,6 +888,9 @@ const CSS = `
 .stock-row-dragover td{border-top:3px solid #0C66E4;}
 .stock-row-alert td:first-child{border-left:4px solid #CA3521;}
 .stock-row-alert{background:#FFFBF9;}
+.stock-row-soldout{box-shadow:inset 0 0 0 2px #CA3521;}
+.stock-row-soldout td:first-child{border-left:4px solid #CA3521;}
+.stock-badge-soldout{background:#CA3521;color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:800;white-space:nowrap;}
 .stock-badge-alert{background:#FFECEB;color:#CA3521;border:1px solid #CA3521;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:800;white-space:nowrap;}
 .stock-badge-ok{background:#DCFFF1;color:#1F845A;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;}
 .stock-safe-input{width:70px;border:1px solid var(--line2);border-radius:6px;padding:4px 7px;font-size:12px;text-align:right;}
@@ -3840,14 +3843,15 @@ function Board() {
                       const sorted=[...hist].sort((a,b)=>new Date(a.date)-new Date(b.date));
                       const viewStock=stockViewDate?([...sorted].reverse().find((h)=>h.date<=stockViewDate)?.stock??null):item.stock;
                       const isAlert=safe>0&&viewStock!==null&&viewStock<safe;
+                      const isSoldout=viewStock===0;
                       const prev=sorted.length>=2?sorted[sorted.length-2]:null;
                       const delta=viewStock!==null&&prev?(viewStock-prev.stock):null;
                       const dailyRate=calcDailyRate(sorted);
                       const daysLeft=dailyRate&&dailyRate>0&&viewStock!==null?Math.floor(viewStock/dailyRate):null;
                       return(
                         <tr key={item.id}
-                          className={"stock-row-alert"===undefined?"":isAlert?"stock-row-alert":""}
-                          style={{background:isAlert?"#FFFBF9":""}}
+                          className={isSoldout?"stock-row-soldout":isAlert?"stock-row-alert":""}
+                          style={{background:isSoldout?"#FFF5F5":isAlert?"#FFFBF9":""}}
                           draggable
                           onDragStart={()=>setStockDragId(item.id)}
                           onDragOver={(e)=>{e.preventDefault();}}
@@ -3903,7 +3907,9 @@ function Board() {
                             })()}
                           </td>
                           <td style={{textAlign:"center"}}>
-                            {isAlert
+                            {isSoldout
+                              ?<span className="stock-badge-soldout">⛔ 품절</span>
+                              :isAlert
                               ?<span className="stock-badge-alert">⚠ 입고 요청</span>
                               :<span className="stock-badge-ok">정상</span>}
                           </td>
