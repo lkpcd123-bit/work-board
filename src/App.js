@@ -1031,6 +1031,9 @@ function Board() {
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const [notifBoxOpen, setNotifBoxOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
+  const [lbZoom, setLbZoom] = useState(1);
+  const [lbPan, setLbPan] = useState({x:0,y:0});
+  const lbDragRef = useRef(null);
   const [c24Token, setC24Token] = useState(()=>localStorage.getItem('c24_token')||'');
   const [c24Expiry, setC24Expiry] = useState(()=>parseInt(localStorage.getItem('c24_expiry')||'0'));
   const [c24RefreshToken, setC24RefreshToken] = useState(()=>localStorage.getItem('c24_refresh_token')||'');
@@ -4827,16 +4830,36 @@ function Board() {
         const images=isGallery?lightbox.images:[lightbox];
         const idx=isGallery?lightbox.index:0;
         const src=images[idx];
-        const go=(delta)=>setLightbox({images,index:(idx+delta+images.length)%images.length});
+        const go=(delta)=>{setLbZoom(1);setLbPan({x:0,y:0});setLightbox({images,index:(idx+delta+images.length)%images.length});};
+        const closeLb=()=>{setLightbox(null);setLbZoom(1);setLbPan({x:0,y:0});};
+        const zoomAt=(next)=>setLbZoom(Math.min(4,Math.max(1,next)));
         return (
-        <div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
-          <img src={src} alt="" style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.5)",objectFit:"contain"}} onClick={(e)=>e.stopPropagation()} />
+        <div onClick={closeLb} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:lbZoom>1?"grab":"zoom-out",overflow:"hidden"}}
+          onWheel={(e)=>{e.preventDefault();zoomAt(lbZoom+(e.deltaY<0?0.3:-0.3));}}>
+          <img src={src} alt=""
+            style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.5)",objectFit:"contain",
+              transform:`translate(${lbPan.x}px,${lbPan.y}px) scale(${lbZoom})`,transition:lbDragRef.current?"none":"transform .15s",
+              cursor:lbZoom>1?"grab":"zoom-in",touchAction:"none"}}
+            onClick={(e)=>{e.stopPropagation();if(lbDragRef.current?.moved)return;zoomAt(lbZoom>1?1:2.2);if(lbZoom>1)setLbPan({x:0,y:0});}}
+            onMouseDown={(e)=>{if(lbZoom<=1)return;e.preventDefault();lbDragRef.current={sx:e.clientX,sy:e.clientY,ox:lbPan.x,oy:lbPan.y,moved:false};}}
+            onMouseMove={(e)=>{const dr=lbDragRef.current;if(!dr)return;const dx=e.clientX-dr.sx,dy=e.clientY-dr.sy;if(Math.abs(dx)>3||Math.abs(dy)>3)dr.moved=true;setLbPan({x:dr.ox+dx,y:dr.oy+dy});}}
+            onMouseUp={()=>{lbDragRef.current=null;}}
+            onMouseLeave={()=>{lbDragRef.current=null;}}
+            onTouchStart={(e)=>{if(lbZoom<=1)return;const t=e.touches[0];lbDragRef.current={sx:t.clientX,sy:t.clientY,ox:lbPan.x,oy:lbPan.y,moved:false};}}
+            onTouchMove={(e)=>{const dr=lbDragRef.current;if(!dr)return;const t=e.touches[0];const dx=t.clientX-dr.sx,dy=t.clientY-dr.sy;if(Math.abs(dx)>3||Math.abs(dy)>3)dr.moved=true;setLbPan({x:dr.ox+dx,y:dr.oy+dy});}}
+            onTouchEnd={()=>{lbDragRef.current=null;}} />
+          <div style={{position:"fixed",bottom:images.length>1?64:24,left:"50%",transform:"translateX(-50%)",display:"flex",gap:6,alignItems:"center",background:"rgba(0,0,0,.5)",borderRadius:20,padding:"5px 8px"}} onClick={(e)=>e.stopPropagation()}>
+            <button onClick={()=>zoomAt(lbZoom-0.5)} style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",width:28,height:28,borderRadius:"50%",cursor:"pointer",fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+            <span style={{color:"#fff",fontSize:12,fontWeight:700,minWidth:38,textAlign:"center"}}>{Math.round(lbZoom*100)}%</span>
+            <button onClick={()=>zoomAt(lbZoom+0.5)} style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",width:28,height:28,borderRadius:"50%",cursor:"pointer",fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+            {lbZoom>1&&<button onClick={()=>{setLbZoom(1);setLbPan({x:0,y:0});}} style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:11,fontWeight:700,borderRadius:14,padding:"0 10px",height:28,cursor:"pointer"}}>초기화</button>}
+          </div>
           {images.length>1&&<>
             <button onClick={(e)=>{e.stopPropagation();go(-1);}} style={{position:"fixed",left:16,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:28,width:48,height:48,borderRadius:"50%",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
             <button onClick={(e)=>{e.stopPropagation();go(1);}} style={{position:"fixed",right:16,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:28,width:48,height:48,borderRadius:"50%",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
             <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,.5)",color:"#fff",borderRadius:20,padding:"6px 16px",fontSize:13,fontWeight:700}}>{idx+1} / {images.length}</div>
           </>}
-          <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:20,right:24,background:"none",border:"none",color:"#fff",fontSize:32,cursor:"pointer",lineHeight:1}}>×</button>
+          <button onClick={closeLb} style={{position:"fixed",top:20,right:24,background:"none",border:"none",color:"#fff",fontSize:32,cursor:"pointer",lineHeight:1}}>×</button>
           <a href={src} download="image" onClick={(e)=>e.stopPropagation()} style={{position:"fixed",bottom:24,right:24,background:"#0C66E4",color:"#fff",borderRadius:8,padding:"8px 18px",fontSize:13,fontWeight:700,textDecoration:"none"}}>⬇ 다운로드</a>
         </div>
         );
