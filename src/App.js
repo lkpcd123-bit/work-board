@@ -4904,7 +4904,7 @@ function Board() {
       )}
 
       {reportDraft&&(
-        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setReportDraft(null)}><div className="modal">
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setReportDraft(null)}><div className="modal" style={{maxWidth:720}}>
           <h2>{reportDraft.id?"일보고 수정":"새 일보고"}</h2>
           <div className="modal-body">
             <div className="r3">
@@ -4916,7 +4916,7 @@ function Board() {
               </div>
               <div className="fld"><label>소분류 (선택)</label><input value={reportDraft.title||""} onChange={(e)=>setReportDraft({...reportDraft,title:e.target.value})} placeholder="예) 키워드 아이디어" /></div>
             </div>
-            <div className="fld"><label>내용</label><textarea autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} placeholder="일보고 내용을 입력하세요" style={{minHeight:100}} /></div>
+            <div className="fld"><label>내용</label><textarea autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} placeholder="일보고 내용을 입력하세요" style={{minHeight:280}} /></div>
           </div>
           <div className="modal-foot">
             {reportDraft.id&&<button className="del" onClick={()=>removeReport(reportDraft)}>삭제</button>}
