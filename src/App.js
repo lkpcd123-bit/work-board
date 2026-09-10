@@ -4832,22 +4832,28 @@ function Board() {
         const src=images[idx];
         const go=(delta)=>{setLbZoom(1);setLbPan({x:0,y:0});setLightbox({images,index:(idx+delta+images.length)%images.length});};
         const closeLb=()=>{setLightbox(null);setLbZoom(1);setLbPan({x:0,y:0});};
-        const zoomAt=(next)=>setLbZoom(Math.min(4,Math.max(1,next)));
+        const zoomAt=(next)=>{const z=Math.min(4,Math.max(1,next));setLbZoom(z);if(z<=1)setLbPan({x:0,y:0});};
         return (
         <div onClick={closeLb} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:lbZoom>1?"grab":"zoom-out",overflow:"hidden"}}
           onWheel={(e)=>{e.preventDefault();zoomAt(lbZoom+(e.deltaY<0?0.3:-0.3));}}>
           <img src={src} alt=""
             style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.5)",objectFit:"contain",
-              transform:`translate(${lbPan.x}px,${lbPan.y}px) scale(${lbZoom})`,transition:lbDragRef.current?"none":"transform .15s",
+              transform:`translate(${lbPan.x}px,${lbPan.y}px) scale(${lbZoom})`,transition:lbDragRef.current?.active?"none":"transform .15s",
               cursor:lbZoom>1?"grab":"zoom-in",touchAction:"none"}}
-            onClick={(e)=>{e.stopPropagation();if(lbDragRef.current?.moved)return;zoomAt(lbZoom>1?1:2.2);if(lbZoom>1)setLbPan({x:0,y:0});}}
-            onMouseDown={(e)=>{if(lbZoom<=1)return;e.preventDefault();lbDragRef.current={sx:e.clientX,sy:e.clientY,ox:lbPan.x,oy:lbPan.y,moved:false};}}
-            onMouseMove={(e)=>{const dr=lbDragRef.current;if(!dr)return;const dx=e.clientX-dr.sx,dy=e.clientY-dr.sy;if(Math.abs(dx)>3||Math.abs(dy)>3)dr.moved=true;setLbPan({x:dr.ox+dx,y:dr.oy+dy});}}
-            onMouseUp={()=>{lbDragRef.current=null;}}
-            onMouseLeave={()=>{lbDragRef.current=null;}}
-            onTouchStart={(e)=>{if(lbZoom<=1)return;const t=e.touches[0];lbDragRef.current={sx:t.clientX,sy:t.clientY,ox:lbPan.x,oy:lbPan.y,moved:false};}}
-            onTouchMove={(e)=>{const dr=lbDragRef.current;if(!dr)return;const t=e.touches[0];const dx=t.clientX-dr.sx,dy=t.clientY-dr.sy;if(Math.abs(dx)>3||Math.abs(dy)>3)dr.moved=true;setLbPan({x:dr.ox+dx,y:dr.oy+dy});}}
-            onTouchEnd={()=>{lbDragRef.current=null;}} />
+            onClick={(e)=>{
+              e.stopPropagation();
+              const dr=lbDragRef.current;
+              if(dr&&dr.moved){lbDragRef.current=null;return;}
+              lbDragRef.current=null;
+              zoomAt(lbZoom>1?1:2.2);
+            }}
+            onMouseDown={(e)=>{if(lbZoom<=1)return;e.preventDefault();lbDragRef.current={sx:e.clientX,sy:e.clientY,ox:lbPan.x,oy:lbPan.y,moved:false,active:true};}}
+            onMouseMove={(e)=>{const dr=lbDragRef.current;if(!dr||!dr.active)return;const dx=e.clientX-dr.sx,dy=e.clientY-dr.sy;if(Math.abs(dx)>3||Math.abs(dy)>3)dr.moved=true;setLbPan({x:dr.ox+dx,y:dr.oy+dy});}}
+            onMouseUp={()=>{if(lbDragRef.current)lbDragRef.current.active=false;}}
+            onMouseLeave={()=>{if(lbDragRef.current)lbDragRef.current.active=false;}}
+            onTouchStart={(e)=>{if(lbZoom<=1)return;const t=e.touches[0];lbDragRef.current={sx:t.clientX,sy:t.clientY,ox:lbPan.x,oy:lbPan.y,moved:false,active:true};}}
+            onTouchMove={(e)=>{const dr=lbDragRef.current;if(!dr||!dr.active)return;const t=e.touches[0];const dx=t.clientX-dr.sx,dy=t.clientY-dr.sy;if(Math.abs(dx)>3||Math.abs(dy)>3)dr.moved=true;setLbPan({x:dr.ox+dx,y:dr.oy+dy});}}
+            onTouchEnd={()=>{if(lbDragRef.current)lbDragRef.current.active=false;}} />
           <div style={{position:"fixed",bottom:images.length>1?64:24,left:"50%",transform:"translateX(-50%)",display:"flex",gap:6,alignItems:"center",background:"rgba(0,0,0,.5)",borderRadius:20,padding:"5px 8px"}} onClick={(e)=>e.stopPropagation()}>
             <button onClick={()=>zoomAt(lbZoom-0.5)} style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",width:28,height:28,borderRadius:"50%",cursor:"pointer",fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
             <span style={{color:"#fff",fontSize:12,fontWeight:700,minWidth:38,textAlign:"center"}}>{Math.round(lbZoom*100)}%</span>
