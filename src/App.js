@@ -2094,7 +2094,16 @@ function Board() {
     return raw;
   },[data.stockData,stockTab]); // eslint-disable-line react-hooks/exhaustive-deps
   const stockSafe=useMemo(()=>data.stockSafe||{},[data.stockSafe]);
-  const reorderRequests=useMemo(()=>(data.reorderRequests||[]).filter((r)=>!r.done),[data.reorderRequests]);
+  const reorderRequests=useMemo(()=>{
+    const list=(data.reorderRequests||[]).filter((r)=>!r.done);
+    const bySku=new Map();
+    list.forEach((r)=>{
+      const key=`${r.channel}_${r.sku}`;
+      const p=bySku.get(key);
+      if(!p||(r.updatedAt||r.createdAt||0)>=(p.updatedAt||p.createdAt||0))bySku.set(key,r);
+    });
+    return [...bySku.values()];
+  },[data.reorderRequests]);
   const inboundPlans=useMemo(()=>(data.inboundPlans||[]).filter((p)=>!p.deleted),[data.inboundPlans]);
   const activeInbounds=useMemo(()=>inboundPlans.filter((p)=>p.status!=="입고 완료"),[inboundPlans]);
   const addInboundPlan=(plan)=>{commit((d)=>({...d,inboundPlans:[...(d.inboundPlans||[]),{...plan,id:uid(),createdAt:Date.now(),createdBy:me||"익명",logs:[{ts:Date.now(),text:"입고 예정 등록",by:me||"익명"}]}],updatedAt:Date.now()}),[]);};
@@ -2175,11 +2184,16 @@ function Board() {
       if(alerts.length){
         await commit((d)=>{
           const cur=d.reorderRequests||[];
-          const doneSkus=new Set(cur.filter((r)=>r.channel==="naver"&&r.done&&alerts.some((a)=>a.id===r.sku)).map((r)=>r.sku));
-          const stillNeeded=alerts.filter((a)=>!doneSkus.has(a.id));
-          const newReq=stillNeeded.map((item)=>({id:uid(),channel:"naver",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`naver_${item.id}`],createdAt:Date.now(),done:false}));
-          const keep=cur.filter((r)=>!(r.channel==="naver"&&!r.done&&stillNeeded.some((a)=>a.id===r.sku)));
-          return {...d,reorderRequests:[...keep,...newReq],updatedAt:Date.now()};
+          const now=Date.now();
+          const updated=cur.map((r)=>{
+            if(r.channel!=="naver"||r.done)return r;
+            const a=alerts.find((x)=>x.id===r.sku);
+            if(!a)return r;
+            return {...r,productName:a.name,currentStock:a.stock,safeStock:stockSafe[`naver_${a.id}`],updatedAt:now};
+          });
+          const existingSkus=new Set(cur.filter((r)=>r.channel==="naver").map((r)=>r.sku));
+          const brandNew=alerts.filter((a)=>!existingSkus.has(a.id)).map((item)=>({id:uid(),channel:"naver",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`naver_${item.id}`],createdAt:now,updatedAt:now,done:false}));
+          return {...d,reorderRequests:[...updated,...brandNew],updatedAt:now};
         },[]);
       }
       alert(`✅ 네이버 재고 업로드 완료 (${items.length}개 SKU)`);
@@ -2225,11 +2239,16 @@ function Board() {
       if(alerts.length){
         await commit((d)=>{
           const cur=d.reorderRequests||[];
-          const doneSkus=new Set(cur.filter((r)=>r.channel==="coupang"&&r.done&&alerts.some((a)=>a.id===r.sku)).map((r)=>r.sku));
-          const stillNeeded=alerts.filter((a)=>!doneSkus.has(a.id));
-          const newReq=stillNeeded.map((item)=>({id:uid(),channel:"coupang",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`coupang_${item.id}`],createdAt:Date.now(),done:false}));
-          const keep=cur.filter((r)=>!(r.channel==="coupang"&&!r.done&&stillNeeded.some((a)=>a.id===r.sku)));
-          return {...d,reorderRequests:[...keep,...newReq],updatedAt:Date.now()};
+          const now=Date.now();
+          const updated=cur.map((r)=>{
+            if(r.channel!=="coupang"||r.done)return r;
+            const a=alerts.find((x)=>x.id===r.sku);
+            if(!a)return r;
+            return {...r,productName:a.name,currentStock:a.stock,safeStock:stockSafe[`coupang_${a.id}`],updatedAt:now};
+          });
+          const existingSkus=new Set(cur.filter((r)=>r.channel==="coupang").map((r)=>r.sku));
+          const brandNew=alerts.filter((a)=>!existingSkus.has(a.id)).map((item)=>({id:uid(),channel:"coupang",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`coupang_${item.id}`],createdAt:now,updatedAt:now,done:false}));
+          return {...d,reorderRequests:[...updated,...brandNew],updatedAt:now};
         },[]);
       }
       alert(`✅ 쿠팡 재고 업로드 완료 (${items.length}개 SKU)`);
