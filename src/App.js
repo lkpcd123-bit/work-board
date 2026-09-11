@@ -413,7 +413,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -436,9 +436,10 @@ function mergeData(r,l) {
     routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
     colLabels:((l.colLabelsUpdatedAt||0)>=(r.colLabelsUpdatedAt||0)?l.colLabels:r.colLabels)||{},colLabelsUpdatedAt:Math.max(l.colLabelsUpdatedAt||0,r.colLabelsUpdatedAt||0),
     log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),
-    tabOrder:(l.updatedAt||0)>=(r.updatedAt||0)?l.tabOrder||[]:r.tabOrder||[],
-    hiddenTabs:(l.updatedAt||0)>=(r.updatedAt||0)?l.hiddenTabs||[]:r.hiddenTabs||[],
-    tabFolders:(l.updatedAt||0)>=(r.updatedAt||0)?l.tabFolders||[]:r.tabFolders||[],
+    tabOrder:((l.tabConfigUpdatedAt||0)>=(r.tabConfigUpdatedAt||0))?l.tabOrder||[]:r.tabOrder||[],
+    hiddenTabs:((l.tabConfigUpdatedAt||0)>=(r.tabConfigUpdatedAt||0))?l.hiddenTabs||[]:r.hiddenTabs||[],
+    tabFolders:((l.tabConfigUpdatedAt||0)>=(r.tabConfigUpdatedAt||0))?l.tabFolders||[]:r.tabFolders||[],
+    tabConfigUpdatedAt:Math.max(l.tabConfigUpdatedAt||0,r.tabConfigUpdatedAt||0),
     refs:[...refMap.values()],
     refCats:((l.updatedAt||0)>=(r.updatedAt||0)?l.refCats:r.refCats)||["디자인","마케팅","경쟁사","콘텐츠"],
     stockData:(()=>{
@@ -463,9 +464,10 @@ function mergeData(r,l) {
     cafe24_schedules:[...c24Map.values()],
     cafe24_token_data:((l.cafe24_token_data?.expiry||0)>=(r.cafe24_token_data?.expiry||0)?l.cafe24_token_data:r.cafe24_token_data)||{},
     notifications:[...notifMap.values()],
-    edProducts:(l.updatedAt||0)>=(r.updatedAt||0)?l.edProducts||{보틀:[],대용량:[],파우치:[]}:r.edProducts||{보틀:[],대용량:[],파우치:[]},
-    edMasterImages:(l.updatedAt||0)>=(r.updatedAt||0)?l.edMasterImages||{보틀:[],대용량:[],파우치:[]}:r.edMasterImages||{보틀:[],대용량:[],파우치:[]},
-    edSavedSummaries:(l.updatedAt||0)>=(r.updatedAt||0)?l.edSavedSummaries||[]:r.edSavedSummaries||[],
+    edProducts:((l.edUpdatedAt||0)>=(r.edUpdatedAt||0))?l.edProducts||{보틀:[],대용량:[],파우치:[]}:r.edProducts||{보틀:[],대용량:[],파우치:[]},
+    edMasterImages:((l.edUpdatedAt||0)>=(r.edUpdatedAt||0))?l.edMasterImages||{보틀:[],대용량:[],파우치:[]}:r.edMasterImages||{보틀:[],대용량:[],파우치:[]},
+    edSavedSummaries:((l.edUpdatedAt||0)>=(r.edUpdatedAt||0))?l.edSavedSummaries||[]:r.edSavedSummaries||[],
+    edUpdatedAt:Math.max(l.edUpdatedAt||0,r.edUpdatedAt||0),
     updatedAt:Date.now() };
 }
 
@@ -984,7 +986,7 @@ function Board() {
   const [tabMgr, setTabMgr] = useState(false);
   const [tabDragId, setTabDragId] = useState(null);
   const tabFolders=useMemo(()=>data.tabFolders||[],[data.tabFolders]);
-  const saveTabConfig=(patch)=>commit((d)=>({...d,...patch,updatedAt:Date.now()}),[]);
+  const saveTabConfig=(patch)=>commit((d)=>({...d,...patch,tabConfigUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
   const saveTabFolders=(folders)=>saveTabConfig({tabFolders:folders});
   const [q, setQ] = useState("");
   const [fCh, setFCh] = useState("전체");
@@ -1864,7 +1866,7 @@ function Board() {
       if(!url){setEdMsg(`❌ ${f.name} 업로드 실패: `+JSON.stringify(upR));return;}
       newImgs.push({id:uid(),url,name:f.name,createdAt:Date.now()});
     }
-    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,...newImgs]},updatedAt:Date.now()}),[]);
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,...newImgs]},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
     setEdMsg(`✅ ${newImgs.length}장 업로드 완료`);
   };
 
@@ -1879,7 +1881,7 @@ function Board() {
     const resultUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
     if(!resultUrl){setEdMsg("❌ 링크 업로드 실패: "+JSON.stringify(upR));return;}
     const fname=u.split('/').pop().split('?')[0]||'img.jpg';
-    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,{id:uid(),url:resultUrl,name:decodeURIComponent(fname),createdAt:Date.now()}]},updatedAt:Date.now()}),[]);
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,{id:uid(),url:resultUrl,name:decodeURIComponent(fname),createdAt:Date.now()}]},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
     setEdMsg(`✅ 링크에서 이미지 추가 완료`);
   };
 
@@ -1893,7 +1895,7 @@ function Board() {
     if(!url){setEdMsg("❌ 업로드 실패: "+JSON.stringify(upR));return;}
     const imgs=[...((data.edMasterImages||{})[edCat]||[])];
     imgs[idx]={...imgs[idx],url,name:file.name,updatedAt:Date.now()};
-    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
     setEdChanged((prev)=>({...prev,[idx]:true}));
     setEdMsg(`✅ ${idx+1}번 이미지 교체 완료`);
   };
@@ -1909,7 +1911,7 @@ function Board() {
     const fname=decodeURIComponent(u.split('/').pop().split('?')[0]||'img.jpg');
     const imgs=[...((data.edMasterImages||{})[edCat]||[])];
     imgs[idx]={...imgs[idx],url:resultUrl,name:fname,updatedAt:Date.now()};
-    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
     setEdChanged((prev)=>({...prev,[idx]:true}));
     setEdMsg(`✅ ${idx+1}번 이미지 링크로 교체 완료`);
   };
@@ -1966,12 +1968,12 @@ function Board() {
         if(d.product){
           successCount++;
           // lastSentAt 업데이트
-          commit((dd)=>({...dd,edProducts:{...(dd.edProducts||{}),[edCat]:(dd.edProducts||{})[edCat]?.map((p)=>p.code===code?{...p,lastSentAt:Date.now()}:p)||[]},updatedAt:Date.now()}),[]);
+          await commit((dd)=>({...dd,edProducts:{...(dd.edProducts||{}),[edCat]:(dd.edProducts||{})[edCat]?.map((p)=>p.code===code?{...p,lastSentAt:Date.now()}:p)||[]},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
         }
       }
       // 마스터 이미지에 lastUrl 저장
       const updatedMaster=masterImgs.map((img,i)=>uploadedUrls[i]?{...img,lastUrl:uploadedUrls[i]}:img);
-      commit((dd)=>({...dd,edMasterImages:{...(dd.edMasterImages||{}),[edCat]:updatedMaster},updatedAt:Date.now()}),[]);
+      await commit((dd)=>({...dd,edMasterImages:{...(dd.edMasterImages||{}),[edCat]:updatedMaster},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
       setEdChanged({});
       log.ok=true;log.msg=`${successCount}/${checkedCodes.length}개 상품 전송 완료`;
       setEdMsg(`✅ ${successCount}/${checkedCodes.length}개 상품 전송 완료!`);
@@ -4414,7 +4416,7 @@ function Board() {
                                 onBlur={(e)=>{
                                   const v=e.target.value.trim();
                                   if(v&&v!==s.text){
-                                    commit((d)=>({...d,edSavedSummaries:(d.edSavedSummaries||[]).map((x)=>x.id===s.id?{...x,text:v}:x),updatedAt:Date.now()}),[]);
+                                    commit((d)=>({...d,edSavedSummaries:(d.edSavedSummaries||[]).map((x)=>x.id===s.id?{...x,text:v}:x),edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                                   }
                                   setEdSummaryEditId(null);
                                 }}
@@ -4430,7 +4432,7 @@ function Board() {
                             <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:"2px 6px"}}
                               onClick={()=>setEdSummaryEditId(s.id)}>수정</button>
                             <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:"2px 6px"}}
-                              onClick={()=>{if(window.confirm("삭제할까요?"))commit((d)=>({...d,edSavedSummaries:(d.edSavedSummaries||[]).filter((x)=>x.id!==s.id),updatedAt:Date.now()}),[]);}}>삭제</button>
+                              onClick={()=>{if(window.confirm("삭제할까요?"))commit((d)=>({...d,edSavedSummaries:(d.edSavedSummaries||[]).filter((x)=>x.id!==s.id),edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);}}>삭제</button>
                           </div>
                         </div>
                       ))}
@@ -4450,7 +4452,7 @@ function Board() {
                       const text=(edSummary[edCat]||"").trim();
                       if(!text)return;
                       const label=edSumLabel.trim()||"저장된 요약설명";
-                      commit((d)=>({...d,edSavedSummaries:[...(d.edSavedSummaries||[]),{id:uid(),label,text,createdAt:Date.now()}],updatedAt:Date.now()}),[]);
+                      commit((d)=>({...d,edSavedSummaries:[...(d.edSavedSummaries||[]),{id:uid(),label,text,createdAt:Date.now()}],edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                       setEdSumLabel('');
                     }}>💾 저장</button>
                     <button className="btn ghost" style={{fontSize:12,padding:"5px 14px",flexShrink:0,color:"var(--ink3)"}} onClick={()=>setEdSummary({...edSummary,[edCat]:""})} title="초기화">✕</button>
@@ -4478,16 +4480,16 @@ function Board() {
                       }}>🔗 링크로 교체</button>
                       <button style={{fontSize:11,color:"var(--danger)",fontWeight:700,border:"1px solid var(--danger)",borderRadius:5,padding:"3px 10px",background:"none",cursor:"pointer"}} onClick={()=>{
                         const imgs=((data.edMasterImages||{})[edCat]||[]).filter((_,j)=>j!==i);
-                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                         const nc={...edChanged};delete nc[i];setEdChanged(nc);
                       }}>삭제</button>
                       <button style={{fontSize:13,background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",padding:"2px 5px"}} disabled={i===0} onClick={()=>{
                         const imgs=[...((data.edMasterImages||{})[edCat]||[])];[imgs[i-1],imgs[i]]=[imgs[i],imgs[i-1]];
-                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                       }}>▲</button>
                       <button style={{fontSize:13,background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",padding:"2px 5px"}} disabled={i===((data.edMasterImages||{})[edCat]||[]).length-1} onClick={()=>{
                         const imgs=[...((data.edMasterImages||{})[edCat]||[])];[imgs[i],imgs[i+1]]=[imgs[i+1],imgs[i]];
-                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                       }}>▼</button>
                     </div>
                     <div style={{padding:10,textAlign:"center",background:"#fff"}}>
@@ -4593,7 +4595,7 @@ function Board() {
                     </div>
                     <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:13,cursor:"pointer"}} onClick={()=>{
                       const next={...(data.edProducts||{}),[edCat]:((data.edProducts||{})[edCat]||[]).filter((x)=>x.code!==p.code)};
-                      commit((d)=>({...d,edProducts:next,updatedAt:Date.now()}),[]);
+                      commit((d)=>({...d,edProducts:next,edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                     }}>×</button>
                   </div>
                 );})}
@@ -4606,7 +4608,7 @@ function Board() {
                     const cur=(data.edProducts||{})[edCat]||[];
                     if(cur.some((x)=>x.code===code))return;
                     const next={...(data.edProducts||{}),[edCat]:[...cur,{code,name:edAddName.trim()||code,lastSentAt:null}]};
-                    commit((d)=>({...d,edProducts:next,updatedAt:Date.now()}),[]);
+                    commit((d)=>({...d,edProducts:next,edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                     setEdAddCode('');setEdAddName('');
                   }}>+ 추가</button>
                 </div>
