@@ -2256,7 +2256,20 @@ function Board() {
   };
   const saveSafeStock=(channel,itemId,val)=>{
     const key=`${channel}_${itemId}`;
-    commit((d)=>({...d,stockSafe:{...(d.stockSafe||{}),[key]:parseInt(val,10)||0},updatedAt:Date.now()}),[]);
+    const safeVal=parseInt(val,10)||0;
+    commit((d)=>{
+      const next={...d,stockSafe:{...(d.stockSafe||{}),[key]:safeVal},updatedAt:Date.now()};
+      const item=((d.stockData||{})[channel]||[]).find((x)=>x.id===itemId);
+      if(item&&safeVal>0&&item.stock<safeVal){
+        const cur=d.reorderRequests||[];
+        const now=Date.now();
+        const existing=cur.find((r)=>r.channel===channel&&r.sku===itemId&&!r.done);
+        next.reorderRequests=existing
+          ?cur.map((r)=>r.id===existing.id?{...r,currentStock:item.stock,safeStock:safeVal,updatedAt:now}:r)
+          :[...cur,{id:uid(),channel,productName:item.name,sku:itemId,currentStock:item.stock,safeStock:safeVal,createdAt:now,updatedAt:now,done:false}];
+      }
+      return next;
+    },[]);
   };
   const doneReorder=(id)=>{commit((d)=>({...d,reorderRequests:(d.reorderRequests||[]).map((r)=>r.id===id?{...r,done:true,updatedAt:Date.now()}:r),updatedAt:Date.now()}),[]);};
 
