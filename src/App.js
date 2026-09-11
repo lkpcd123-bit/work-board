@@ -2169,11 +2169,11 @@ function Board() {
         ...item,updatedAt:uploadTs,history:[{date:today,stock:item.stock}]
       }));
       const finalMerged=[...orderedMerged,...newItems];
-      commit((d)=>({...d,stockData:{...(d.stockData||{}),naver:finalMerged},updatedAt:Date.now()}),[]);
+      await commit((d)=>({...d,stockData:{...(d.stockData||{}),naver:finalMerged},updatedAt:Date.now()}),[]);
       // 안전재고 미달 자동 입고요청
       const alerts=items.filter((item)=>{const safe=stockSafe[`naver_${item.id}`];return safe&&item.stock<safe;});
       if(alerts.length){
-        commit((d)=>{
+        await commit((d)=>{
           const cur=d.reorderRequests||[];
           const doneSkus=new Set(cur.filter((r)=>r.channel==="naver"&&r.done&&alerts.some((a)=>a.id===r.sku)).map((r)=>r.sku));
           const stillNeeded=alerts.filter((a)=>!doneSkus.has(a.id));
@@ -2220,10 +2220,10 @@ function Board() {
         ...item,updatedAt:uploadTs,history:[{date:today,stock:item.stock}]
       }));
       const finalMerged=[...orderedMerged,...newItems];
-      commit((d)=>({...d,stockData:{...(d.stockData||{}),coupang:finalMerged},updatedAt:Date.now()}),[]);
+      await commit((d)=>({...d,stockData:{...(d.stockData||{}),coupang:finalMerged},updatedAt:Date.now()}),[]);
       const alerts=items.filter((item)=>{const safe=stockSafe[`coupang_${item.id}`];return safe&&item.stock<safe;});
       if(alerts.length){
-        commit((d)=>{
+        await commit((d)=>{
           const cur=d.reorderRequests||[];
           const doneSkus=new Set(cur.filter((r)=>r.channel==="coupang"&&r.done&&alerts.some((a)=>a.id===r.sku)).map((r)=>r.sku));
           const stillNeeded=alerts.filter((a)=>!doneSkus.has(a.id));
