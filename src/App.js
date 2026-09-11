@@ -449,7 +449,7 @@ function mergeData(r,l) {
         coupang:(lsd.coupang||[]).length>=(rsd.coupang||[]).length?lsd.coupang||[]:rsd.coupang||[],
       };
     })(),
-    stockSafe:(()=>{const ls=l.stockSafe||{};const rs=r.stockSafe||{};return Object.keys(ls).length>=Object.keys(rs).length?ls:rs;})(),
+    stockSafe:{...(r.stockSafe||{}),...(l.stockSafe||{})},
     reorderRequests:[...roMap.values()],
     inboundPlans:[...inbMap.values()],
     cafe24_schedules:[...c24Map.values()],
