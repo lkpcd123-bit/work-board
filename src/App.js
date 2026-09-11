@@ -446,7 +446,9 @@ function mergeData(r,l) {
         const m=new Map();
         [...(rArr||[]),...(lArr||[])].forEach((it)=>{
           const p=m.get(it.id);
-          if(!p||(it.date||"")>=(p.date||""))m.set(it.id,it);
+          const itKey=it.updatedAt||(it.date?new Date(it.date).getTime():0);
+          const pKey=p?(p.updatedAt||(p.date?new Date(p.date).getTime():0)):-1;
+          if(!p||itKey>=pKey)m.set(it.id,it);
         });
         return [...m.values()];
       };
@@ -2148,22 +2150,23 @@ function Board() {
       const existing=(data.stockData||{}).naver||[];
       // NAVER_KEEP_SKUS에 없는 항목은 기존 목록에서도 완전 제거
       const filteredExisting=existing.filter((e)=>NAVER_KEEP_SKUS.has(e.id));
+      const uploadTs=Date.now();
       // 1) 기존에 있던 항목은 기존 순서 그대로, 재고만 업데이트 (업로드에 없으면 0으로)
       const orderedMerged=filteredExisting.map((e)=>{
         const newItem=skuMap[e.id];
         const prevHistory=e.history||[];
         if(newItem){
-          return{...e,stock:newItem.stock,name:newItem.name||e.name,date:today,
+          return{...e,stock:newItem.stock,name:newItem.name||e.name,date:today,updatedAt:uploadTs,
             history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:newItem.stock}].slice(-30)};
         }
         // 이번 업로드에 없는 항목 → 재고 0으로 기록
-        return{...e,stock:0,date:today,
+        return{...e,stock:0,date:today,updatedAt:uploadTs,
           history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:0}].slice(-30)};
       });
       // 2) 기존에 없던 새 항목은 맨 뒤에 추가
       const existingIds=new Set(filteredExisting.map((e)=>e.id));
       const newItems=items.filter((item)=>!existingIds.has(item.id)).map((item)=>({
-        ...item,history:[{date:today,stock:item.stock}]
+        ...item,updatedAt:uploadTs,history:[{date:today,stock:item.stock}]
       }));
       const finalMerged=[...orderedMerged,...newItems];
       commit((d)=>({...d,stockData:{...(d.stockData||{}),naver:finalMerged},updatedAt:Date.now()}),[]);
@@ -2195,19 +2198,20 @@ function Board() {
       const items=Object.values(skuMap).map((item)=>({...item,date:today}));
       const existing=(data.stockData||{}).coupang||[];
       const filteredExisting=existing.filter((e)=>COUPANG_KEEP_SKUS.has(e.id));
+      const uploadTs=Date.now();
       const orderedMerged=filteredExisting.map((e)=>{
         const newItem=skuMap[e.id];
         const prevHistory=e.history||[];
         if(newItem){
-          return{...e,stock:newItem.stock,name:newItem.name,date:today,
+          return{...e,stock:newItem.stock,name:newItem.name,date:today,updatedAt:uploadTs,
             history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:newItem.stock}].slice(-30)};
         }
-        return{...e,stock:0,date:today,
+        return{...e,stock:0,date:today,updatedAt:uploadTs,
           history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:0}].slice(-30)};
       });
       const existingIds=new Set(filteredExisting.map((e)=>e.id));
       const newItems=items.filter((item)=>!existingIds.has(item.id)).map((item)=>({
-        ...item,history:[{date:today,stock:item.stock}]
+        ...item,updatedAt:uploadTs,history:[{date:today,stock:item.stock}]
       }));
       const finalMerged=[...orderedMerged,...newItems];
       commit((d)=>({...d,stockData:{...(d.stockData||{}),coupang:finalMerged},updatedAt:Date.now()}),[]);
