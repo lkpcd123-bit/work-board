@@ -442,11 +442,17 @@ function mergeData(r,l) {
     refs:[...refMap.values()],
     refCats:((l.updatedAt||0)>=(r.updatedAt||0)?l.refCats:r.refCats)||["디자인","마케팅","경쟁사","콘텐츠"],
     stockData:(()=>{
-      const lsd=l.stockData||{naver:[],coupang:[]};
-      const rsd=r.stockData||{naver:[],coupang:[]};
+      const mergeStockArr=(rArr,lArr)=>{
+        const m=new Map();
+        [...(rArr||[]),...(lArr||[])].forEach((it)=>{
+          const p=m.get(it.id);
+          if(!p||(it.date||"")>=(p.date||""))m.set(it.id,it);
+        });
+        return [...m.values()];
+      };
       return {
-        naver:(lsd.naver||[]).length>=(rsd.naver||[]).length?lsd.naver||[]:rsd.naver||[],
-        coupang:(lsd.coupang||[]).length>=(rsd.coupang||[]).length?lsd.coupang||[]:rsd.coupang||[],
+        naver:mergeStockArr(r.stockData?.naver,l.stockData?.naver),
+        coupang:mergeStockArr(r.stockData?.coupang,l.stockData?.coupang),
       };
     })(),
     stockSafe:{...(r.stockSafe||{}),...(l.stockSafe||{})},
@@ -2217,7 +2223,7 @@ function Board() {
     const key=`${channel}_${itemId}`;
     commit((d)=>({...d,stockSafe:{...(d.stockSafe||{}),[key]:parseInt(val,10)||0},updatedAt:Date.now()}),[]);
   };
-  const doneReorder=(id)=>{commit((d)=>({...d,reorderRequests:(d.reorderRequests||[]).map((r)=>r.id===id?{...r,done:true}:r),updatedAt:Date.now()}),[]);};
+  const doneReorder=(id)=>{commit((d)=>({...d,reorderRequests:(d.reorderRequests||[]).map((r)=>r.id===id?{...r,done:true,updatedAt:Date.now()}:r),updatedAt:Date.now()}),[]);};
 
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
