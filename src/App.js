@@ -2140,7 +2140,7 @@ function Board() {
         if(skuMap[skuId]){
           skuMap[skuId].stock+=stock;
         }else{
-          skuMap[skuId]={id:skuId,barcode:String(r[1]||""),name:String(r[2]||""),stock};
+          skuMap[skuId]={id:skuId,sku:skuId,barcode:String(r[1]||""),name:String(r[2]||""),stock};
         }
       }
       const items=Object.values(skuMap).map((item)=>({...item,date:today}));
