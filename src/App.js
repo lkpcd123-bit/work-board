@@ -2173,8 +2173,14 @@ function Board() {
       // 안전재고 미달 자동 입고요청
       const alerts=items.filter((item)=>{const safe=stockSafe[`naver_${item.id}`];return safe&&item.stock<safe;});
       if(alerts.length){
-        const newReq=alerts.map((item)=>({id:uid(),channel:"naver",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`naver_${item.id}`],createdAt:Date.now(),done:false}));
-        commit((d)=>({...d,reorderRequests:[...(d.reorderRequests||[]).filter((r)=>!alerts.some((a)=>r.sku===a.sku&&r.channel==="naver")),...newReq],updatedAt:Date.now()}),[]);
+        commit((d)=>{
+          const cur=d.reorderRequests||[];
+          const doneSkus=new Set(cur.filter((r)=>r.channel==="naver"&&r.done&&alerts.some((a)=>a.id===r.sku)).map((r)=>r.sku));
+          const stillNeeded=alerts.filter((a)=>!doneSkus.has(a.id));
+          const newReq=stillNeeded.map((item)=>({id:uid(),channel:"naver",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`naver_${item.id}`],createdAt:Date.now(),done:false}));
+          const keep=cur.filter((r)=>!(r.channel==="naver"&&!r.done&&stillNeeded.some((a)=>a.id===r.sku)));
+          return {...d,reorderRequests:[...keep,...newReq],updatedAt:Date.now()};
+        },[]);
       }
       alert(`✅ 네이버 재고 업로드 완료 (${items.length}개 SKU)`);
 
@@ -2217,8 +2223,14 @@ function Board() {
       commit((d)=>({...d,stockData:{...(d.stockData||{}),coupang:finalMerged},updatedAt:Date.now()}),[]);
       const alerts=items.filter((item)=>{const safe=stockSafe[`coupang_${item.id}`];return safe&&item.stock<safe;});
       if(alerts.length){
-        const newReq=alerts.map((item)=>({id:uid(),channel:"coupang",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`coupang_${item.id}`],createdAt:Date.now(),done:false}));
-        commit((d)=>({...d,reorderRequests:[...(d.reorderRequests||[]).filter((r)=>!alerts.some((a)=>r.sku===a.sku&&r.channel==="coupang")),...newReq],updatedAt:Date.now()}),[]);
+        commit((d)=>{
+          const cur=d.reorderRequests||[];
+          const doneSkus=new Set(cur.filter((r)=>r.channel==="coupang"&&r.done&&alerts.some((a)=>a.id===r.sku)).map((r)=>r.sku));
+          const stillNeeded=alerts.filter((a)=>!doneSkus.has(a.id));
+          const newReq=stillNeeded.map((item)=>({id:uid(),channel:"coupang",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`coupang_${item.id}`],createdAt:Date.now(),done:false}));
+          const keep=cur.filter((r)=>!(r.channel==="coupang"&&!r.done&&stillNeeded.some((a)=>a.id===r.sku)));
+          return {...d,reorderRequests:[...keep,...newReq],updatedAt:Date.now()};
+        },[]);
       }
       alert(`✅ 쿠팡 재고 업로드 완료 (${items.length}개 SKU)`);
     }
