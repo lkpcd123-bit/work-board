@@ -413,7 +413,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockOrderTs:{naver:0,coupang:0},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
@@ -443,7 +443,7 @@ function mergeData(r,l) {
     refs:[...refMap.values()],
     refCats:((l.updatedAt||0)>=(r.updatedAt||0)?l.refCats:r.refCats)||["디자인","마케팅","경쟁사","콘텐츠"],
     stockData:(()=>{
-      const mergeStockArr=(rArr,lArr)=>{
+      const mergeStockArr=(rArr,lArr,rOrderTs,lOrderTs)=>{
         const m=new Map();
         [...(rArr||[]),...(lArr||[])].forEach((it)=>{
           const p=m.get(it.id);
@@ -451,13 +451,22 @@ function mergeData(r,l) {
           const pKey=p?(p.updatedAt||(p.date?new Date(p.date).getTime():0)):-1;
           if(!p||itKey>=pKey)m.set(it.id,it);
         });
-        return [...m.values()];
+        // 순서는 값 최신순과 별개로, 더 최근에 순서가 바뀐 쪽을 따라감
+        const orderTemplate=(lOrderTs||0)>=(rOrderTs||0)?(lArr||[]):(rArr||[]);
+        const ordered=orderTemplate.map((it)=>m.get(it.id)).filter(Boolean);
+        const orderedIds=new Set(orderTemplate.map((it)=>it.id));
+        const rest=[...m.values()].filter((it)=>!orderedIds.has(it.id));
+        return [...ordered,...rest];
       };
       return {
-        naver:mergeStockArr(r.stockData?.naver,l.stockData?.naver),
-        coupang:mergeStockArr(r.stockData?.coupang,l.stockData?.coupang),
+        naver:mergeStockArr(r.stockData?.naver,l.stockData?.naver,r.stockOrderTs?.naver,l.stockOrderTs?.naver),
+        coupang:mergeStockArr(r.stockData?.coupang,l.stockData?.coupang,r.stockOrderTs?.coupang,l.stockOrderTs?.coupang),
       };
     })(),
+    stockOrderTs:{
+      naver:Math.max(l.stockOrderTs?.naver||0,r.stockOrderTs?.naver||0),
+      coupang:Math.max(l.stockOrderTs?.coupang||0,r.stockOrderTs?.coupang||0),
+    },
     stockSafe:{...(r.stockSafe||{}),...(l.stockSafe||{})},
     reorderRequests:[...roMap.values()],
     inboundPlans:[...inbMap.values()],
@@ -3922,7 +3931,7 @@ function Board() {
                             if(fi<0||ti<0)return;
                             const [moved]=cur.splice(fi,1);
                             cur.splice(ti,0,moved);
-                            commit((d)=>({...d,stockData:{...(d.stockData||{}),[stockTab]:cur},updatedAt:Date.now()}),[]);
+                            commit((d)=>({...d,stockData:{...(d.stockData||{}),[stockTab]:cur},stockOrderTs:{...(d.stockOrderTs||{}),[stockTab]:Date.now()},updatedAt:Date.now()}),[]);
                             setStockDragId(null);
                           }}
                           onDragEnd={()=>{setStockDragId(null);}}>
