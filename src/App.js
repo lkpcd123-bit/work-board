@@ -410,6 +410,7 @@ const readFileAsBase64=(file)=>new Promise((resolve)=>{
   reader.readAsDataURL(file);
 });
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const dowKr = (dateStr) => { if(!dateStr) return ""; const d=new Date(dateStr+"T00:00:00"); return ["일","월","화","수","목","금","토"][d.getDay()]; };
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
@@ -1047,7 +1048,6 @@ function Board() {
   const [reportCatFilter, setReportCatFilter] = useState("전체");
   const [reportDraft, setReportDraft] = useState(null);
   const [reportExpand, setReportExpand] = useState({});
-  const [reportDrag, setReportDrag] = useState(null);
   const [reportSubText, setReportSubText] = useState({});
   const [reportSubEditId, setReportSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
@@ -1680,41 +1680,28 @@ function Board() {
     if(reportCatFilter!=="전체")list=list.filter((x)=>(x.cat||"미분류")===reportCatFilter);
     const q=reportQuery.trim().toLowerCase();
     if(q)list=list.filter((x)=>`${x.cat||""} ${x.sub||""} ${x.title||""} ${x.text||""} ${(x.subs||[]).map((s)=>s.text).join(" ")}`.toLowerCase().includes(q));
-    return list.slice().sort((a,b)=>(a.order??999)-(b.order??999));
+    return list.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
   },[reportItems,reportCatFilter,reportQuery]);
   const reportCatOptions=useMemo(()=>["전체",...new Set(reportItems.map((x)=>x.cat||"미분류"))],[reportItems]);
   const saveReport=(close=true)=>{
     const text=(reportDraft.text||"").trim();
     if(!text){alert("일보고 내용을 입력하세요.");return;}
     const now=Date.now();
+    const date=reportDraft.date||todayStr();
     if(reportDraft.id){
-      commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportDraft.id?{...x,cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,updatedAt:now}:x)}),[mkLog("일보고 수정",null,text.slice(0,30))]);
+      commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportDraft.id?{...x,cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,date,updatedAt:now}:x)}),[mkLog("일보고 수정",null,text.slice(0,30))]);
     }else{
-      const rec={id:uid(),cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,subs:[],createdAt:now,updatedAt:now,createdBy:me};
+      const rec={id:uid(),cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,date,subs:[],createdAt:now,updatedAt:now,createdBy:me};
       commit((d)=>({...d,reportItems:[...(d.reportItems||[]),rec]}),[mkLog("일보고 생성",null,text.slice(0,30))]);
-      if(!close)setReportDraft({...reportDraft,id:rec.id,createdAt:now,updatedAt:now});
+      if(!close)setReportDraft({...reportDraft,id:rec.id,date,createdAt:now,updatedAt:now});
     }
     if(close)setReportDraft(null);
   };
   const removeReport=(m)=>{commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("일보고 삭제",null,(m.text||"").slice(0,30))]);setReportDraft(null);};
   const duplicateReport=(m)=>{
     const now=Date.now();
-    const copy={id:uid(),cat:m.cat,sub:m.sub,title:m.title?m.title+" (복사)":"",text:m.text,subs:[],order:null,createdAt:now,updatedAt:now,createdBy:me};
+    const copy={id:uid(),cat:m.cat,sub:m.sub,title:m.title?m.title+" (복사)":"",text:m.text,date:todayStr(),subs:[],createdAt:now,updatedAt:now,createdBy:me};
     commit((d)=>({...d,reportItems:[...(d.reportItems||[]),copy]}),[mkLog("일보고 복사",null,(copy.text||"").slice(0,30))]);
-  };
-  const reorderReport=(fromId,toId)=>{
-    if(!canEdit||fromId===toId)return;
-    const arr=[...reportFiltered];
-    const fi=arr.findIndex((x)=>x.id===fromId);
-    const ti=arr.findIndex((x)=>x.id===toId);
-    if(fi<0||ti<0)return;
-    const [moved]=arr.splice(fi,1);
-    arr.splice(ti,0,moved);
-    const now=Date.now();
-    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>{
-      const pos=arr.findIndex((a)=>a.id===x.id);
-      return pos>=0?{...x,order:pos,updatedAt:now}:x;
-    })}),[]);
   };
   const addReportSub=(reportId,text)=>{
     const t=text.trim();if(!t)return;
@@ -3376,7 +3363,7 @@ function Board() {
           <div className="panel" style={{padding:14,marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
               <div style={{fontSize:14,fontWeight:800}}>일보고</div>
-              {canEdit&&<button className="btn-save" onClick={()=>setReportDraft({cat:"",sub:"",title:"",text:""})}>+ 일보고 추가</button>}
+              {canEdit&&<button className="btn-save" onClick={()=>setReportDraft({cat:"",sub:"",title:"",text:"",date:todayStr()})}>+ 일보고 추가</button>}
             </div>
             <div style={{display:"flex",gap:7,marginTop:12,flexWrap:"wrap"}}>
               <input className="inp" style={{flex:1,minWidth:160}} placeholder="검색 (분류·제목·내용·하위항목)" value={reportQuery} onChange={(e)=>setReportQuery(e.target.value)} />
@@ -3392,15 +3379,10 @@ function Board() {
             {reportFiltered.map((m)=>{
               const expanded=!!reportExpand[m.id];
               return (
-                <div key={m.id} draggable={canEdit}
-                  onDragStart={(e)=>{setReportDrag(m.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",m.id);}catch(err){}}}
-                  onDragOver={(e)=>{e.preventDefault();e.dataTransfer.dropEffect="move";}}
-                  onDrop={()=>{if(reportDrag)reorderReport(reportDrag,m.id);setReportDrag(null);}}
-                  onDragEnd={()=>setReportDrag(null)}
-                  className={"memocard"+(reportDrag===m.id?" dragging":"")}>
+                <div key={m.id} className="memocard">
                   <div className="memohead">
                     <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>
-                      {(m.cat||m.sub)&&<div className="memopath">{[m.cat,m.sub].filter(Boolean).join(" > ")}</div>}
+                      <div className="memopath">{m.date&&<b style={{color:"var(--pri)"}}>{m.date} ({dowKr(m.date)}){(m.cat||m.sub)?" · ":""}</b>}{[m.cat,m.sub].filter(Boolean).join(" > ")}</div>
                       {m.title&&<div className="memotitle">{m.title}</div>}
                       <div className="memotext">{m.text}</div>
                     </div>
@@ -4972,6 +4954,10 @@ function Board() {
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setReportDraft(null)}><div className="modal" style={{maxWidth:720}}>
           <h2>{reportDraft.id?"일보고 수정":"새 일보고"}</h2>
           <div className="modal-body">
+            <div className="fld" style={{maxWidth:220}}><label>날짜</label>
+              <input type="date" value={reportDraft.date||todayStr()} onChange={(e)=>setReportDraft({...reportDraft,date:e.target.value})} />
+              {reportDraft.date&&<div style={{fontSize:12,color:"var(--pri)",fontWeight:700,marginTop:4}}>{dowKr(reportDraft.date)}요일</div>}
+            </div>
             <div className="r3">
               <div className="fld"><label>대분류 (선택)</label><input list="report-cats" value={reportDraft.cat||""} onChange={(e)=>setReportDraft({...reportDraft,cat:e.target.value})} placeholder="예) 마케팅" />
                 <datalist id="report-cats">{reportCatNames.map((c)=><option key={c} value={c} />)}</datalist>
