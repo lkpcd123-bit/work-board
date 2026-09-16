@@ -411,6 +411,66 @@ const readFileAsBase64=(file)=>new Promise((resolve)=>{
 });
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const dowKr = (dateStr) => { if(!dateStr) return ""; const d=new Date(dateStr+"T00:00:00"); return ["일","월","화","수","목","금","토"][d.getDay()]; };
+// ── 일보고 등 "- 항목 / Tab 들여쓰기 / **굵게**" 아웃라인 텍스트 렌더링 ──
+const renderBoldSpans = (text) => {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) => (p.startsWith("**") && p.endsWith("**") && p.length > 3) ? <b key={i}>{p.slice(2, -2)}</b> : <React.Fragment key={i}>{p}</React.Fragment>);
+};
+const renderOutlineText = (text) => {
+  const lines = (text || "").split("\n");
+  return lines.map((line, i) => {
+    const m = line.match(/^(\s*)[-•]\s?(.*)$/);
+    if (m) {
+      const indent = m[1].replace(/\t/g, "  ").length;
+      const level = Math.min(Math.floor(indent / 2), 3);
+      return (
+        <div key={i} style={{ paddingLeft: level * 20, display: "flex", gap: 6, lineHeight: 1.6 }}>
+          <span style={{ flexShrink: 0, color: "var(--ink3)" }}>{level === 0 ? "•" : "◦"}</span>
+          <span>{renderBoldSpans(m[2])}</span>
+        </div>
+      );
+    }
+    if (!line.trim()) return <div key={i} style={{ height: 6 }} />;
+    return <div key={i} style={{ lineHeight: 1.6 }}>{renderBoldSpans(line)}</div>;
+  });
+};
+// Tab=들여쓰기, Shift+Tab=내어쓰기, 불릿 줄에서 Enter=다음 줄도 같은 들여쓰기의 불릿으로 이어짐
+const outlineTextareaKeyDown = (e, value, onChange) => {
+  const ta = e.target;
+  const val = value || "";
+  if (e.key === "Tab") {
+    e.preventDefault();
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+    if (e.shiftKey) {
+      const lineText = val.slice(lineStart, start);
+      const removeCount = lineText.startsWith("  ") ? 2 : (lineText.startsWith(" ") ? 1 : 0);
+      if (removeCount > 0) {
+        const next = val.slice(0, lineStart) + lineText.slice(removeCount) + val.slice(start);
+        onChange(next);
+        setTimeout(() => ta.setSelectionRange(start - removeCount, end - removeCount), 0);
+      }
+    } else {
+      const next = val.slice(0, start) + "  " + val.slice(end);
+      onChange(next);
+      setTimeout(() => ta.setSelectionRange(start + 2, start + 2), 0);
+    }
+    return;
+  }
+  if (e.key === "Enter" && !e.shiftKey) {
+    const start = ta.selectionStart;
+    const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+    const curLine = val.slice(lineStart, start);
+    const m = curLine.match(/^(\s*)[-•]\s?/);
+    if (m) {
+      e.preventDefault();
+      const prefix = "\n" + m[1] + "- ";
+      const next = val.slice(0, start) + prefix + val.slice(start);
+      onChange(next);
+      setTimeout(() => ta.setSelectionRange(start + prefix.length, start + prefix.length), 0);
+    }
+  }
+};
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
@@ -3383,11 +3443,7 @@ function Board() {
                   <div className="memohead">
                     <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>
                       <div className="memopath">{m.date&&<b style={{color:"var(--pri)"}}>{m.date} ({dowKr(m.date)}){(m.cat||m.sub)?" · ":""}</b>}{[m.cat,m.sub].filter(Boolean).join(" > ")}</div>
-                      {m.title&&<div className="memotitle">{m.title}</div>}
-                      <div className="memotext">{m.text}</div>
-                    </div>
-                    <div style={{display:"flex",gap:6,flexShrink:0}}>
-                      <button className="riedit" onClick={()=>setReportExpand({...reportExpand,[m.id]:!expanded})}>{(m.subs||[]).length>0?`하위 ${(m.subs||[]).length}`:"+하위"}</button>
+                      <div className="memotext">{renderOutlineText(m.text)}</div>
                       {canEdit&&<button className="riedit" onClick={()=>duplicateReport(m)}>복사</button>}
                       {canEdit&&<button className="riedit" onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>수정</button>}
                     </div>
@@ -4967,7 +5023,7 @@ function Board() {
               </div>
               <div className="fld"><label>소분류 (선택)</label><input value={reportDraft.title||""} onChange={(e)=>setReportDraft({...reportDraft,title:e.target.value})} placeholder="예) 키워드 아이디어" /></div>
             </div>
-            <div className="fld"><label>내용</label><textarea autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} placeholder="일보고 내용을 입력하세요" style={{minHeight:280}} /></div>
+            <div className="fld"><label>내용 <span style={{fontWeight:400,color:"var(--ink3)",fontSize:11.5}}>("- " 로 시작 = 점, Tab = 들여쓰기(하위 점), **글자**= 굵게)</span></label><textarea autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} onKeyDown={(e)=>outlineTextareaKeyDown(e,reportDraft.text,(v)=>setReportDraft({...reportDraft,text:v}))} placeholder={"- 매출 자동화시트\n  - 이사님 작업이 필요한 부분이 있어 전달드림\n- **금일 금일 품고 발송**\n  - 트리플베리요거트맛, 630g"} style={{minHeight:280,fontFamily:"inherit"}} /></div>
           </div>
           <div className="modal-foot">
             {reportDraft.id&&<button className="del" onClick={()=>removeReport(reportDraft)}>삭제</button>}
