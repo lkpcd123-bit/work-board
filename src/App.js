@@ -1822,6 +1822,20 @@ function Board() {
   const c24TokenValid=()=>c24TokenRef.current&&c24Expiry>Date.now();
   // 토큰 state가 바뀔 때 ref도 동기화
   useEffect(()=>{c24TokenRef.current=c24Token;},[c24Token]);
+  // 다른 컴퓨터/세션에서 인증한 토큰을 Firestore에서 받아와 반영 (localStorage는 최초 로딩용 캐시일 뿐)
+  useEffect(()=>{
+    const td=data.cafe24_token_data;
+    if(td&&td.access_token&&td.expiry&&td.expiry>c24Expiry){
+      setC24Token(td.access_token);
+      setC24Expiry(td.expiry);
+      if(td.refresh_token)setC24RefreshToken(td.refresh_token);
+      try{
+        localStorage.setItem('c24_token',td.access_token);
+        localStorage.setItem('c24_expiry',td.expiry);
+        if(td.refresh_token)localStorage.setItem('c24_refresh_token',td.refresh_token);
+      }catch(e){}
+    }
+  },[data.cafe24_token_data]); // eslint-disable-line react-hooks/exhaustive-deps
   const c24SaveSchedules=(list)=>{
     setC24Schedules(list);
     localStorage.setItem('c24_schedules',JSON.stringify(list));
