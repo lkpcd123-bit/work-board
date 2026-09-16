@@ -3446,7 +3446,11 @@ function Board() {
                   <div className="memohead">
                     <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>
                       <div className="memopath">{m.date&&<b style={{color:"var(--pri)"}}>{m.date} ({dowKr(m.date)}){(m.cat||m.sub)?" · ":""}</b>}{[m.cat,m.sub].filter(Boolean).join(" > ")}</div>
+                      {m.title&&<div className="memotitle">{m.title}</div>}
                       <div className="memotext">{renderOutlineText(m.text)}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <button className="riedit" onClick={()=>setReportExpand({...reportExpand,[m.id]:!expanded})}>{(m.subs||[]).length>0?`하위 ${(m.subs||[]).length}`:"+하위"}</button>
                       {canEdit&&<button className="riedit" onClick={()=>duplicateReport(m)}>복사</button>}
                       {canEdit&&<button className="riedit" onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>수정</button>}
                     </div>
