@@ -2321,10 +2321,13 @@ function Board() {
       if(item&&safeVal>0&&item.stock<safeVal){
         const cur=d.reorderRequests||[];
         const now=Date.now();
-        const existing=cur.find((r)=>r.channel===channel&&r.sku===itemId&&!r.done);
-        next.reorderRequests=existing
-          ?cur.map((r)=>r.id===existing.id?{...r,currentStock:item.stock,safeStock:safeVal,updatedAt:now}:r)
-          :[...cur,{id:uid(),channel,productName:item.name,sku:itemId,currentStock:item.stock,safeStock:safeVal,createdAt:now,updatedAt:now,done:false}];
+        const existingAny=cur.find((r)=>r.channel===channel&&r.sku===itemId);
+        if(!existingAny){
+          next.reorderRequests=[...cur,{id:uid(),channel,productName:item.name,sku:itemId,currentStock:item.stock,safeStock:safeVal,createdAt:now,updatedAt:now,done:false}];
+        }else if(!existingAny.done){
+          next.reorderRequests=cur.map((r)=>r.id===existingAny.id?{...r,currentStock:item.stock,safeStock:safeVal,updatedAt:now}:r);
+        }
+        // 이미 처리완료(done)된 건은 그대로 둠 — 재알림 없음
       }
       return next;
     },[]);
