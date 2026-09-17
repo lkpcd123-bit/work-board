@@ -2059,6 +2059,23 @@ function Board() {
     if(!res||!res.product)c24AddLog(`❌ 상품 ${productNo} 수정 실패: `+JSON.stringify(res).slice(0,150));
     return !!(res&&res.product);
   };
+  // 진짜 "품절" 처리: 상품의 모든 품목(옵션) 재고를 0으로 만들고 품절표시를 켠 뒤 판매도 중지
+  const c24MarkSoldout=async(productNo)=>{
+    const vRes=await c24Api({action:'getVariants',productNo});
+    const variants=vRes?.variants||[];
+    if(!variants.length){
+      c24AddLog(`⚠ 품목을 찾을 수 없음: #${productNo} — 판매중지만 처리`);
+      return await c24UpdateProduct(productNo,{selling:'F'});
+    }
+    let allOk=true;
+    for(const v of variants){
+      const code=v.variant_code;
+      const r=await c24Api({action:'updateVariantInventory',productNo,variantCode:code,payload:{use_inventory:'T',display_soldout:'T',quantity:0}});
+      if(r?.error){allOk=false;c24AddLog(`❌ 품목 ${code} 품절처리 실패: `+JSON.stringify(r).slice(0,120));}
+    }
+    await c24UpdateProduct(productNo,{selling:'F'});
+    return allOk;
+  };
   const c24AddSchedule=()=>{
     if(!c24SelProduct){alert('상품을 먼저 선택해주세요.');return;}
     if(!c24OpenAt&&!c24CloseAt){alert('오픈 또는 종료 일시를 입력해주세요.');return;}
@@ -2090,9 +2107,11 @@ function Board() {
         else{updated.error='오픈 실패';changed=true;}
       }
       if(s.closeAt&&!s.closeDone&&new Date(s.closeAt)<=now){
-        c24AddLog(`🔴 종료 실행: #${s.productNo}`);
-        const payload=s.closeAction==='soldout'?{selling:'F',soldout:'T'}:s.closeAction==='hide'?{display:'F',selling:'F'}:{selling:'F'};
-        const ok=await c24UpdateProduct(s.productNo,payload);
+        c24AddLog(`🔴 종료 실행: #${s.productNo} (처리: ${s.closeAction||'soldout'})`);
+        let ok;
+        if(s.closeAction==='hide')ok=await c24UpdateProduct(s.productNo,{display:'F',selling:'F'});
+        else if(s.closeAction==='selling_off')ok=await c24UpdateProduct(s.productNo,{selling:'F'});
+        else ok=await c24MarkSoldout(s.productNo);
         if(ok){updated.closeDone=true;c24AddLog(`✅ 종료 완료: #${s.productNo}`);changed=true;}
         else{updated.error='종료 실패';changed=true;}
       }
@@ -5503,4 +5522,3 @@ function Board() {
     </div>
   );
 }
-
