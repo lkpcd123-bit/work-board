@@ -127,10 +127,8 @@ export default async function handler(req, res) {
       });
       const text = await r.text();
       console.log('copyProduct status:', r.status, text.slice(0, 500));
-      // 응답에서 product_no 추출 시도
       let d;
       try { d = JSON.parse(text); } catch(e) {
-        // HTML 응답에서 product_no 추출
         const m = text.match(/product_no['":\s]+(\d+)/);
         if(m) d = { product_no: parseInt(m[1]) };
         else d = { raw: text.slice(0, 500) };
@@ -153,6 +151,18 @@ export default async function handler(req, res) {
       console.log('updateVariant', r.status, JSON.stringify(d).slice(0,200));
       return res.status(r.status).json(d);
 
+    } else if (action === 'updateVariantInventory') {
+      // 품목 재고 수정 — quantity:0 + display_soldout:'T' 로 진짜 "품절" 처리
+      const no = parseInt(productNo, 10);
+      const { variantCode } = req.body;
+      const r = await fetch(`${BASE}/products/${no}/variants/${variantCode}/inventories`, {
+        method: 'PUT', headers: H,
+        body: JSON.stringify({ shop_no: 1, request: payload }),
+      });
+      const d = await j(r);
+      console.log('updateVariantInventory', r.status, JSON.stringify(d).slice(0,200));
+      return res.status(r.status).json(d);
+
     } else {
       return res.status(400).json({ error: `Invalid action: ${action}` });
     }
@@ -161,5 +171,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 }
-
-// 추가: 관리자 세션으로 상품 복사
