@@ -419,7 +419,7 @@ const renderBoldSpans = (text) => {
 const renderOutlineText = (text) => {
   const lines = (text || "").split("\n");
   return lines.map((line, i) => {
-    const m = line.match(/^(\s*)[-•]\s?(.*)$/);
+    const m = line.match(/^(\s*)[-•*]\s?(.*)$/);
     if (m) {
       const indent = m[1].replace(/\t/g, "  ").length;
       const level = Math.min(Math.floor(indent / 2), 3);
@@ -433,43 +433,6 @@ const renderOutlineText = (text) => {
     if (!line.trim()) return <div key={i} style={{ height: 6 }} />;
     return <div key={i} style={{ lineHeight: 1.6 }}>{renderBoldSpans(line)}</div>;
   });
-};
-// Tab=들여쓰기, Shift+Tab=내어쓰기, 불릿 줄에서 Enter=다음 줄도 같은 들여쓰기의 불릿으로 이어짐
-const outlineTextareaKeyDown = (e, value, onChange) => {
-  const ta = e.target;
-  const val = value || "";
-  if (e.key === "Tab") {
-    e.preventDefault();
-    const start = ta.selectionStart, end = ta.selectionEnd;
-    const lineStart = val.lastIndexOf("\n", start - 1) + 1;
-    if (e.shiftKey) {
-      const lineText = val.slice(lineStart, start);
-      const removeCount = lineText.startsWith("  ") ? 2 : (lineText.startsWith(" ") ? 1 : 0);
-      if (removeCount > 0) {
-        const next = val.slice(0, lineStart) + lineText.slice(removeCount) + val.slice(start);
-        onChange(next);
-        setTimeout(() => ta.setSelectionRange(start - removeCount, end - removeCount), 0);
-      }
-    } else {
-      const next = val.slice(0, start) + "  " + val.slice(end);
-      onChange(next);
-      setTimeout(() => ta.setSelectionRange(start + 2, start + 2), 0);
-    }
-    return;
-  }
-  if (e.key === "Enter" && !e.shiftKey) {
-    const start = ta.selectionStart;
-    const lineStart = val.lastIndexOf("\n", start - 1) + 1;
-    const curLine = val.slice(lineStart, start);
-    const m = curLine.match(/^(\s*)[-•]\s?/);
-    if (m) {
-      e.preventDefault();
-      const prefix = "\n" + m[1] + "- ";
-      const next = val.slice(0, start) + prefix + val.slice(start);
-      onChange(next);
-      setTimeout(() => ta.setSelectionRange(start + prefix.length, start + prefix.length), 0);
-    }
-  }
 };
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
@@ -1109,6 +1072,7 @@ function Board() {
   const [reportDraft, setReportDraft] = useState(null);
   const [reportExpand, setReportExpand] = useState({});
   const [reportSubText, setReportSubText] = useState({});
+  const reportTaRef = useRef(null);
   const [reportSubEditId, setReportSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const [notifBoxOpen, setNotifBoxOpen] = useState(false);
@@ -1743,6 +1707,42 @@ function Board() {
     return list.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
   },[reportItems,reportCatFilter,reportQuery]);
   const reportCatOptions=useMemo(()=>["전체",...new Set(reportItems.map((x)=>x.cat||"미분류"))],[reportItems]);
+  // 버튼으로 서식 넣기 (모바일엔 Tab 키가 없어서 버튼 방식이 훨씬 편함)
+  const reportAddBullet=()=>{
+    const ta=reportTaRef.current; if(!ta)return;
+    const val=reportDraft.text||"";
+    const pos=ta.selectionStart;
+    const needsNl=pos>0&&val[pos-1]!=="\n";
+    const insert=(needsNl?"\n":"")+"- ";
+    const next=val.slice(0,pos)+insert+val.slice(pos);
+    setReportDraft({...reportDraft,text:next});
+    setTimeout(()=>{ta.focus();const p=pos+insert.length;ta.setSelectionRange(p,p);},0);
+  };
+  const reportIndent=(dir)=>{
+    const ta=reportTaRef.current; if(!ta)return;
+    const val=reportDraft.text||"";
+    const pos=ta.selectionStart;
+    const lineStart=val.lastIndexOf("\n",pos-1)+1;
+    let lineEnd=val.indexOf("\n",lineStart); if(lineEnd===-1)lineEnd=val.length;
+    const line=val.slice(lineStart,lineEnd);
+    let newLine,delta;
+    if(dir>0){newLine="  "+line;delta=2;}
+    else if(line.startsWith("  ")){newLine=line.slice(2);delta=-2;}
+    else if(line.startsWith(" ")){newLine=line.slice(1);delta=-1;}
+    else{newLine=line;delta=0;}
+    const next=val.slice(0,lineStart)+newLine+val.slice(lineEnd);
+    setReportDraft({...reportDraft,text:next});
+    setTimeout(()=>{ta.focus();const p=Math.max(lineStart,pos+delta);ta.setSelectionRange(p,p);},0);
+  };
+  const reportBold=()=>{
+    const ta=reportTaRef.current; if(!ta)return;
+    const val=reportDraft.text||"";
+    const start=ta.selectionStart,end=ta.selectionEnd;
+    const sel=val.slice(start,end)||"굵은 글자";
+    const next=val.slice(0,start)+"**"+sel+"**"+val.slice(end);
+    setReportDraft({...reportDraft,text:next});
+    setTimeout(()=>{ta.focus();ta.setSelectionRange(start+2,start+2+sel.length);},0);
+  };
   const saveReport=(close=true)=>{
     const text=(reportDraft.text||"").trim();
     if(!text){alert("일보고 내용을 입력하세요.");return;}
@@ -5063,7 +5063,15 @@ function Board() {
               </div>
               <div className="fld"><label>소분류 (선택)</label><input value={reportDraft.title||""} onChange={(e)=>setReportDraft({...reportDraft,title:e.target.value})} placeholder="예) 키워드 아이디어" /></div>
             </div>
-            <div className="fld"><label>내용 <span style={{fontWeight:400,color:"var(--ink3)",fontSize:11.5}}>("- " 로 시작 = 점, Tab = 들여쓰기(하위 점), **글자**= 굵게)</span></label><textarea autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} onKeyDown={(e)=>outlineTextareaKeyDown(e,reportDraft.text,(v)=>setReportDraft({...reportDraft,text:v}))} placeholder={"- 매출 자동화시트\n  - 이사님 작업이 필요한 부분이 있어 전달드림\n- **금일 금일 품고 발송**\n  - 트리플베리요거트맛, 630g"} style={{minHeight:280,fontFamily:"inherit"}} /></div>
+            <div className="fld"><label>내용</label>
+              <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={reportAddBullet}>• 점 추가</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={()=>reportIndent(1)}>→ 들여쓰기</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={()=>reportIndent(-1)}>← 내어쓰기</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontWeight:800}} onClick={reportBold}>B 굵게</button>
+              </div>
+              <textarea ref={reportTaRef} autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} placeholder={"여기에 입력한 뒤, 줄을 클릭하고 위 버튼으로 점·들여쓰기·굵게를 적용하세요"} style={{minHeight:280,fontFamily:"inherit"}} />
+            </div>
           </div>
           <div className="modal-foot">
             {reportDraft.id&&<button className="del" onClick={()=>removeReport(reportDraft)}>삭제</button>}
