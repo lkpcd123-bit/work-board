@@ -440,14 +440,14 @@ const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Dat
 const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockOrderTs:{naver:0,coupang:0},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
-  const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
-  const rm=new Map(); [...(r.routines||[]),...(l.routines||[])].forEach(t=>{const p=rm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))rm.set(t.id,t);});
-  const cm=new Map(); [...(r.checkitems||[]),...(l.checkitems||[])].forEach(t=>{const p=cm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))cm.set(t.id,t);});
-  const mm2=new Map(); [...(r.monthlies||[]),...(l.monthlies||[])].forEach(t=>{const p=mm2.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mm2.set(t.id,t);});
-  const ri=new Map(); [...(r.rItems||[]),...(l.rItems||[])].forEach(t=>{const p=ri.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))ri.set(t.id,t);});
-  const mi=new Map(); [...(r.memoItems||[]),...(l.memoItems||[])].forEach(t=>{const p=mi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mi.set(t.id,t);});
-  const rpi=new Map(); [...(r.reportItems||[]),...(l.reportItems||[])].forEach(t=>{const p=rpi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))rpi.set(t.id,t);});
-  const mmi=new Map(); [...(r.mindmaps||[]),...(l.mindmaps||[])].forEach(t=>{const p=mmi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mmi.set(t.id,t);});
+  const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))map.set(t.id,t);});
+  const rm=new Map(); [...(r.routines||[]),...(l.routines||[])].forEach(t=>{const p=rm.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))rm.set(t.id,t);});
+  const cm=new Map(); [...(r.checkitems||[]),...(l.checkitems||[])].forEach(t=>{const p=cm.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))cm.set(t.id,t);});
+  const mm2=new Map(); [...(r.monthlies||[]),...(l.monthlies||[])].forEach(t=>{const p=mm2.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))mm2.set(t.id,t);});
+  const ri=new Map(); [...(r.rItems||[]),...(l.rItems||[])].forEach(t=>{const p=ri.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))ri.set(t.id,t);});
+  const mi=new Map(); [...(r.memoItems||[]),...(l.memoItems||[])].forEach(t=>{const p=mi.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))mi.set(t.id,t);});
+  const rpi=new Map(); [...(r.reportItems||[]),...(l.reportItems||[])].forEach(t=>{const p=rpi.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))rpi.set(t.id,t);});
+  const mmi=new Map(); [...(r.mindmaps||[]),...(l.mindmaps||[])].forEach(t=>{const p=mmi.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))mmi.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const inbMap=new Map(); [...(r.inboundPlans||[]),...(l.inboundPlans||[])].forEach(t=>{const p=inbMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))inbMap.set(t.id,t);});
