@@ -411,10 +411,16 @@ const readFileAsBase64=(file)=>new Promise((resolve)=>{
 });
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const dowKr = (dateStr) => { if(!dateStr) return ""; const d=new Date(dateStr+"T00:00:00"); return ["일","월","화","수","목","금","토"][d.getDay()]; };
-// ── 일보고 등 "- 항목 / Tab 들여쓰기 / **굵게**" 아웃라인 텍스트 렌더링 ──
-const renderBoldSpans = (text) => {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((p, i) => (p.startsWith("**") && p.endsWith("**") && p.length > 3) ? <b key={i}>{p.slice(2, -2)}</b> : <React.Fragment key={i}>{p}</React.Fragment>);
+// ── 일보고 등 "- 항목 / 들여쓰기 / **굵게** / *기울임* / __밑줄__" 아웃라인 텍스트 렌더링 ──
+const OUTLINE_BULLETS = ["•", "◦", "–", "–"];
+const renderFormattedSpans = (text) => {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__)/g);
+  return parts.map((p, i) => {
+    if (p.startsWith("**") && p.endsWith("**") && p.length > 3) return <b key={i}>{p.slice(2, -2)}</b>;
+    if (p.startsWith("__") && p.endsWith("__") && p.length > 3) return <u key={i}>{p.slice(2, -2)}</u>;
+    if (p.startsWith("*") && p.endsWith("*") && p.length > 1) return <i key={i}>{p.slice(1, -1)}</i>;
+    return <React.Fragment key={i}>{p}</React.Fragment>;
+  });
 };
 const renderOutlineText = (text) => {
   const lines = (text || "").split("\n");
@@ -422,16 +428,16 @@ const renderOutlineText = (text) => {
     const m = line.match(/^(\s*)[-•*]\s?(.*)$/);
     if (m) {
       const indent = m[1].replace(/\t/g, "  ").length;
-      const level = Math.min(Math.floor(indent / 2), 3);
+      const level = Math.min(Math.floor(indent / 2), OUTLINE_BULLETS.length - 1);
       return (
         <div key={i} style={{ paddingLeft: level * 20, display: "flex", gap: 6, lineHeight: 1.6 }}>
-          <span style={{ flexShrink: 0, color: "var(--ink3)" }}>{level === 0 ? "•" : "◦"}</span>
-          <span>{renderBoldSpans(m[2])}</span>
+          <span style={{ flexShrink: 0, color: "var(--ink3)" }}>{OUTLINE_BULLETS[level]}</span>
+          <span>{renderFormattedSpans(m[2])}</span>
         </div>
       );
     }
     if (!line.trim()) return <div key={i} style={{ height: 6 }} />;
-    return <div key={i} style={{ lineHeight: 1.6 }}>{renderBoldSpans(line)}</div>;
+    return <div key={i} style={{ lineHeight: 1.6 }}>{renderFormattedSpans(line)}</div>;
   });
 };
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
@@ -1740,6 +1746,24 @@ function Board() {
     const start=ta.selectionStart,end=ta.selectionEnd;
     const sel=val.slice(start,end)||"굵은 글자";
     const next=val.slice(0,start)+"**"+sel+"**"+val.slice(end);
+    setReportDraft({...reportDraft,text:next});
+    setTimeout(()=>{ta.focus();ta.setSelectionRange(start+2,start+2+sel.length);},0);
+  };
+  const reportItalic=()=>{
+    const ta=reportTaRef.current; if(!ta)return;
+    const val=reportDraft.text||"";
+    const start=ta.selectionStart,end=ta.selectionEnd;
+    const sel=val.slice(start,end)||"기울임 글자";
+    const next=val.slice(0,start)+"*"+sel+"*"+val.slice(end);
+    setReportDraft({...reportDraft,text:next});
+    setTimeout(()=>{ta.focus();ta.setSelectionRange(start+1,start+1+sel.length);},0);
+  };
+  const reportUnderline=()=>{
+    const ta=reportTaRef.current; if(!ta)return;
+    const val=reportDraft.text||"";
+    const start=ta.selectionStart,end=ta.selectionEnd;
+    const sel=val.slice(start,end)||"밑줄 글자";
+    const next=val.slice(0,start)+"__"+sel+"__"+val.slice(end);
     setReportDraft({...reportDraft,text:next});
     setTimeout(()=>{ta.focus();ta.setSelectionRange(start+2,start+2+sel.length);},0);
   };
@@ -5069,8 +5093,10 @@ function Board() {
                 <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={()=>reportIndent(1)}>→ 들여쓰기</button>
                 <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={()=>reportIndent(-1)}>← 내어쓰기</button>
                 <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontWeight:800}} onClick={reportBold}>B 굵게</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontStyle:"italic"}} onClick={reportItalic}>I 기울임</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",textDecoration:"underline"}} onClick={reportUnderline}>U 밑줄</button>
               </div>
-              <textarea ref={reportTaRef} autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} placeholder={"여기에 입력한 뒤, 줄을 클릭하고 위 버튼으로 점·들여쓰기·굵게를 적용하세요"} style={{minHeight:280,fontFamily:"inherit"}} />
+              <textarea ref={reportTaRef} autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} placeholder={"여기에 입력한 뒤, 줄을 클릭하고 위 버튼으로 점·들여쓰기·굵게·기울임·밑줄을 적용하세요"} style={{minHeight:280,fontFamily:"inherit"}} />
             </div>
           </div>
           <div className="modal-foot">
@@ -5530,4 +5556,3 @@ function Board() {
     </div>
   );
 }
-
