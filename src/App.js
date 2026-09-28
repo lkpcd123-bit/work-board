@@ -1864,18 +1864,26 @@ function Board() {
   const [inboundModal, setInboundModal] = useState(null); // 입고 예정 등록/수정 모달
   const [inboundDraft, setInboundDraft] = useState(null);
   const INBOUND_STEPS=["입고 준비 중","입고중","재고 확인 중","입고 완료"];
-  const reorderRequests=useMemo(()=>(data.reorderRequests||[]).filter((r)=>!r.done),[data.reorderRequests]);
+  const stockSafe=useMemo(()=>data.stockSafe||{},[data.stockSafe]);
+  // 네이버+쿠팡 전체에서 안전재고 미달 항목 (입고 요청 패널용)
+  const allAlertItems=useMemo(()=>{
+    const result=[];
+    const naverRaw=((data.stockData||{}).naver||[]).filter((e)=>NAVER_KEEP_SKUS.has(e.id));
+    const coupangRaw=((data.stockData||{}).coupang||[]).filter((e)=>COUPANG_KEEP_SKUS.has(e.id));
+    naverRaw.forEach((item)=>{const safe=stockSafe[`naver_${item.id}`];if(safe&&item.stock<safe)result.push({...item,channel:"naver",safe});});
+    coupangRaw.forEach((item)=>{const safe=stockSafe[`coupang_${item.id}`];if(safe&&item.stock<safe)result.push({...item,channel:"coupang",safe});});
+    return result;
+  },[data.stockData,stockSafe]); // eslint-disable-line react-hooks/exhaustive-deps
   const stockItems=useMemo(()=>{
     const raw=(data.stockData||{})[stockTab]||[];
     let filtered;
     if(stockTab==="naver")filtered=raw.filter((e)=>NAVER_KEEP_SKUS.has(e.id));
     else if(stockTab==="coupang")filtered=COUPANG_KEEP_SKUS.size?raw.filter((e)=>COUPANG_KEEP_SKUS.has(e.id)):raw;
     else filtered=raw;
-    // 입고 요청이 있는 항목을 상단에 표시
-    const reorderSkus=new Set(reorderRequests.filter((r)=>r.channel===stockTab).map((r)=>r.sku));
-    return [...filtered.filter((e)=>reorderSkus.has(e.id)),...filtered.filter((e)=>!reorderSkus.has(e.id))];
-  },[data.stockData,stockTab,reorderRequests]); // eslint-disable-line react-hooks/exhaustive-deps
-  const stockSafe=useMemo(()=>data.stockSafe||{},[data.stockSafe]);
+    // 안전재고 미달 항목을 상단에 표시
+    const alertSkus=new Set(allAlertItems.filter((a)=>a.channel===stockTab).map((a)=>a.id));
+    return [...filtered.filter((e)=>alertSkus.has(e.id)),...filtered.filter((e)=>!alertSkus.has(e.id))];
+  },[data.stockData,stockTab,allAlertItems]); // eslint-disable-line react-hooks/exhaustive-deps
   const inboundPlans=useMemo(()=>(data.inboundPlans||[]).filter((p)=>!p.deleted),[data.inboundPlans]);
   const activeInbounds=useMemo(()=>inboundPlans.filter((p)=>p.status!=="입고 완료"),[inboundPlans]);
   const addInboundPlan=(plan)=>{commit((d)=>({...d,inboundPlans:[...(d.inboundPlans||[]),{...plan,id:uid(),createdAt:Date.now(),createdBy:me||"익명",logs:[{ts:Date.now(),text:"입고 예정 등록",by:me||"익명"}]}],updatedAt:Date.now()}),[]);};
@@ -1950,22 +1958,6 @@ function Board() {
       }));
       const finalMerged=[...orderedMerged,...newItems];
       commit((d)=>({...d,stockData:{...(d.stockData||{}),naver:finalMerged},updatedAt:Date.now()}),[]);
-      // 안전재고 미달 자동 입고요청 (중복 방지: 기존 미완료 요청이 있으면 재고수치만 업데이트)
-      const alerts=items.filter((item)=>{const safe=stockSafe[`naver_${item.id}`];return safe&&item.stock<safe;});
-      if(alerts.length){
-        commit((d)=>{
-          const existing=d.reorderRequests||[];
-          const updated=existing.map((r)=>{
-            if(r.channel!=="naver"||r.done)return r;
-            const match=alerts.find((a)=>a.id===r.sku);
-            if(match)return{...r,currentStock:match.stock,safeStock:stockSafe[`naver_${match.id}`],updatedAt:Date.now()};
-            return r;
-          });
-          const existingSkus=new Set(existing.filter((r)=>r.channel==="naver"&&!r.done).map((r)=>r.sku));
-          const newReq=alerts.filter((a)=>!existingSkus.has(a.id)).map((item)=>({id:uid(),channel:"naver",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`naver_${item.id}`],createdAt:Date.now(),done:false}));
-          return{...d,reorderRequests:[...updated,...newReq],updatedAt:Date.now()};
-        },[]);
-      }
       alert(`✅ 네이버 재고 업로드 완료 (${items.length}개 SKU)`);
 
     }else{
@@ -2004,21 +1996,6 @@ function Board() {
       }));
       const finalMerged=[...orderedMerged,...newItems];
       commit((d)=>({...d,stockData:{...(d.stockData||{}),coupang:finalMerged},updatedAt:Date.now()}),[]);
-      const alerts=items.filter((item)=>{const safe=stockSafe[`coupang_${item.id}`];return safe&&item.stock<safe;});
-      if(alerts.length){
-        commit((d)=>{
-          const existing=d.reorderRequests||[];
-          const updated=existing.map((r)=>{
-            if(r.channel!=="coupang"||r.done)return r;
-            const match=alerts.find((a)=>a.id===r.sku);
-            if(match)return{...r,currentStock:match.stock,safeStock:stockSafe[`coupang_${match.id}`],updatedAt:Date.now()};
-            return r;
-          });
-          const existingSkus=new Set(existing.filter((r)=>r.channel==="coupang"&&!r.done).map((r)=>r.sku));
-          const newReq=alerts.filter((a)=>!existingSkus.has(a.id)).map((item)=>({id:uid(),channel:"coupang",productName:item.name,sku:item.id,currentStock:item.stock,safeStock:stockSafe[`coupang_${item.id}`],createdAt:Date.now(),done:false}));
-          return{...d,reorderRequests:[...updated,...newReq],updatedAt:Date.now()};
-        },[]);
-      }
       alert(`✅ 쿠팡 재고 업로드 완료 (${items.length}개 SKU)`);
     }
   };
@@ -2026,7 +2003,7 @@ function Board() {
     const key=`${channel}_${itemId}`;
     commit((d)=>({...d,stockSafe:{...(d.stockSafe||{}),[key]:parseInt(val,10)||0},updatedAt:Date.now()}),[]);
   };
-  const doneReorder=(id)=>{commit((d)=>({...d,reorderRequests:(d.reorderRequests||[]).map((r)=>r.id===id?{...r,done:true}:r),updatedAt:Date.now()}),[]);};
+
 
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
@@ -3467,27 +3444,26 @@ function Board() {
           </div>
 
           {/* 입고 요청 패널 */}
-          {reorderRequests.length>0&&(
+          {allAlertItems.length>0&&(
             <div className="panel" style={{marginBottom:14,borderLeft:"4px solid #CA3521"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                <h3 style={{color:"#CA3521",margin:0}}>🚨 입고 요청 ({reorderRequests.length}건)</h3>
+                <h3 style={{color:"#CA3521",margin:0}}>🚨 입고 요청 ({allAlertItems.length}건)</h3>
               </div>
-              {reorderRequests.map((r)=>(
-                <div key={r.id} className="reorder-card">
+              {allAlertItems.map((item)=>(
+                <div key={`${item.channel}_${item.id}`} className="reorder-card">
                   <div>
-                    <div style={{fontWeight:800,fontSize:13}}>{r.productName}</div>
+                    <div style={{fontWeight:800,fontSize:13}}>{item.name}</div>
                     <div style={{fontSize:11.5,color:"var(--ink3)",marginTop:3}}>
-                      <span style={{marginRight:10}}>{r.channel==="naver"?"네이버":"쿠팡"}</span>
-                      <span style={{marginRight:10}}>SKU: {r.sku}</span>
-                      현재고 <b style={{color:"#CA3521"}}>{r.currentStock.toLocaleString()}</b> / 안전재고 <b>{r.safeStock.toLocaleString()}</b>
+                      <span style={{marginRight:10}}>{item.channel==="naver"?"네이버":"쿠팡"}</span>
+                      <span style={{marginRight:10}}>SKU: {item.sku||item.id}</span>
+                      현재고 <b style={{color:"#CA3521"}}>{item.stock.toLocaleString()}</b> / 안전재고 <b>{item.safe.toLocaleString()}</b>
                     </div>
                   </div>
-                  <button className="btn ghost" style={{fontSize:12,flexShrink:0}} onClick={()=>doneReorder(r.id)}>✔ 처리완료</button>
                 </div>
               ))}
             </div>
           )}
-          {reorderRequests.length===0&&(
+          {allAlertItems.length===0&&(
             <div className="panel" style={{marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:20}}>✅</span>
               <span style={{fontSize:13,color:"var(--ok)",fontWeight:700}}>입고 요청 없음 — 모든 상품이 안전재고 이상입니다</span>
