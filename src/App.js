@@ -1296,6 +1296,8 @@ function Board() {
   const [issueFilter, setIssueFilter] = useState("open");
   const dataRef = useRef(data); dataRef.current = data;
   const busyRef = useRef(false);
+  const pendingRef = useRef(0);          // 진행 중인 저장 요청 수
+  const queueRef = useRef(Promise.resolve()); // 저장 요청 직렬화 큐
   const addingRef = useRef(false);
   const importRef = useRef(null);
 
@@ -1354,26 +1356,40 @@ function Board() {
       if(snap.exists()){
         const r=snap.data();
         if(r&&(r.updatedAt||0)>(dataRef.current.updatedAt||0)){
-          setData(mergeData(r,dataRef.current));
+          const m=mergeData(r,dataRef.current);dataRef.current=m;setData(m);
         }
       }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const commit = useCallback(async (mutator, logEntries) => {
-    busyRef.current=true; setSaveState("saving");
-    const optimistic=mutator(dataRef.current); setData(optimistic);
+  // 저장: 요청을 큐로 직렬화하고, 항상 "가장 최신 로컬 상태"를 기준으로 서버와 병합한다.
+  // (예전엔 체크박스를 연속으로 누르면 저장이 겹쳐서 먼저 끝난 저장이 나중 변경을 덮어써 원래대로 돌아왔음)
+  const commit = useCallback((mutator, logEntries) => {
+    pendingRef.current++; busyRef.current=true; setSaveState("saving");
+    // ref를 동기적으로 갱신해야 연속 클릭도 서로의 변경을 누적한다
+    const optimistic=mutator(dataRef.current); dataRef.current=optimistic; setData(optimistic);
+    const job=async()=>{
     try {
-      let remote=null;
-      try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
+      // 서버 읽기 실패 시 로컬 데이터로 문서 전체를 덮어쓰지 않도록 재시도 후 중단
+      let remote=null,readOk=false,readErr=null;
+      for(let i=0;i<3&&!readOk;i++){
+        try{const snap=await getDoc(BOARD_REF());remote=snap.exists()?snap.data():null;readOk=true;}
+        catch(e){readErr=e;await new Promise((r)=>setTimeout(r,600*(i+1)));}
+      }
+      if(!readOk)throw readErr||new Error("read failed");
       const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],reportItems:Array.isArray(remote.reportItems)?remote.reportItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]},edMasterImages:remote.edMasterImages||{보틀:[],대용량:[],파우치:[]},edSavedSummaries:Array.isArray(remote.edSavedSummaries)?remote.edSavedSummaries:[]}:emptyData();
-      const merged=mergeData(base,optimistic);
+      const merged=mergeData(base,dataRef.current);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
       // 안전망: remote에 있지만 merged에 없는 필드는 보존 (구버전 코드가 알 수 없는 필드를 지우는 것 방지)
       if(remote){Object.keys(remote).forEach((k)=>{if(!(k in merged))merged[k]=remote[k];});}
-      await setDoc(BOARD_REF(),merged); setData(merged); setSaveState("saved"); setTimeout(()=>setSaveState("idle"),1500);
-    } catch(e){setSaveState("error");} finally{busyRef.current=false;}
+      await setDoc(BOARD_REF(),merged);
+      // 뒤따르는 저장이 남아 있으면 화면을 덮어쓰지 않는다 (마지막 저장이 최신 상태로 반영)
+      if(pendingRef.current===1){dataRef.current=merged;setData(merged);setSaveState("saved");setTimeout(()=>setSaveState("idle"),1500);}
+    } catch(e){setSaveState("error");} finally{pendingRef.current=Math.max(0,pendingRef.current-1);if(pendingRef.current===0)busyRef.current=false;}
+    };
+    queueRef.current=queueRef.current.then(job,job);
+    return queueRef.current;
   }, []);
 
   const mkLog=(action,task,detail)=>({id:uid(),ts:Date.now(),who:me||"익명",taskId:task?.id||null,taskTitle:task?.title||"",action,detail:detail||""});
