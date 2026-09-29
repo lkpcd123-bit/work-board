@@ -1457,8 +1457,8 @@ function Board() {
     setDraft(null);
   };
 
-  const saveDraft=()=>{
-    if(!draft.title.trim())return;
+  const saveDraft=(close=true)=>{
+    if(!draft.title.trim()){alert("업무명을 입력하세요.");return;}
     const now=Date.now(),isNew=draft._new,clean={...draft};delete clean._new;
     const before=data.tasks.find((t)=>t.id===draft.id),logs=[];
     if(isNew)logs.push(mkLog("업무 생성",clean,`${clean.channel} · ${clean.type}`));
@@ -1466,7 +1466,8 @@ function Board() {
     let spawn=null;
     if(clean.status==="done"&&before?.status!=="done"&&clean.repeat!=="none"){spawn={...clean,id:uid(),status:"todo",due:nextDue(clean.due,clean.repeat),checklist:(clean.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}
     commit((d)=>{const ex=d.tasks.some((t)=>t.id===clean.id);const rec={...clean,createdAt:before?.createdAt||now,createdBy:before?.createdBy||me,updatedAt:now,updatedBy:me,doneAt:clean.status==="done"?(before?.doneAt||now):null};let tasks=ex?d.tasks.map((t)=>t.id===rec.id?rec:t):[rec,...d.tasks];if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);
-    setDraft(null);
+    // 중간 저장: 창을 유지하고 신규 → 기존 업무로 전환 (이후 저장은 수정으로 처리)
+    if(close)setDraft(null);else setDraft({...clean,createdAt:before?.createdAt||now,createdBy:before?.createdBy||me,updatedAt:now,updatedBy:me});
   };
 
   const moveTask=(task,statusId)=>{if(!canEdit||task.status===statusId)return;const now=Date.now();const logs=[mkLog("상태 변경",task,`${cols.find((c)=>c.id===task.status)?.label} -> ${cols.find((c)=>c.id===statusId)?.label}`)];let spawn=null;if(statusId==="done"&&task.repeat&&task.repeat!=="none"){spawn={...task,id:uid(),status:"todo",due:nextDue(task.due,task.repeat),checklist:(task.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}commit((d)=>{let tasks=d.tasks.map((t)=>t.id===task.id?{...t,status:statusId,updatedAt:now,updatedBy:me,doneAt:statusId==="done"?(t.doneAt||now):null}:t);if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);if(statusId==="done"&&task.status!=="done"){}};
@@ -5400,7 +5401,7 @@ function Board() {
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
             <h2 style={{margin:0}}>{draft._new?"새 업무":"업무 상세"}</h2>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              {canEdit&&!draft._new&&<button className="btn-save" style={{fontSize:12,padding:"5px 14px",background:"#1F845A"}} onClick={saveDraft}>💾 중간 저장</button>}
+              {canEdit&&<button className="btn-save" style={{fontSize:12,padding:"5px 14px",background:"#1F845A"}} onClick={()=>saveDraft(false)}>💾 중간 저장</button>}
               <button style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"var(--ink3)",lineHeight:1}} onClick={()=>setDraft(null)}>×</button>
             </div>
           </div>
@@ -5604,7 +5605,9 @@ function Board() {
             {!draft._new&&canEdit&&draft.owner&&draft.owner!==me&&<button className="btn ghost" style={{color:"#0C66E4",borderColor:"#0C66E4"}} onClick={()=>{sendManualNotif(draft,draft.owner);alert(`${draft.owner}님에게 알림을 보냈습니다.`);}}>📬 알림 전송</button>}
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setDraft(null)}>닫기</button>
-            <button className="btn" onClick={saveDraft} style={{background:"#0C66E4",color:"#fff"}}>저장</button>         </div>
+            <button className="btn-save" style={{background:"#1F845A"}} onClick={()=>saveDraft(false)}>💾 중간 저장</button>
+            <button className="btn" onClick={()=>saveDraft(true)} style={{background:"#0C66E4",color:"#fff"}}>저장</button>
+          </div>
         </div></div>
       )}
     </div>
