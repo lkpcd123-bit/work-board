@@ -65,6 +65,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
         const [scDraft,setScDraft]=React.useState(null);
         const [scCopyOpen,setScCopyOpen]=React.useState(false);
         const [scCopyTarget,setScCopyTarget]=React.useState("월");
+        const [scViewMode,setScViewMode]=React.useState("circle");
         
         const copyToDay=(targetDay)=>{
           const src=scBlocks[scDay]||[];
@@ -87,6 +88,38 @@ function ScheduleView({uid, saveBlocks: _save}) {
         const toMin=(h,m)=>h*60+m;
         const blockTop=(h,m)=>((toMin(h,m)-toMin(START_H,START_M))/totalMin)*100;
         const blockH=(sh,sm,eh,em)=>((toMin(eh,em)-toMin(sh,sm))/totalMin)*100;
+
+        // ── 원형(24시간 시계방향) 차트용 헬퍼 ──
+        const CX=170,CY=170,R_OUT=150,R_IN=95;
+        const polarXY=(r,angleDeg)=>{
+          const rad=angleDeg*Math.PI/180;
+          return {x:CX+r*Math.sin(rad), y:CY-r*Math.cos(rad)};
+        };
+        const ringSlicePath=(rOuter,rInner,startAngle,endAngle)=>{
+          let a1=startAngle,a2=endAngle;
+          if(a2<=a1)a2=a1+0.01;
+          const large=(a2-a1)>180?1:0;
+          const p1=polarXY(rOuter,a1),p2=polarXY(rOuter,a2),p3=polarXY(rInner,a2),p4=polarXY(rInner,a1);
+          return `M ${p1.x} ${p1.y} A ${rOuter} ${rOuter} 0 ${large} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${rInner} ${rInner} 0 ${large} 0 ${p4.x} ${p4.y} Z`;
+        };
+        const minToAngle=(min)=>(min/1440)*360;
+        const handleRingClick=(e)=>{
+          const svg=e.currentTarget;
+          const rect=svg.getBoundingClientRect();
+          const scale=340/rect.width;
+          const px=(e.clientX-rect.left)*scale, py=(e.clientY-rect.top)*scale;
+          const dx=px-CX, dy=py-CY;
+          const dist=Math.sqrt(dx*dx+dy*dy);
+          if(dist<R_IN-15||dist>R_OUT+15)return;
+          let angleDeg=Math.atan2(dx,-dy)*180/Math.PI;
+          if(angleDeg<0)angleDeg+=360;
+          let snapped=Math.round((angleDeg/360*1440)/30)*30;
+          if(snapped>=1440)snapped=0;
+          const sh=Math.floor(snapped/60),sm=snapped%60;
+          let endMin=snapped+60;const eh=endMin>=1440?23:Math.floor(endMin/60),em=endMin>=1440?59:endMin%60;
+          setScDraft({id:null,title:"",sh,sm,eh,em,color:COLORS[blocks.length%COLORS.length],memo:""});
+          setScAddOpen(true);
+        };
 
         const todayDate=(day)=>{
           const d=new Date();
@@ -118,7 +151,14 @@ function ScheduleView({uid, saveBlocks: _save}) {
             ))}
           </div>
 
+          {/* 보기 전환 */}
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            <button onClick={()=>setScViewMode("bar")} style={{padding:"6px 14px",borderRadius:8,border:"1px solid var(--line)",fontSize:12,fontWeight:700,cursor:"pointer",background:scViewMode==="bar"?"#0C66E4":"var(--card)",color:scViewMode==="bar"?"#fff":"var(--ink2)"}}>막대형</button>
+            <button onClick={()=>setScViewMode("circle")} style={{padding:"6px 14px",borderRadius:8,border:"1px solid var(--line)",fontSize:12,fontWeight:700,cursor:"pointer",background:scViewMode==="circle"?"#0C66E4":"var(--card)",color:scViewMode==="circle"?"#fff":"var(--ink2)"}}>🕐 원형(24시간)</button>
+          </div>
+
           <div style={{display:"flex",gap:16}}>
+            {scViewMode==="bar"&&(<>
             {/* 시간 눈금 + 블록 */}
             <div style={{flex:1,position:"relative",background:"var(--card)",borderRadius:12,boxShadow:"var(--sh)",padding:"0 0 0 56px",minHeight:520,overflow:"hidden"}}>
               {/* 시간 눈금 */}
@@ -146,7 +186,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
                 const top=blockTop(b.sh,b.sm);
                 const h=blockH(b.sh,b.sm,b.eh,b.em);
                 return(
-                  <div key={b.id} style={{position:"absolute",left:60,right:8,top:`${top}%`,height:`${h}%`,background:b.color||"#0C66E4",borderRadius:7,padding:"6px 10px",cursor:"pointer",overflow:"hidden",boxSizing:"border-box",minHeight:24,zIndex:2}}
+                  <div key={b.id} style={{position:"absolute",left:60,right:8,top:`${top}%`,height:`${h}%`,background:b.color||"#0C66E4",borderRadius:7,padding:"10px 14px",cursor:"pointer",overflow:"hidden",boxSizing:"border-box",minHeight:24,zIndex:2}}
                     onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
                     <div style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.title}</div>
                     {h>5&&<div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>}
@@ -166,6 +206,51 @@ function ScheduleView({uid, saveBlocks: _save}) {
                   setScAddOpen(true);
                 }} />
             </div>
+            </>)}
+            {scViewMode==="circle"&&(
+              <div style={{flex:1,background:"var(--card)",borderRadius:12,boxShadow:"var(--sh)",padding:16,display:"flex",alignItems:"center",justifyContent:"center",minHeight:520}}>
+                <svg viewBox="0 0 340 340" style={{width:"100%",maxWidth:400,height:"auto"}} onClick={handleRingClick}>
+                  {/* 배경 링(빈 시간대, 클릭으로 추가) */}
+                  <path d={ringSlicePath(R_OUT,R_IN,0,360)} fill="var(--bg)" stroke="var(--line)" strokeWidth={1} />
+                  {/* 시간 눈금 */}
+                  {Array.from({length:24},(_,h)=>{
+                    const angle=minToAngle(h*60);
+                    const isLabel=h%2===0;
+                    const p1=polarXY(R_IN-2,angle),p2=polarXY(isLabel?R_OUT+10:R_OUT+4,angle);
+                    const lp=polarXY(R_OUT+22,angle);
+                    return(
+                      <g key={h}>
+                        <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="var(--ink3)" strokeWidth={isLabel?1.5:1} opacity={isLabel?0.6:0.3} />
+                        {isLabel&&<text x={lp.x} y={lp.y} fontSize={10} fill="var(--ink3)" textAnchor="middle" dominantBaseline="middle">{h}</text>}
+                      </g>
+                    );
+                  })}
+                  {/* 일정 블록 (원형 슬라이스) */}
+                  {blocks.map((b)=>{
+                    const a1=minToAngle(toMin(b.sh,b.sm)),a2=minToAngle(toMin(b.eh,b.em));
+                    const mid=polarXY((R_OUT+R_IN)/2,(a1+(a2>a1?a2:a2+360))/2);
+                    return(
+                      <g key={b.id} style={{cursor:"pointer"}} onClick={(e)=>{e.stopPropagation();setScDraft({...b});setScAddOpen(true);}}>
+                        <path d={ringSlicePath(R_OUT,R_IN,a1,a2>a1?a2:a2+360)} fill={b.color||"#0C66E4"} stroke="var(--card)" strokeWidth={2} />
+                        <text x={mid.x} y={mid.y} fontSize={10} fontWeight={700} fill="#fff" textAnchor="middle" dominantBaseline="middle">{b.title.length>6?b.title.slice(0,6)+"…":b.title}</text>
+                      </g>
+                    );
+                  })}
+                  {/* 현재 시각 표시 */}
+                  {scDay===defaultDay&&(()=>{
+                    const now=new Date();const angle=minToAngle(toMin(now.getHours(),now.getMinutes()));
+                    const p1=polarXY(R_IN-8,angle),p2=polarXY(R_OUT+8,angle),dot=polarXY(R_OUT+8,angle);
+                    return(
+                      <g pointerEvents="none">
+                        <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#CA3521" strokeWidth={2} />
+                        <circle cx={dot.x} cy={dot.y} r={4} fill="#CA3521" />
+                      </g>
+                    );
+                  })()}
+                  <text x={CX} y={CY} fontSize={13} fontWeight={700} fill="var(--ink2)" textAnchor="middle" dominantBaseline="middle">{scDay}요일</text>
+                </svg>
+              </div>
+            )}
             {/* 사이드 */}
             <div style={{width:160,flexShrink:0}}>
               <button className="btn-save" style={{width:"100%",marginBottom:8}} onClick={()=>{setScDraft({id:null,title:"",sh:9,sm:30,eh:10,em:30,color:COLORS[0],memo:""});setScAddOpen(true);}}>+ 일정 추가</button>
@@ -173,7 +258,7 @@ function ScheduleView({uid, saveBlocks: _save}) {
               <div style={{fontSize:12,color:"var(--ink3)",marginBottom:8,fontWeight:700}}>{scDay}요일 일정 ({blocks.length})</div>
               {blocks.length===0&&<div style={{fontSize:12,color:"var(--ink3)"}}>일정이 없습니다</div>}
               {[...blocks].sort((a,b)=>toMin(a.sh,a.sm)-toMin(b.sh,b.sm)).map((b)=>(
-                <div key={b.id} style={{background:b.color,borderRadius:7,padding:"7px 10px",marginBottom:6,cursor:"pointer"}} onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
+                <div key={b.id} style={{background:b.color,borderRadius:7,padding:"10px 14px",marginBottom:10,cursor:"pointer"}} onClick={()=>{setScDraft({...b});setScAddOpen(true);}}>
                   <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{b.title}</div>
                   <div style={{fontSize:10,color:"rgba(255,255,255,.8)",marginTop:2}}>{String(b.sh).padStart(2,"0")}:{String(b.sm).padStart(2,"0")} ~ {String(b.eh).padStart(2,"0")}:{String(b.em).padStart(2,"0")}</div>
                 </div>
@@ -227,9 +312,9 @@ function ScheduleView({uid, saveBlocks: _save}) {
           {/* 일정 추가/수정 모달 */}
           {scAddOpen&&scDraft&&(
             <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setScAddOpen(false)}>
-              <div className="modal" style={{maxWidth:380}} onClick={(e)=>e.stopPropagation()}>
+              <div className="modal" style={{maxWidth:420}} onClick={(e)=>e.stopPropagation()}>
                 <div className="modal-head"><h3>{scDraft.id?"일정 수정":"일정 추가"}</h3><button className="x" onClick={()=>setScAddOpen(false)}>×</button></div>
-                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:14}}>
+                <div className="modal-body" style={{display:"flex",flexDirection:"column",gap:22,padding:"22px 24px"}}>
                   <div className="fld"><label>제목</label><input value={scDraft.title} onChange={(e)=>setScDraft({...scDraft,title:e.target.value})} placeholder="회의, 업무, 점심..." autoFocus /></div>
                   <div className="r3">
                     <div className="fld"><label>시작</label>
@@ -325,19 +410,50 @@ const readFileAsBase64=(file)=>new Promise((resolve)=>{
   reader.readAsDataURL(file);
 });
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const dowKr = (dateStr) => { if(!dateStr) return ""; const d=new Date(dateStr+"T00:00:00"); return ["일","월","화","수","목","금","토"][d.getDay()]; };
+// ── 일보고 등 "- 항목 / 들여쓰기 / **굵게** / *기울임* / __밑줄__" 아웃라인 텍스트 렌더링 ──
+const OUTLINE_BULLETS = ["•", "◦", "–", "–"];
+const renderFormattedSpans = (text) => {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__)/g);
+  return parts.map((p, i) => {
+    if (p.startsWith("**") && p.endsWith("**") && p.length > 3) return <b key={i}>{p.slice(2, -2)}</b>;
+    if (p.startsWith("__") && p.endsWith("__") && p.length > 3) return <u key={i}>{p.slice(2, -2)}</u>;
+    if (p.startsWith("*") && p.endsWith("*") && p.length > 1) return <i key={i}>{p.slice(1, -1)}</i>;
+    return <React.Fragment key={i}>{p}</React.Fragment>;
+  });
+};
+const renderOutlineText = (text) => {
+  const lines = (text || "").split("\n");
+  return lines.map((line, i) => {
+    const m = line.match(/^(\s*)[-•*]\s?(.*)$/);
+    if (m) {
+      const indent = m[1].replace(/\t/g, "  ").length;
+      const level = Math.min(Math.floor(indent / 2), OUTLINE_BULLETS.length - 1);
+      return (
+        <div key={i} style={{ paddingLeft: level * 20, display: "flex", gap: 6, lineHeight: 1.6 }}>
+          <span style={{ flexShrink: 0, color: "var(--ink3)" }}>{OUTLINE_BULLETS[level]}</span>
+          <span>{renderFormattedSpans(m[2])}</span>
+        </div>
+      );
+    }
+    if (!line.trim()) return <div key={i} style={{ height: 6 }} />;
+    return <div key={i} style={{ lineHeight: 1.6 }}>{renderFormattedSpans(line)}</div>;
+  });
+};
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],log:[],updatedAt:0 });
+const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockOrderTs:{naver:0,coupang:0},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
-  const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))map.set(t.id,t);});
-  const rm=new Map(); [...(r.routines||[]),...(l.routines||[])].forEach(t=>{const p=rm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))rm.set(t.id,t);});
-  const cm=new Map(); [...(r.checkitems||[]),...(l.checkitems||[])].forEach(t=>{const p=cm.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))cm.set(t.id,t);});
-  const mm2=new Map(); [...(r.monthlies||[]),...(l.monthlies||[])].forEach(t=>{const p=mm2.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mm2.set(t.id,t);});
-  const ri=new Map(); [...(r.rItems||[]),...(l.rItems||[])].forEach(t=>{const p=ri.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))ri.set(t.id,t);});
-  const mi=new Map(); [...(r.memoItems||[]),...(l.memoItems||[])].forEach(t=>{const p=mi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mi.set(t.id,t);});
-  const mmi=new Map(); [...(r.mindmaps||[]),...(l.mindmaps||[])].forEach(t=>{const p=mmi.get(t.id);if(!p||(t.updatedAt||0)>(p.updatedAt||0))mmi.set(t.id,t);});
+  const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))map.set(t.id,t);});
+  const rm=new Map(); [...(r.routines||[]),...(l.routines||[])].forEach(t=>{const p=rm.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))rm.set(t.id,t);});
+  const cm=new Map(); [...(r.checkitems||[]),...(l.checkitems||[])].forEach(t=>{const p=cm.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))cm.set(t.id,t);});
+  const mm2=new Map(); [...(r.monthlies||[]),...(l.monthlies||[])].forEach(t=>{const p=mm2.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))mm2.set(t.id,t);});
+  const ri=new Map(); [...(r.rItems||[]),...(l.rItems||[])].forEach(t=>{const p=ri.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))ri.set(t.id,t);});
+  const mi=new Map(); [...(r.memoItems||[]),...(l.memoItems||[])].forEach(t=>{const p=mi.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))mi.set(t.id,t);});
+  const rpi=new Map(); [...(r.reportItems||[]),...(l.reportItems||[])].forEach(t=>{const p=rpi.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))rpi.set(t.id,t);});
+  const mmi=new Map(); [...(r.mindmaps||[]),...(l.mindmaps||[])].forEach(t=>{const p=mmi.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))mmi.set(t.id,t);});
   const lm=new Map(); [...(r.log||[]),...(l.log||[])].forEach(e=>lm.set(e.id,e));
   const mm=new Map(); [...(r.members||[]),...(l.members||[])].forEach(m=>{const p=mm.get(m.name);if(!p||(m.updatedAt||0)>=(p.updatedAt||0))mm.set(m.name,m);});
   const inbMap=new Map(); [...(r.inboundPlans||[]),...(l.inboundPlans||[])].forEach(t=>{const p=inbMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))inbMap.set(t.id,t);});
@@ -346,32 +462,51 @@ function mergeData(r,l) {
   const c24Map=new Map(); [...(r.cafe24_schedules||[]),...(l.cafe24_schedules||[])].forEach(t=>{const p=c24Map.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))c24Map.set(t.id,t);});
   const notifMap=new Map(); [...(r.notifications||[]),...(l.notifications||[])].forEach(t=>{const p=notifMap.get(t.id);if(!p||(t.updatedAt||t.ts||0)>=(p.updatedAt||p.ts||0))notifMap.set(t.id,t);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
-  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],mindmaps:[...mmi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
+  return { tasks:[...map.values()],routines:[...rm.values()],checkitems:[...cm.values()],monthlies:[...mm2.values()],rItems:[...ri.values()],memoItems:[...mi.values()],reportItems:[...rpi.values()],mindmaps:[...mmi.values()],members:[...mm.values()],channels:(uc?l.channels:r.channels)||DEFAULT_CHANNELS,channelsUpdatedAt:Math.max(l.channelsUpdatedAt||0,r.channelsUpdatedAt||0),types:((l.typesUpdatedAt||0)>=(r.typesUpdatedAt||0)?l.types:r.types)||TYPES,typesUpdatedAt:Math.max(l.typesUpdatedAt||0,r.typesUpdatedAt||0),
     routineCats:((l.routineCatsUpdatedAt||0)>=(r.routineCatsUpdatedAt||0)?l.routineCats:r.routineCats)||["오전","오후"],routineCatsUpdatedAt:Math.max(l.routineCatsUpdatedAt||0,r.routineCatsUpdatedAt||0),
     colLabels:((l.colLabelsUpdatedAt||0)>=(r.colLabelsUpdatedAt||0)?l.colLabels:r.colLabels)||{},colLabelsUpdatedAt:Math.max(l.colLabelsUpdatedAt||0,r.colLabelsUpdatedAt||0),
     log:[...lm.values()].sort((a,b)=>b.ts-a.ts).slice(0,LOG_CAP),
-    tabOrder:(l.updatedAt||0)>=(r.updatedAt||0)?l.tabOrder||[]:r.tabOrder||[],
-    hiddenTabs:(l.updatedAt||0)>=(r.updatedAt||0)?l.hiddenTabs||[]:r.hiddenTabs||[],
-    tabFolders:(l.updatedAt||0)>=(r.updatedAt||0)?l.tabFolders||[]:r.tabFolders||[],
+    tabOrder:((l.tabConfigUpdatedAt||0)>=(r.tabConfigUpdatedAt||0))?l.tabOrder||[]:r.tabOrder||[],
+    hiddenTabs:((l.tabConfigUpdatedAt||0)>=(r.tabConfigUpdatedAt||0))?l.hiddenTabs||[]:r.hiddenTabs||[],
+    tabFolders:((l.tabConfigUpdatedAt||0)>=(r.tabConfigUpdatedAt||0))?l.tabFolders||[]:r.tabFolders||[],
+    tabConfigUpdatedAt:Math.max(l.tabConfigUpdatedAt||0,r.tabConfigUpdatedAt||0),
     refs:[...refMap.values()],
     refCats:((l.updatedAt||0)>=(r.updatedAt||0)?l.refCats:r.refCats)||["디자인","마케팅","경쟁사","콘텐츠"],
     stockData:(()=>{
-      const lsd=l.stockData||{naver:[],coupang:[]};
-      const rsd=r.stockData||{naver:[],coupang:[]};
+      const mergeStockArr=(rArr,lArr,rOrderTs,lOrderTs)=>{
+        const m=new Map();
+        [...(rArr||[]),...(lArr||[])].forEach((it)=>{
+          const p=m.get(it.id);
+          const itKey=it.updatedAt||(it.date?new Date(it.date).getTime():0);
+          const pKey=p?(p.updatedAt||(p.date?new Date(p.date).getTime():0)):-1;
+          if(!p||itKey>=pKey)m.set(it.id,it);
+        });
+        // 순서는 값 최신순과 별개로, 더 최근에 순서가 바뀐 쪽을 따라감
+        const orderTemplate=(lOrderTs||0)>=(rOrderTs||0)?(lArr||[]):(rArr||[]);
+        const ordered=orderTemplate.map((it)=>m.get(it.id)).filter(Boolean);
+        const orderedIds=new Set(orderTemplate.map((it)=>it.id));
+        const rest=[...m.values()].filter((it)=>!orderedIds.has(it.id));
+        return [...ordered,...rest];
+      };
       return {
-        naver:(lsd.naver||[]).length>=(rsd.naver||[]).length?lsd.naver||[]:rsd.naver||[],
-        coupang:(lsd.coupang||[]).length>=(rsd.coupang||[]).length?lsd.coupang||[]:rsd.coupang||[],
+        naver:mergeStockArr(r.stockData?.naver,l.stockData?.naver,r.stockOrderTs?.naver,l.stockOrderTs?.naver),
+        coupang:mergeStockArr(r.stockData?.coupang,l.stockData?.coupang,r.stockOrderTs?.coupang,l.stockOrderTs?.coupang),
       };
     })(),
-    stockSafe:(()=>{const ls=l.stockSafe||{};const rs=r.stockSafe||{};return Object.keys(ls).length>=Object.keys(rs).length?ls:rs;})(),
+    stockOrderTs:{
+      naver:Math.max(l.stockOrderTs?.naver||0,r.stockOrderTs?.naver||0),
+      coupang:Math.max(l.stockOrderTs?.coupang||0,r.stockOrderTs?.coupang||0),
+    },
+    stockSafe:{...(r.stockSafe||{}),...(l.stockSafe||{})},
     reorderRequests:[...roMap.values()],
     inboundPlans:[...inbMap.values()],
     cafe24_schedules:[...c24Map.values()],
     cafe24_token_data:((l.cafe24_token_data?.expiry||0)>=(r.cafe24_token_data?.expiry||0)?l.cafe24_token_data:r.cafe24_token_data)||{},
     notifications:[...notifMap.values()],
-    edProducts:(l.updatedAt||0)>=(r.updatedAt||0)?l.edProducts||{보틀:[],대용량:[],파우치:[]}:r.edProducts||{보틀:[],대용량:[],파우치:[]},
-    edMasterImages:(l.updatedAt||0)>=(r.updatedAt||0)?l.edMasterImages||{보틀:[],대용량:[],파우치:[]}:r.edMasterImages||{보틀:[],대용량:[],파우치:[]},
-    edSavedSummaries:(l.updatedAt||0)>=(r.updatedAt||0)?l.edSavedSummaries||[]:r.edSavedSummaries||[],
+    edProducts:((l.edUpdatedAt||0)>=(r.edUpdatedAt||0))?l.edProducts||{보틀:[],대용량:[],파우치:[]}:r.edProducts||{보틀:[],대용량:[],파우치:[]},
+    edMasterImages:((l.edUpdatedAt||0)>=(r.edUpdatedAt||0))?l.edMasterImages||{보틀:[],대용량:[],파우치:[]}:r.edMasterImages||{보틀:[],대용량:[],파우치:[]},
+    edSavedSummaries:((l.edUpdatedAt||0)>=(r.edUpdatedAt||0))?l.edSavedSummaries||[]:r.edSavedSummaries||[],
+    edUpdatedAt:Math.max(l.edUpdatedAt||0,r.edUpdatedAt||0),
     updatedAt:Date.now() };
 }
 
@@ -474,7 +609,6 @@ const CSS = `
 .cmeta{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11.5px;color:var(--ink3);flex-wrap:wrap;font-weight:600;}
 .cmeta .ch{color:var(--ch);font-weight:700;}
 .ctitle{font-size:16px;font-weight:700;line-height:1.45;margin-bottom:9px;word-break:keep-all;color:var(--ink);}
-.card.done .ctitle{color:var(--ink3);text-decoration:line-through;}
 .ctags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
 .tag{font-size:11.5px;font-weight:600;background:#E9F2FF;color:#0055CC;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;}
 .cbar{height:6px;background:#DFE1E6;border-radius:3px;margin-bottom:8px;overflow:hidden;}
@@ -523,6 +657,10 @@ const CSS = `
 /* ── 모달 ── */
 .mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:center;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:50;}
 .modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:0;display:flex;flex-direction:column;max-height:90vh;}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;border-bottom:1px solid var(--line);}
+.modal-head h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.02em;}
+.modal-head .x{background:none;border:none;cursor:pointer;color:var(--ink3);font-size:28px;line-height:1;padding:0;width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:8px;}
+.modal-head .x:hover{background:var(--bg);color:var(--danger);}
 .modal h2{font-size:19px;font-weight:800;margin:0;padding:24px 28px 18px;border-bottom:1px solid var(--line);letter-spacing:-.02em;}
 .modal-body{flex:1;overflow-y:auto;padding:24px 28px;}
 .modal-foot{padding:18px 28px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;}
@@ -723,6 +861,12 @@ const CSS = `
 .ckrow.dragging{opacity:.4;cursor:grabbing;box-shadow:0 0 0 2px var(--pri),var(--sh);}
 .ckrowmain{display:flex;align-items:flex-start;gap:11px;}
 .ckbox{width:22px;height:22px;border:2px solid #8F959C;border-radius:6px;background:#fff;font-size:12px;color:var(--ok);flex-shrink:0;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.ccklist{display:flex;flex-direction:column;gap:4px;}
+.ccklist-wrap{margin-bottom:9px;}
+.ccktoggle{background:none;border:none;color:var(--ink3);font-size:10.5px;cursor:pointer;padding:0 0 4px;display:block;}
+.ccktoggle:hover{color:var(--pri);}
+.ccklitem{display:flex;align-items:center;gap:6px;font-size:12px;}
+.ccklitem .ckbox.sm{width:15px;height:15px;font-size:9px;border-radius:4px;}
 .ckbox:hover{border-color:var(--ok);background:#F5FBF7;}
 .ckbox.on{background:var(--ok);border-color:var(--ok);color:#fff;}
 .ckbox.sm{width:18px;height:18px;font-size:10px;}
@@ -737,6 +881,8 @@ const CSS = `
 .ckexp:hover{color:var(--pri);}
 .cksubs{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px;padding-left:33px;}
 .cksub{display:flex;align-items:center;gap:8px;font-size:13px;}
+.cksubsubs{margin-left:24px;padding-left:12px;border-left:2px solid var(--line2);display:flex;flex-direction:column;gap:5px;margin-top:5px;margin-bottom:5px;}
+.cksubsub{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink3);}
 @media(max-width:1100px){.ckcols{grid-template-columns:1fr;}}
 
 /* ══ AI 비서 ══ */
@@ -791,6 +937,9 @@ const CSS = `
 .stock-row-dragover td{border-top:3px solid #0C66E4;}
 .stock-row-alert td:first-child{border-left:4px solid #CA3521;}
 .stock-row-alert{background:#FFFBF9;}
+.stock-row-soldout{box-shadow:inset 0 0 0 2px #CA3521;}
+.stock-row-soldout td:first-child{border-left:4px solid #CA3521;}
+.stock-badge-soldout{background:#CA3521;color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:800;white-space:nowrap;}
 .stock-badge-alert{background:#FFECEB;color:#CA3521;border:1px solid #CA3521;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:800;white-space:nowrap;}
 .stock-badge-ok{background:#DCFFF1;color:#1F845A;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;}
 .stock-safe-input{width:70px;border:1px solid var(--line2);border-radius:6px;padding:4px 7px;font-size:12px;text-align:right;}
@@ -834,14 +983,15 @@ const CSS = `
 
 `;
 
-const NAVER_KEEP_SKUS=new Set(["NS1uPBOcsQM1MT","NS1vpdLRzsy8Xr","NS1vf86aATxYqZ","NS1uPBO2exBRia","NS1uPBOJrgQhYF","NS1vfsnpPCxncZ","NS1uPBNotHhmLJ","NS1vpdMwo7GMGg","NS1uPBP1uITAvC","NS1wfXZeeKDZK5","NS1vpdMajlycY5","NS1vpdKMb0EHPS","NS1vf85vJ0gaCk","NS1uZ5gbN1DYgz","NS1vCCaENFVoHW","NS1vpdLykuN57H","NS1vf87gHK12ua","NS1vf7i4FBUwVF","NS1vf87BDpVYh7","NS1vf7hOtYoah7","NS1wfXZfzJe2wn","NS1vCCZIMYAdxL","NS1vf88E4xCOjU","NS1uPBMG0OxYHu","NS1vf7ibqnFnqJ","NS1vpdL6IsADzi","NS1uPBNex4R4Wk","NS1uPBLUnWSDV7"]);
-const COUPANG_KEEP_SKUS=new Set(["70646963","70867985","69981721","72573108","72583287","72583187","72583693","70649996","70649822","73242551","72584751","70649974","70649928","72583070","64809040"]);
+const NAVER_KEEP_SKUS=new Set(["NS1uPBOcsQM1MT","NS1vpdLRzsy8Xr","NS1vf86aATxYqZ","NS1uPBO2exBRia","NS1uPBOJrgQhYF","NS1vfsnpPCxncZ","NS1uPBNotHhmLJ","NS1vpdMwo7GMGg","NS1uPBP1uITAvC","NS1wfXZeeKDZK5","NS1vpdMajlycY5","NS1vpdKMb0EHPS","NS1vf85vJ0gaCk","NS1uZ5gbN1DYgz","NS1vCCaENFVoHW","NS1vpdLykuN57H","NS1vf87gHK12ua","NS1vf7i4FBUwVF","NS1vf87BDpVYh7","NS1vf7hOtYoah7","NS1wfXZfzJe2wn","NS1vCCZIMYAdxL","NS1vf88E4xCOjU","NS1uPBMG0OxYHu","NS1vf7ibqnFnqJ","NS1vpdL6IsADzi","NS1uPBNex4R4Wk","NS1uPBLUnWSDV7","NS1x6LJcJoImlX","NS1x6LKEMQ5nww"]);
+const COUPANG_KEEP_SKUS=new Set(["70646963","70867985","69981721","72573108","72583287","72583187","72583693","70649996","70649822","73242551","72584751","70649974","70649928","72583070","64809040","79698189","79698894"]);
 const ALL_TABS=[
   {id:"board",label:"보드"},
   {id:"routine",label:"반복업무"},
   {id:"monthly",label:"월간 업무"},
   {id:"checklist",label:"체크리스트"},
   {id:"memo",label:"메모"},
+  {id:"report",label:"일보고"},
   {id:"mindmap",label:"마인드맵"},
   {id:"ref",label:"래퍼런스"},
   {id:"schedule",label:"시간표"},
@@ -875,7 +1025,7 @@ function Board() {
   const [tabMgr, setTabMgr] = useState(false);
   const [tabDragId, setTabDragId] = useState(null);
   const tabFolders=useMemo(()=>data.tabFolders||[],[data.tabFolders]);
-  const saveTabConfig=(patch)=>commit((d)=>({...d,...patch,updatedAt:Date.now()}),[]);
+  const saveTabConfig=(patch)=>commit((d)=>({...d,...patch,tabConfigUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
   const saveTabFolders=(folders)=>saveTabConfig({tabFolders:folders});
   const [q, setQ] = useState("");
   const [fCh, setFCh] = useState("전체");
@@ -914,6 +1064,8 @@ function Board() {
   const [riIssueSubEditId, setRiIssueSubEditId] = useState(null);
   const [riQuickIssueId, setRiQuickIssueId] = useState(null);
   const [riQuickIssueText, setRiQuickIssueText] = useState("");
+  const [cardCkHidden, setCardCkHidden] = useState({});
+  const [edUrlInput, setEdUrlInput] = useState("");
   const [memoQuery, setMemoQuery] = useState("");
   const [memoCatFilter, setMemoCatFilter] = useState("전체");
   const [memoDraft, setMemoDraft] = useState(null);
@@ -921,9 +1073,19 @@ function Board() {
   const [memoDrag, setMemoDrag] = useState(null);
   const [memoSubText, setMemoSubText] = useState({});
   const [memoSubEditId, setMemoSubEditId] = useState(null);
+  const [reportQuery, setReportQuery] = useState("");
+  const [reportCatFilter, setReportCatFilter] = useState("전체");
+  const [reportDraft, setReportDraft] = useState(null);
+  const [reportExpand, setReportExpand] = useState({});
+  const [reportSubText, setReportSubText] = useState({});
+  const reportTaRef = useRef(null);
+  const [reportSubEditId, setReportSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const [notifBoxOpen, setNotifBoxOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
+  const [lbZoom, setLbZoom] = useState(1);
+  const [lbPan, setLbPan] = useState({x:0,y:0});
+  const lbDragRef = useRef(null);
   const [c24Token, setC24Token] = useState(()=>localStorage.getItem('c24_token')||'');
   const [c24Expiry, setC24Expiry] = useState(()=>parseInt(localStorage.getItem('c24_expiry')||'0'));
   const [c24RefreshToken, setC24RefreshToken] = useState(()=>localStorage.getItem('c24_refresh_token')||'');
@@ -937,7 +1099,7 @@ function Board() {
   const [c24OpenSelling, setC24OpenSelling] = useState('T');
   const [c24OpenDisplay, setC24OpenDisplay] = useState('T');
   const [c24CloseAction, setC24CloseAction] = useState('soldout');
-  const [c24Log, setC24Log] = useState(['⏱ 스케줄러 준비 중...']);
+  const [c24Log, setC24Log] = useState(()=>{try{return JSON.parse(localStorage.getItem('c24_log')||'[]');}catch(e){return[];}});
   const [c24EditSchedule, setC24EditSchedule] = useState(null);
   const [c24SubTab, setC24SubTab] = useState('schedule');
   // 상품 편집기
@@ -1058,7 +1220,7 @@ function Board() {
     try {
       let remote=null;
       try{const snap=await getDoc(BOARD_REF());if(snap.exists())remote=snap.data();}catch(e){}
-      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]},edMasterImages:remote.edMasterImages||{보틀:[],대용량:[],파우치:[]},edSavedSummaries:Array.isArray(remote.edSavedSummaries)?remote.edSavedSummaries:[]}:emptyData();
+      const base=remote&&Array.isArray(remote.tasks)?{...emptyData(),...remote,checkitems:Array.isArray(remote.checkitems)?remote.checkitems:[],monthlies:Array.isArray(remote.monthlies)?remote.monthlies:[],routineCats:Array.isArray(remote.routineCats)?remote.routineCats:["오전","오후"],rItems:Array.isArray(remote.rItems)?remote.rItems:[],colLabels:remote.colLabels||{},memoItems:Array.isArray(remote.memoItems)?remote.memoItems:[],reportItems:Array.isArray(remote.reportItems)?remote.reportItems:[],mindmaps:Array.isArray(remote.mindmaps)?remote.mindmaps:[],refs:Array.isArray(remote.refs)?remote.refs:[],refCats:Array.isArray(remote.refCats)?remote.refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:remote.stockData||{naver:[],coupang:[]},stockSafe:remote.stockSafe||{},reorderRequests:Array.isArray(remote.reorderRequests)?remote.reorderRequests:[],inboundPlans:Array.isArray(remote.inboundPlans)?remote.inboundPlans:[],tabOrder:Array.isArray(remote.tabOrder)?remote.tabOrder:[],hiddenTabs:Array.isArray(remote.hiddenTabs)?remote.hiddenTabs:[],tabFolders:Array.isArray(remote.tabFolders)?remote.tabFolders:[],edProducts:remote.edProducts||{보틀:[],대용량:[],파우치:[]},edMasterImages:remote.edMasterImages||{보틀:[],대용량:[],파우치:[]},edSavedSummaries:Array.isArray(remote.edSavedSummaries)?remote.edSavedSummaries:[]}:emptyData();
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
@@ -1160,6 +1322,7 @@ function Board() {
   };
 
   const moveTask=(task,statusId)=>{if(!canEdit||task.status===statusId)return;const now=Date.now();const logs=[mkLog("상태 변경",task,`${cols.find((c)=>c.id===task.status)?.label} -> ${cols.find((c)=>c.id===statusId)?.label}`)];let spawn=null;if(statusId==="done"&&task.repeat&&task.repeat!=="none"){spawn={...task,id:uid(),status:"todo",due:nextDue(task.due,task.repeat),checklist:(task.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}commit((d)=>{let tasks=d.tasks.map((t)=>t.id===task.id?{...t,status:statusId,updatedAt:now,updatedBy:me,doneAt:statusId==="done"?(t.doneAt||now):null}:t);if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);if(statusId==="done"&&task.status!=="done"){}};
+  const toggleCardCk=(t,ckId)=>{if(!canEdit)return;commit((d)=>({...d,tasks:d.tasks.map((x)=>x.id===t.id?{...x,checklist:(x.checklist||[]).map((c)=>c.id===ckId?{...c,done:!c.done}:c),updatedAt:Date.now(),updatedBy:me}:x)}),[mkLog("체크 항목",t,"토글")]);};
   const removeTask=(task)=>{commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,deleted:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("업무 삭제",task)]);setDraft(null);};
   const setArchivedFlag=(task,flag)=>commit((d)=>({...d,tasks:d.tasks.map((t)=>t.id===task.id?{...t,archived:flag,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog(flag?"아카이브":"아카이브 해제",task)]);
   const archiveDone=()=>{const targets=live.filter((t)=>t.status==="done");if(!targets.length){setConfirmBox(null);return;}const ids=new Set(targets.map((t)=>t.id));commit((d)=>({...d,tasks:d.tasks.map((t)=>ids.has(t.id)?{...t,archived:true,updatedAt:Date.now(),updatedBy:me}:t)}),[mkLog("완료 일괄 보관",null,`${targets.length}건`)]);setConfirmBox(null);};
@@ -1217,7 +1380,7 @@ function Board() {
   };
   const [ckDrag, setCkDrag] = useState(null);
   const [ckSubDrag, setCkSubDrag] = useState(null);
-  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);if(willDone)setConfirmBox({kind:"archiveCk",ckId:c.id,ckTitle:c.title});};
+  const toggleCk=(c)=>{if(!canEdit)return;const willDone=!c.done;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,done:willDone,doneAt:willDone?Date.now():null,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:c.done?"체크 해제":"체크 완료",detail:""}]);};
   const reorderCk=(tab,fromId,toId)=>{if(!canEdit||fromId===toId)return;const ordered=ckByTab(tab).filter((x)=>!x.done);const fi=ordered.findIndex((x)=>x.id===fromId);const ti=ordered.findIndex((x)=>x.id===toId);if(fi<0||ti<0)return;const arr=[...ordered];const[moved]=arr.splice(fi,1);arr.splice(ti,0,moved);const now=Date.now();commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>{const pos=arr.findIndex((a)=>a.id===x.id);return pos>=0?{...x,order:pos,updatedAt:now}:x;})}),[])};
   const removeCk=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크항목 삭제",detail:""}]);setCkDraft(null);};
   const duplicateCk=(c)=>{
@@ -1231,6 +1394,7 @@ function Board() {
   };
   const clearCkItem=(c)=>{commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>({...s,done:false})),updatedAt:Date.now()}:x)}),[{id:uid(),ts:Date.now(),who:me||"익명",taskId:c.id,taskTitle:c.title,action:"체크 해제",detail:""}]);};
   const toggleSub=(c,subId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,done:!s.done}:s),updatedAt:Date.now()}:x)}),[]);};
+  const toggleSubSub=(c,subId,subsubId)=>{if(!canEdit)return;commit((d)=>({...d,checkitems:(d.checkitems||[]).map((x)=>x.id===c.id?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,subsubs:(s.subsubs||[]).map((y)=>y.id===subsubId?{...y,done:!y.done}:y)}:s),updatedAt:Date.now()}:x)}),[]);};
 
   /* ── AI 비서 ── */
 
@@ -1537,6 +1701,105 @@ function Board() {
     commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
   };
 
+  /* ── 일보고 (메모와 동일 구조) ── */
+  const reportItems=useMemo(()=>(data.reportItems||[]).filter((x)=>!x.deleted),[data.reportItems]);
+  const reportCatNames=useMemo(()=>[...new Set(reportItems.map((x)=>x.cat).filter(Boolean))].sort(),[reportItems]);
+  const reportSubNames=useMemo(()=>(cat)=>[...new Set(reportItems.filter((x)=>x.cat===cat).map((x)=>x.sub).filter(Boolean))].sort(),[reportItems]);
+  const reportFiltered=useMemo(()=>{
+    let list=reportItems;
+    if(reportCatFilter!=="전체")list=list.filter((x)=>(x.cat||"미분류")===reportCatFilter);
+    const q=reportQuery.trim().toLowerCase();
+    if(q)list=list.filter((x)=>`${x.cat||""} ${x.sub||""} ${x.title||""} ${x.text||""} ${(x.subs||[]).map((s)=>s.text).join(" ")}`.toLowerCase().includes(q));
+    return list.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
+  },[reportItems,reportCatFilter,reportQuery]);
+  const reportCatOptions=useMemo(()=>["전체",...new Set(reportItems.map((x)=>x.cat||"미분류"))],[reportItems]);
+  // 버튼으로 서식 넣기 (모바일엔 Tab 키가 없어서 버튼 방식이 훨씬 편함)
+  const reportAddBullet=()=>{
+    const ta=reportTaRef.current; if(!ta)return;
+    const val=reportDraft.text||"";
+    const pos=ta.selectionStart;
+    const needsNl=pos>0&&val[pos-1]!=="\n";
+    const insert=(needsNl?"\n":"")+"- ";
+    const next=val.slice(0,pos)+insert+val.slice(pos);
+    setReportDraft({...reportDraft,text:next});
+    setTimeout(()=>{ta.focus();const p=pos+insert.length;ta.setSelectionRange(p,p);},0);
+  };
+  const reportIndent=(dir)=>{
+    const ta=reportTaRef.current; if(!ta)return;
+    const val=reportDraft.text||"";
+    const pos=ta.selectionStart;
+    const lineStart=val.lastIndexOf("\n",pos-1)+1;
+    let lineEnd=val.indexOf("\n",lineStart); if(lineEnd===-1)lineEnd=val.length;
+    const line=val.slice(lineStart,lineEnd);
+    let newLine,delta;
+    if(dir>0){newLine="  "+line;delta=2;}
+    else if(line.startsWith("  ")){newLine=line.slice(2);delta=-2;}
+    else if(line.startsWith(" ")){newLine=line.slice(1);delta=-1;}
+    else{newLine=line;delta=0;}
+    const next=val.slice(0,lineStart)+newLine+val.slice(lineEnd);
+    setReportDraft({...reportDraft,text:next});
+    setTimeout(()=>{ta.focus();const p=Math.max(lineStart,pos+delta);ta.setSelectionRange(p,p);},0);
+  };
+  const reportBold=()=>{
+    const ta=reportTaRef.current; if(!ta)return;
+    const val=reportDraft.text||"";
+    const start=ta.selectionStart,end=ta.selectionEnd;
+    const sel=val.slice(start,end)||"굵은 글자";
+    const next=val.slice(0,start)+"**"+sel+"**"+val.slice(end);
+    setReportDraft({...reportDraft,text:next});
+    setTimeout(()=>{ta.focus();ta.setSelectionRange(start+2,start+2+sel.length);},0);
+  };
+  const reportItalic=()=>{
+    const ta=reportTaRef.current; if(!ta)return;
+    const val=reportDraft.text||"";
+    const start=ta.selectionStart,end=ta.selectionEnd;
+    const sel=val.slice(start,end)||"기울임 글자";
+    const next=val.slice(0,start)+"*"+sel+"*"+val.slice(end);
+    setReportDraft({...reportDraft,text:next});
+    setTimeout(()=>{ta.focus();ta.setSelectionRange(start+1,start+1+sel.length);},0);
+  };
+  const reportUnderline=()=>{
+    const ta=reportTaRef.current; if(!ta)return;
+    const val=reportDraft.text||"";
+    const start=ta.selectionStart,end=ta.selectionEnd;
+    const sel=val.slice(start,end)||"밑줄 글자";
+    const next=val.slice(0,start)+"__"+sel+"__"+val.slice(end);
+    setReportDraft({...reportDraft,text:next});
+    setTimeout(()=>{ta.focus();ta.setSelectionRange(start+2,start+2+sel.length);},0);
+  };
+  const saveReport=(close=true)=>{
+    const text=(reportDraft.text||"").trim();
+    if(!text){alert("일보고 내용을 입력하세요.");return;}
+    const now=Date.now();
+    const date=reportDraft.date||todayStr();
+    if(reportDraft.id){
+      commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportDraft.id?{...x,cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,date,updatedAt:now}:x)}),[mkLog("일보고 수정",null,text.slice(0,30))]);
+    }else{
+      const rec={id:uid(),cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,date,subs:[],createdAt:now,updatedAt:now,createdBy:me};
+      commit((d)=>({...d,reportItems:[...(d.reportItems||[]),rec]}),[mkLog("일보고 생성",null,text.slice(0,30))]);
+      if(!close)setReportDraft({...reportDraft,id:rec.id,date,createdAt:now,updatedAt:now});
+    }
+    if(close)setReportDraft(null);
+  };
+  const removeReport=(m)=>{commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("일보고 삭제",null,(m.text||"").slice(0,30))]);setReportDraft(null);};
+  const duplicateReport=(m)=>{
+    const now=Date.now();
+    const copy={id:uid(),cat:m.cat,sub:m.sub,title:m.title?m.title+" (복사)":"",text:m.text,date:todayStr(),subs:[],createdAt:now,updatedAt:now,createdBy:me};
+    commit((d)=>({...d,reportItems:[...(d.reportItems||[]),copy]}),[mkLog("일보고 복사",null,(copy.text||"").slice(0,30))]);
+  };
+  const addReportSub=(reportId,text)=>{
+    const t=text.trim();if(!t)return;
+    const sub={id:uid(),text:t,author:me||"익명",ts:Date.now()};
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:[...(x.subs||[]),sub],updatedAt:Date.now()}:x)}),[]);
+  };
+  const editReportSub=(reportId,subId,text)=>{
+    const t=text.trim();if(!t)return;
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,text:t,edited:true}:s),updatedAt:Date.now()}:x)}),[]);
+  };
+  const removeReportSub=(reportId,subId)=>{
+    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
+  };
+
   /* ── 마인드맵 (계층형) ── */
   const mindmaps=useMemo(()=>(data.mindmaps||[]).filter((m)=>!m.deleted),[data.mindmaps]);
   const mmMakeNode=(text,color)=>({id:uid(),text:text||"노드",color:color||null,children:[],collapsed:false});
@@ -1571,10 +1834,32 @@ function Board() {
   const C24_MALL='slowrocket';
   const C24_CLIENT_ID='XUlWW7h7N9claZtHu37zhA';
   const C24_REDIRECT='https://work-board-one.vercel.app';
-  const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`];return next.slice(-100);});
+  const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`].slice(-100);try{localStorage.setItem('c24_log',JSON.stringify(next));}catch(e){}return next;});
+  // 다른 컴퓨터/GitHub Actions가 갱신한 스케줄을 Firestore에서 받아와 반영 (localStorage는 최초 로딩용 캐시일 뿐)
+  useEffect(()=>{
+    if(Array.isArray(data.cafe24_schedules)){
+      const list=data.cafe24_schedules.filter((s)=>!s.deleted);
+      setC24Schedules(list);
+      try{localStorage.setItem('c24_schedules',JSON.stringify(list));}catch(e){}
+    }
+  },[data.cafe24_schedules]);
   const c24TokenValid=()=>c24TokenRef.current&&c24Expiry>Date.now();
   // 토큰 state가 바뀔 때 ref도 동기화
   useEffect(()=>{c24TokenRef.current=c24Token;},[c24Token]);
+  // 다른 컴퓨터/세션에서 인증한 토큰을 Firestore에서 받아와 반영 (localStorage는 최초 로딩용 캐시일 뿐)
+  useEffect(()=>{
+    const td=data.cafe24_token_data;
+    if(td&&td.access_token&&td.expiry&&td.expiry>c24Expiry){
+      setC24Token(td.access_token);
+      setC24Expiry(td.expiry);
+      if(td.refresh_token)setC24RefreshToken(td.refresh_token);
+      try{
+        localStorage.setItem('c24_token',td.access_token);
+        localStorage.setItem('c24_expiry',td.expiry);
+        if(td.refresh_token)localStorage.setItem('c24_refresh_token',td.refresh_token);
+      }catch(e){}
+    }
+  },[data.cafe24_token_data]); // eslint-disable-line react-hooks/exhaustive-deps
   const c24SaveSchedules=(list)=>{
     setC24Schedules(list);
     localStorage.setItem('c24_schedules',JSON.stringify(list));
@@ -1675,8 +1960,23 @@ function Board() {
       if(!url){setEdMsg(`❌ ${f.name} 업로드 실패: `+JSON.stringify(upR));return;}
       newImgs.push({id:uid(),url,name:f.name,createdAt:Date.now()});
     }
-    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,...newImgs]},updatedAt:Date.now()}),[]);
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,...newImgs]},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
     setEdMsg(`✅ ${newImgs.length}장 업로드 완료`);
+  };
+
+  // 링크(URL)로 마스터 이미지 추가 — 용량 제한 없이 카페24가 서버에서 직접 가져옴
+  const addMasterImageFromUrl=async(url)=>{
+    const u=(url||"").trim();
+    if(!u){setEdMsg("❌ 이미지 링크를 입력하세요");return;}
+    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요 — 이미지를 저장하려면 먼저 로그인하세요");return;}
+    setEdMsg('링크에서 이미지 가져오는 중...');
+    const cur=(data.edMasterImages||{})[edCat]||[];
+    const upR=await c24Api({action:'uploadImageFromUrl',imageUrl:u});
+    const resultUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+    if(!resultUrl){setEdMsg("❌ 링크 업로드 실패: "+JSON.stringify(upR));return;}
+    const fname=u.split('/').pop().split('?')[0]||'img.jpg';
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:[...cur,{id:uid(),url:resultUrl,name:decodeURIComponent(fname),createdAt:Date.now()}]},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
+    setEdMsg(`✅ 링크에서 이미지 추가 완료`);
   };
 
   const replaceMasterImage=async(idx,file)=>{
@@ -1689,9 +1989,25 @@ function Board() {
     if(!url){setEdMsg("❌ 업로드 실패: "+JSON.stringify(upR));return;}
     const imgs=[...((data.edMasterImages||{})[edCat]||[])];
     imgs[idx]={...imgs[idx],url,name:file.name,updatedAt:Date.now()};
-    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
     setEdChanged((prev)=>({...prev,[idx]:true}));
     setEdMsg(`✅ ${idx+1}번 이미지 교체 완료`);
+  };
+
+  const replaceMasterImageFromUrl=async(idx,url)=>{
+    const u=(url||"").trim();
+    if(!u)return;
+    if(!c24TokenValid()){setEdMsg("❌ 카페24 로그인 필요");return;}
+    setEdMsg(`${idx+1}번 이미지 링크로 교체 중...`);
+    const upR=await c24Api({action:'uploadImageFromUrl',imageUrl:u});
+    const resultUrl=upR?.images?.[0]?.path||upR?.images?.[0]?.image_path||upR?.images?.[0]?.url;
+    if(!resultUrl){setEdMsg("❌ 업로드 실패: "+JSON.stringify(upR));return;}
+    const fname=decodeURIComponent(u.split('/').pop().split('?')[0]||'img.jpg');
+    const imgs=[...((data.edMasterImages||{})[edCat]||[])];
+    imgs[idx]={...imgs[idx],url:resultUrl,name:fname,updatedAt:Date.now()};
+    commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
+    setEdChanged((prev)=>({...prev,[idx]:true}));
+    setEdMsg(`✅ ${idx+1}번 이미지 링크로 교체 완료`);
   };
 
   const sendImages=async(imgIdxs)=>{
@@ -1746,12 +2062,12 @@ function Board() {
         if(d.product){
           successCount++;
           // lastSentAt 업데이트
-          commit((dd)=>({...dd,edProducts:{...(dd.edProducts||{}),[edCat]:(dd.edProducts||{})[edCat]?.map((p)=>p.code===code?{...p,lastSentAt:Date.now()}:p)||[]},updatedAt:Date.now()}),[]);
+          await commit((dd)=>({...dd,edProducts:{...(dd.edProducts||{}),[edCat]:(dd.edProducts||{})[edCat]?.map((p)=>p.code===code?{...p,lastSentAt:Date.now()}:p)||[]},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
         }
       }
       // 마스터 이미지에 lastUrl 저장
       const updatedMaster=masterImgs.map((img,i)=>uploadedUrls[i]?{...img,lastUrl:uploadedUrls[i]}:img);
-      commit((dd)=>({...dd,edMasterImages:{...(dd.edMasterImages||{}),[edCat]:updatedMaster},updatedAt:Date.now()}),[]);
+      await commit((dd)=>({...dd,edMasterImages:{...(dd.edMasterImages||{}),[edCat]:updatedMaster},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
       setEdChanged({});
       log.ok=true;log.msg=`${successCount}/${checkedCodes.length}개 상품 전송 완료`;
       setEdMsg(`✅ ${successCount}/${checkedCodes.length}개 상품 전송 완료!`);
@@ -1763,6 +2079,26 @@ function Board() {
     setEdSending(false);
   };
   const c24UpdateProduct=async(productNo,payload)=>{
+    const res=await c24Api({action:'update',productNo,payload});
+    if(!res||!res.product)c24AddLog(`❌ 상품 ${productNo} 수정 실패: `+JSON.stringify(res).slice(0,150));
+    return !!(res&&res.product);
+  };
+  // 진짜 "품절" 처리: 상품의 모든 품목(옵션) 재고를 0으로 만들고 품절표시를 켠 뒤 판매도 중지
+  const c24MarkSoldout=async(productNo)=>{
+    const vRes=await c24Api({action:'getVariants',productNo});
+    const variants=vRes?.variants||[];
+    if(!variants.length){
+      c24AddLog(`⚠ 품목을 찾을 수 없음: #${productNo} — 판매중지만 처리`);
+      return await c24UpdateProduct(productNo,{selling:'F'});
+    }
+    let allOk=true;
+    for(const v of variants){
+      const code=v.variant_code;
+      const r=await c24Api({action:'updateVariantInventory',productNo,variantCode:code,payload:{use_inventory:'T',display_soldout:'T',quantity:0}});
+      if(r?.error){allOk=false;c24AddLog(`❌ 품목 ${code} 품절처리 실패: `+JSON.stringify(r).slice(0,120));}
+    }
+    await c24UpdateProduct(productNo,{selling:'F'});
+    return allOk;
   };
   const c24AddSchedule=()=>{
     if(!c24SelProduct){alert('상품을 먼저 선택해주세요.');return;}
@@ -1773,7 +2109,7 @@ function Board() {
     c24SaveSchedules(next);
     c24AddLog(`✅ 스케줄 등록: #${s.productNo} ${s.productName} | 오픈:${s.openAt||'없음'} | 종료:${s.closeAt||'없음'}`);
   };
-  const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.filter((s)=>s.id!==id));c24AddLog('🗑 스케줄 삭제');};
+  const c24DeleteSchedule=(id)=>{c24SaveSchedules(c24Schedules.map((s)=>s.id===id?{...s,deleted:true,updatedAt:Date.now()}:s));c24AddLog('🗑 스케줄 삭제');};
   const c24UpdateSchedule=(updated)=>{
     c24SaveSchedules(c24Schedules.map((s)=>s.id===updated.id?{...updated,openDone:false,closeDone:false,error:null}:s));
     c24AddLog(`✏ 스케줄 수정: #${updated.productNo} ${updated.productName}`);
@@ -1795,9 +2131,11 @@ function Board() {
         else{updated.error='오픈 실패';changed=true;}
       }
       if(s.closeAt&&!s.closeDone&&new Date(s.closeAt)<=now){
-        c24AddLog(`🔴 종료 실행: #${s.productNo}`);
-        const payload=s.closeAction==='soldout'?{selling:'F',soldout:'T'}:s.closeAction==='hide'?{display:'F',selling:'F'}:{selling:'F'};
-        const ok=await c24UpdateProduct(s.productNo,payload);
+        c24AddLog(`🔴 종료 실행: #${s.productNo} (처리: ${s.closeAction||'soldout'})`);
+        let ok;
+        if(s.closeAction==='hide')ok=await c24UpdateProduct(s.productNo,{display:'F',selling:'F'});
+        else if(s.closeAction==='selling_off')ok=await c24UpdateProduct(s.productNo,{selling:'F'});
+        else ok=await c24MarkSoldout(s.productNo);
         if(ok){updated.closeDone=true;c24AddLog(`✅ 종료 완료: #${s.productNo}`);changed=true;}
         else{updated.error='종료 실패';changed=true;}
       }
@@ -1851,7 +2189,7 @@ function Board() {
   const addRefCat=(name)=>{const t=name.trim();if(!t||refCats.includes(t))return;commit((d)=>({...d,refCats:[...(d.refCats||[]),t],updatedAt:Date.now()}),[]);};
   const deleteRefCat=(name)=>{commit((d)=>({...d,refCats:(d.refCats||[]).filter((c)=>c!==name),updatedAt:Date.now()}),[]);};
   const handleRefImages=async(files)=>{
-    const imgs=await Promise.all(Array.from(files).map((f)=>resizeImage(f,1200,1200,0.85)));
+    const imgs=await Promise.all(Array.from(files).map((f)=>resizeImage(f,1600,1600,0.9)));
     imgs.forEach((src)=>setRefDraft((d)=>({...d,images:[...(d?.images||[]),{id:uid(),src}]})));
   };
 
@@ -1931,7 +2269,7 @@ function Board() {
         if(skuMap[skuId]){
           skuMap[skuId].stock+=stock;
         }else{
-          skuMap[skuId]={id:skuId,barcode:String(r[1]||""),name:String(r[2]||""),stock};
+          skuMap[skuId]={id:skuId,sku:skuId,barcode:String(r[1]||""),name:String(r[2]||""),stock};
         }
       }
       const items=Object.values(skuMap).map((item)=>({...item,date:today}));
@@ -1939,25 +2277,26 @@ function Board() {
       const existing=(data.stockData||{}).naver||[];
       // NAVER_KEEP_SKUS에 없는 항목은 기존 목록에서도 완전 제거
       const filteredExisting=existing.filter((e)=>NAVER_KEEP_SKUS.has(e.id));
+      const uploadTs=Date.now();
       // 1) 기존에 있던 항목은 기존 순서 그대로, 재고만 업데이트 (업로드에 없으면 0으로)
       const orderedMerged=filteredExisting.map((e)=>{
         const newItem=skuMap[e.id];
         const prevHistory=e.history||[];
         if(newItem){
-          return{...e,stock:newItem.stock,name:newItem.name||e.name,date:today,
+          return{...e,stock:newItem.stock,name:newItem.name||e.name,date:today,updatedAt:uploadTs,
             history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:newItem.stock}].slice(-30)};
         }
         // 이번 업로드에 없는 항목 → 재고 0으로 기록
-        return{...e,stock:0,date:today,
+        return{...e,stock:0,date:today,updatedAt:uploadTs,
           history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:0}].slice(-30)};
       });
       // 2) 기존에 없던 새 항목은 맨 뒤에 추가
       const existingIds=new Set(filteredExisting.map((e)=>e.id));
       const newItems=items.filter((item)=>!existingIds.has(item.id)).map((item)=>({
-        ...item,history:[{date:today,stock:item.stock}]
+        ...item,updatedAt:uploadTs,history:[{date:today,stock:item.stock}]
       }));
       const finalMerged=[...orderedMerged,...newItems];
-      commit((d)=>({...d,stockData:{...(d.stockData||{}),naver:finalMerged},updatedAt:Date.now()}),[]);
+      await commit((d)=>({...d,stockData:{...(d.stockData||{}),naver:finalMerged},updatedAt:Date.now()}),[]);
       alert(`✅ 네이버 재고 업로드 완료 (${items.length}개 SKU)`);
 
     }else{
@@ -1980,22 +2319,23 @@ function Board() {
       const items=Object.values(skuMap).map((item)=>({...item,date:today}));
       const existing=(data.stockData||{}).coupang||[];
       const filteredExisting=existing.filter((e)=>COUPANG_KEEP_SKUS.has(e.id));
+      const uploadTs=Date.now();
       const orderedMerged=filteredExisting.map((e)=>{
         const newItem=skuMap[e.id];
         const prevHistory=e.history||[];
         if(newItem){
-          return{...e,stock:newItem.stock,name:newItem.name,date:today,
+          return{...e,stock:newItem.stock,name:newItem.name,date:today,updatedAt:uploadTs,
             history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:newItem.stock}].slice(-30)};
         }
-        return{...e,stock:0,date:today,
+        return{...e,stock:0,date:today,updatedAt:uploadTs,
           history:[...prevHistory.filter((h)=>h.date!==today),{date:today,stock:0}].slice(-30)};
       });
       const existingIds=new Set(filteredExisting.map((e)=>e.id));
       const newItems=items.filter((item)=>!existingIds.has(item.id)).map((item)=>({
-        ...item,history:[{date:today,stock:item.stock}]
+        ...item,updatedAt:uploadTs,history:[{date:today,stock:item.stock}]
       }));
       const finalMerged=[...orderedMerged,...newItems];
-      commit((d)=>({...d,stockData:{...(d.stockData||{}),coupang:finalMerged},updatedAt:Date.now()}),[]);
+      await commit((d)=>({...d,stockData:{...(d.stockData||{}),coupang:finalMerged},updatedAt:Date.now()}),[]);
       alert(`✅ 쿠팡 재고 업로드 완료 (${items.length}개 SKU)`);
     }
   };
@@ -2003,7 +2343,6 @@ function Board() {
     const key=`${channel}_${itemId}`;
     commit((d)=>({...d,stockSafe:{...(d.stockSafe||{}),[key]:parseInt(val,10)||0},updatedAt:Date.now()}),[]);
   };
-
 
   const exportJson=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(dataRef.current,null,2)],{type:"application/json"}));a.download=`work-board-${todayStr()}.json`;a.click();};
   const importJson=async(file)=>{try{const p=JSON.parse(await file.text());if(!Array.isArray(p.tasks))throw new Error();commit((d)=>mergeData(d,{...emptyData(),...p}),[mkLog("백업 가져오기",null,`${p.tasks.length}건`)]);} catch(e){alert("읽을 수 없는 파일입니다.");}};
@@ -2100,6 +2439,21 @@ function Board() {
           const pct=t.progress!=null&&t.progress>0?t.progress:(ck.length?Math.round(ckDone/ck.length*100):0);
           return <div className="cbar" title={`진행률 ${pct}%`}><i style={{width:pct+"%"}} /></div>;
         })()}
+        {ck.length>0&&(
+          <div className="ccklist-wrap">
+            <button className="ccktoggle" onClick={(e)=>{e.stopPropagation();setCardCkHidden({...cardCkHidden,[t.id]:!cardCkHidden[t.id]});}}>{cardCkHidden[t.id]?`체크리스트 보기 (${ckDone}/${ck.length})`:"체크리스트 숨김"}</button>
+            {!cardCkHidden[t.id]&&(
+              <div className="ccklist" onClick={(e)=>e.stopPropagation()}>
+                {ck.map((c)=>(
+                  <div key={c.id} className="ccklitem">
+                    <button className={"ckbox sm"+(c.done?" on":"")} disabled={!canEdit} onClick={()=>toggleCardCk(t,c.id)}>{c.done?"✓":""}</button>
+                    <span style={{textDecoration:c.done?"line-through":"none",color:c.done?"var(--ink3)":"inherit"}}>{c.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="cfoot">
           <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
             {t.owner?<span className={"ownerchip"+(t.owner===me?" me":"")}>{t.owner}</span>:<span style={{color:"var(--ink3)"}}>미지정</span>}
@@ -2195,7 +2549,7 @@ function Board() {
       </div>
       <div className="tabs">
         {visibleTabs.map((t)=>{
-          const badgeMap={board:live.length,routine:rItems.filter((it)=>!(it.checkins||{})[riDate]).length,monthly:mlyByMonth(mlyDate).filter((m)=>!m.done).length,checklist:checkitems.filter((c)=>!c.done).length,memo:memoItems.length,issue:allIssues.filter((i)=>!i.resolved).length,archive:archived.length};
+          const badgeMap={board:live.length,routine:rItems.filter((it)=>!(it.checkins||{})[riDate]).length,monthly:mlyByMonth(mlyDate).filter((m)=>!m.done).length,checklist:checkitems.filter((c)=>!c.done).length,memo:memoItems.length,report:reportItems.length,issue:allIssues.filter((i)=>!i.resolved).length,archive:archived.length};
           const n=badgeMap[t.id]??null;
           return(
           <button key={t.id}
@@ -2601,7 +2955,7 @@ function Board() {
                   {items.map((c)=>{
                     const dd=dayDiff(c.due);const over=dd!==null&&dd<0&&!c.done;
                     const subs=c.subs||[];const subDone=subs.filter((s)=>s.done).length;
-                    const exp=ckExpand[c.id];
+                    const exp=ckExpand[c.id]!==false;
                     return (
                       <div key={c.id} draggable={canEdit&&!c.done}
                         onDragStart={(e)=>{setCkDrag(c.id);e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",c.id);}catch(err){}}}
@@ -2628,10 +2982,22 @@ function Board() {
                         {isCL&&exp&&subs.length>0&&(
                           <div className="cksubs">
                             {subs.map((s)=>(
-                              <div key={s.id} className="cksub">
-                                <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"✓":""}</button>
-                                <span style={{textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
-                              </div>
+                              <React.Fragment key={s.id}>
+                                <div className="cksub">
+                                  <button className={"ckbox sm"+(s.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSub(c,s.id)}>{s.done?"✓":""}</button>
+                                  <span style={{textDecoration:s.done?"line-through":"none",color:s.done?"var(--ink3)":"inherit"}}>{s.text}</span>
+                                </div>
+                                {(s.subsubs||[]).length>0&&(
+                                  <div className="cksubsubs">
+                                    {(s.subsubs||[]).map((ss)=>(
+                                      <div key={ss.id} className="cksubsub">
+                                        <button className={"ckbox sm"+(ss.done?" on":"")} disabled={!canEdit} onClick={()=>toggleSubSub(c,s.id,ss.id)}>{ss.done?"✓":""}</button>
+                                        <span style={{textDecoration:ss.done?"line-through":"none",color:ss.done?"var(--ink3)":"inherit"}}>{ss.text}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </React.Fragment>
                             ))}
                           </div>
                         )}
@@ -2903,13 +3269,13 @@ function Board() {
                 const items=Array.from(e.clipboardData.items||[]);
                 const imgItem=items.find((i)=>i.type.startsWith("image/"));
                 if(!imgItem)return;e.preventDefault();
-                const src=await resizeImage(imgItem.getAsFile(),1200,1200,0.85);
+                const src=await resizeImage(imgItem.getAsFile(),1600,1600,0.9);
                 setRefDraft({title:"",cat:refCats[0]||"",memo:"",images:[{id:uid(),src}],fav:false});
                 setRefAddOpen(true);
               }}
               onDragOver={(e)=>{e.preventDefault();setRefPasteActive(true);}}
               onDragLeave={()=>setRefPasteActive(false)}
-              onDrop={async(e)=>{e.preventDefault();setRefPasteActive(false);const files=Array.from(e.dataTransfer.files).filter((f)=>f.type.startsWith("image/"));if(!files.length)return;const src=await resizeImage(files[0],1200,1200,0.85);setRefDraft({title:"",cat:refCats[0]||"",memo:"",images:[{id:uid(),src}],fav:false});setRefAddOpen(true);}}>
+              onDrop={async(e)=>{e.preventDefault();setRefPasteActive(false);const files=Array.from(e.dataTransfer.files).filter((f)=>f.type.startsWith("image/"));if(!files.length)return;const src=await resizeImage(files[0],1600,1600,0.9);setRefDraft({title:"",cat:refCats[0]||"",memo:"",images:[{id:uid(),src}],fav:false});setRefAddOpen(true);}}>
               📋 여기에 이미지를 <b>Ctrl+V</b> 붙여넣거나 <b>드래그</b>해서 바로 추가하세요
             </div>
           )}
@@ -2917,13 +3283,13 @@ function Board() {
           <div className="refgrid">
             {refFiltered.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",padding:40,color:"var(--ink3)"}}>래퍼런스가 없습니다</div>}
             {refFiltered.map((r)=>(
-              <div key={r.id} className={"refcard"+(r.fav?" fav":"")} onClick={()=>r.images?.[0]&&setLightbox(r.images[0].src)}>
+              <div key={r.id} className={"refcard"+(r.fav?" fav":"")} onClick={()=>r.images?.length&&setLightbox({images:r.images.map((im)=>im.src),index:0})}>
                 {r.images?.[0]
                   ?<img src={r.images[0].src} alt={r.title} />
                   :<div style={{height:140,background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🖼</div>}
                 <div className="refbody">
                   {r.cat&&<div className="refcat">{r.cat}</div>}
-                  <div className="reftitle">{r.title||"제목 없음"}</div>
+                  <div className="reftitle">{r.title||"제목 없음"}{(r.images||[]).length>1&&<span style={{fontSize:11,color:"var(--ink3)",fontWeight:400,marginLeft:6}}>🖼 {r.images.length}</span>}</div>
                   {r.memo&&<div className="refmemo">{r.memo}</div>}
                   <div className="reffoot">
                     <span>{new Date(r.createdAt).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})}</span>
@@ -2948,9 +3314,9 @@ function Board() {
                   <div style={{marginBottom:14}}>
                     <label style={{fontSize:12,fontWeight:700,color:"var(--ink3)",display:"block",marginBottom:6}}>이미지</label>
                     <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:8}}>
-                      {(refDraft.images||[]).map((img)=>(
+                      {(refDraft.images||[]).map((img,imgIdx)=>(
                         <div key={img.id} style={{position:"relative"}}>
-                          <img src={img.src} alt="" style={{width:90,height:70,objectFit:"cover",borderRadius:7,cursor:"pointer",border:"1px solid var(--line)"}} onClick={()=>setLightbox(img.src)} />
+                          <img src={img.src} alt="" style={{width:90,height:70,objectFit:"cover",borderRadius:7,cursor:"pointer",border:"1px solid var(--line)"}} onClick={()=>setLightbox({images:(refDraft.images||[]).map((im)=>im.src),index:imgIdx})} />
                           <button onClick={()=>setRefDraft({...refDraft,images:refDraft.images.filter((x)=>x.id!==img.id)})}
                             style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.6)",color:"#fff",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",fontSize:11,padding:0}}>×</button>
                         </div>
@@ -2963,7 +3329,7 @@ function Board() {
                       </label>
                       <div className="refpaste" style={{flex:1,padding:"8px 12px",fontSize:12}}
                         tabIndex={0}
-                        onPaste={async(e)=>{const items=Array.from(e.clipboardData.items||[]);const imgItem=items.find((i)=>i.type.startsWith("image/"));if(!imgItem)return;e.preventDefault();const src=await resizeImage(imgItem.getAsFile(),1200,1200,0.85);setRefDraft((d)=>({...d,images:[...(d.images||[]),{id:uid(),src}]}));}}
+                        onPaste={async(e)=>{const items=Array.from(e.clipboardData.items||[]);const imgItem=items.find((i)=>i.type.startsWith("image/"));if(!imgItem)return;e.preventDefault();const src=await resizeImage(imgItem.getAsFile(),1600,1600,0.9);setRefDraft((d)=>({...d,images:[...(d.images||[]),{id:uid(),src}]}));}}
                         >Ctrl+V 붙여넣기</div>
                     </div>
                   </div>
@@ -3055,6 +3421,71 @@ function Board() {
                         <textarea className="hinput" placeholder="하위 항목 입력 (Enter 추가, Shift+Enter 줄바꿈)"
                           value={memoSubText[m.id]||""} onChange={(e)=>setMemoSubText({...memoSubText,[m.id]:e.target.value})}
                           onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addMemoSub(m.id,memoSubText[m.id]||"");setMemoSubText({...memoSubText,[m.id]:""});}} />
+                      </div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {view==="report"&&(
+        <div>
+          <div className="panel" style={{padding:14,marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <div style={{fontSize:14,fontWeight:800}}>일보고</div>
+              {canEdit&&<button className="btn-save" onClick={()=>setReportDraft({cat:"",sub:"",title:"",text:"",date:todayStr()})}>+ 일보고 추가</button>}
+            </div>
+            <div style={{display:"flex",gap:7,marginTop:12,flexWrap:"wrap"}}>
+              <input className="inp" style={{flex:1,minWidth:160}} placeholder="검색 (분류·제목·내용·하위항목)" value={reportQuery} onChange={(e)=>setReportQuery(e.target.value)} />
+              <select className="sel" value={reportCatFilter} onChange={(e)=>setReportCatFilter(e.target.value)}>
+                {reportCatOptions.map((c)=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {reportFiltered.length===0&&<div className="empty">{reportQuery||reportCatFilter!=="전체"?"조건에 맞는 일보고가 없습니다":"일보고가 없습니다. + 일보고 추가로 시작하세요."}</div>}
+
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {reportFiltered.map((m)=>{
+              const expanded=!!reportExpand[m.id];
+              return (
+                <div key={m.id} className="memocard">
+                  <div className="memohead">
+                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>
+                      <div className="memopath">{m.date&&<b style={{color:"var(--pri)"}}>{m.date} ({dowKr(m.date)}){(m.cat||m.sub)?" · ":""}</b>}{[m.cat,m.sub].filter(Boolean).join(" > ")}</div>
+                      {m.title&&<div className="memotitle">{m.title}</div>}
+                      <div className="memotext">{renderOutlineText(m.text)}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <button className="riedit" onClick={()=>setReportExpand({...reportExpand,[m.id]:!expanded})}>{(m.subs||[]).length>0?`하위 ${(m.subs||[]).length}`:"+하위"}</button>
+                      {canEdit&&<button className="riedit" onClick={()=>duplicateReport(m)}>복사</button>}
+                      {canEdit&&<button className="riedit" onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>수정</button>}
+                    </div>
+                  </div>
+                  {expanded&&(
+                    <div className="memosubs">
+                      {(m.subs||[]).length===0&&<span className="hint">하위 항목이 없습니다</span>}
+                      {(m.subs||[]).map((s)=>(
+                        <div key={s.id} className="cmt">
+                          <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}{s.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
+                          {reportSubEditId===s.id
+                            ? <textarea className="hinput" defaultValue={s.text} autoFocus style={{width:"100%",marginTop:4}}
+                                onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editReportSub(m.id,s.id,e.target.value);setReportSubEditId(null);}}
+                                onBlur={(e)=>{editReportSub(m.id,s.id,e.target.value);setReportSubEditId(null);}} />
+                            : <p>{s.text}</p>}
+                          {canEdit&&reportSubEditId!==s.id&&<div style={{display:"flex",gap:10}}>
+                            <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setReportSubEditId(s.id)}>수정</button>
+                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeReportSub(m.id,s.id)}>삭제</button>
+                          </div>}
+                        </div>
+                      ))}
+                      {canEdit&&<div className="addrow">
+                        <textarea className="hinput" placeholder="하위 항목 입력 (Enter 추가, Shift+Enter 줄바꿈)"
+                          value={reportSubText[m.id]||""} onChange={(e)=>setReportSubText({...reportSubText,[m.id]:e.target.value})}
+                          onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addReportSub(m.id,reportSubText[m.id]||"");setReportSubText({...reportSubText,[m.id]:""});}} />
                       </div>}
                     </div>
                   )}
@@ -3515,6 +3946,7 @@ function Board() {
                       <th>SKU</th>
                       <th style={{textAlign:"right"}}>현재고</th>
                       <th style={{textAlign:"right"}}>전일대비</th>
+                      <th style={{textAlign:"right"}}>입고</th>
                       <th style={{textAlign:"right"}}>일평균소진</th>
                       <th style={{textAlign:"right"}}>예상소진일</th>
                       <th style={{textAlign:"right"}}>안전재고</th>
@@ -3531,14 +3963,15 @@ function Board() {
                       const sorted=[...hist].sort((a,b)=>new Date(a.date)-new Date(b.date));
                       const viewStock=stockViewDate?([...sorted].reverse().find((h)=>h.date<=stockViewDate)?.stock??null):item.stock;
                       const isAlert=safe>0&&viewStock!==null&&viewStock<safe;
+                      const isSoldout=viewStock===0;
                       const prev=sorted.length>=2?sorted[sorted.length-2]:null;
                       const delta=viewStock!==null&&prev?(viewStock-prev.stock):null;
                       const dailyRate=calcDailyRate(sorted);
                       const daysLeft=dailyRate&&dailyRate>0&&viewStock!==null?Math.floor(viewStock/dailyRate):null;
                       return(
                         <tr key={item.id}
-                          className={"stock-row-alert"===undefined?"":isAlert?"stock-row-alert":""}
-                          style={{background:isAlert?"#FFFBF9":""}}
+                          className={isSoldout?"stock-row-soldout":isAlert?"stock-row-alert":""}
+                          style={{background:isSoldout?"#FFF5F5":isAlert?"#FFFBF9":""}}
                           draggable
                           onDragStart={()=>setStockDragId(item.id)}
                           onDragOver={(e)=>{e.preventDefault();}}
@@ -3552,7 +3985,7 @@ function Board() {
                             if(fi<0||ti<0)return;
                             const [moved]=cur.splice(fi,1);
                             cur.splice(ti,0,moved);
-                            commit((d)=>({...d,stockData:{...(d.stockData||{}),[stockTab]:cur},updatedAt:Date.now()}),[]);
+                            commit((d)=>({...d,stockData:{...(d.stockData||{}),[stockTab]:cur},stockOrderTs:{...(d.stockOrderTs||{}),[stockTab]:Date.now()},updatedAt:Date.now()}),[]);
                             setStockDragId(null);
                           }}
                           onDragEnd={()=>{setStockDragId(null);}}>
@@ -3561,10 +3994,12 @@ function Board() {
                           <td style={{color:"var(--ink3)",fontSize:12}}>{item.sku}</td>
                           <td style={{textAlign:"right",fontWeight:700,fontSize:14}}>{viewStock===null?<span style={{color:"var(--ink3)"}}>-</span>:viewStock.toLocaleString()}</td>
                           <td style={{textAlign:"right"}}>
-                            {delta===null?<span style={{color:"var(--ink3)"}}>-</span>
-                              :delta>0?<span className="stock-delta-up">▲{Math.abs(delta).toLocaleString()}</span>
-                              :delta<0?<span className="stock-delta-down">▼{Math.abs(delta).toLocaleString()}</span>
-                              :<span className="stock-delta-zero">-</span>}
+                            {delta===null||delta>=0?<span style={{color:"var(--ink3)"}}>-</span>
+                              :<span className="stock-delta-down">▼{Math.abs(delta).toLocaleString()}</span>}
+                          </td>
+                          <td style={{textAlign:"right"}}>
+                            {delta===null||delta<=0?<span style={{color:"var(--ink3)"}}>-</span>
+                              :<span className="stock-delta-up">▲{Math.abs(delta).toLocaleString()}</span>}
                           </td>
                           <td style={{textAlign:"right",color:"var(--ink3)"}}>
                             {dailyRate!==null?`${dailyRate.toLocaleString()}개/일`:"-"}
@@ -3592,7 +4027,9 @@ function Board() {
                             })()}
                           </td>
                           <td style={{textAlign:"center"}}>
-                            {isAlert
+                            {isSoldout
+                              ?<span className="stock-badge-soldout">⛔ 품절</span>
+                              :isAlert
                               ?<span className="stock-badge-alert">⚠ 입고 요청</span>
                               :<span className="stock-badge-ok">정상</span>}
                           </td>
@@ -3751,7 +4188,7 @@ function Board() {
 
           {/* 서브탭 */}
           <div style={{display:"flex",gap:0,borderBottom:"2px solid var(--line)",marginBottom:0}}>
-            {[{id:"schedule",label:"📅 스케줄"},{id:"editor",label:"✏️ 상품 편집기"},{id:"ytlink",label:"🎬 유튜브링크"}].map((t)=>(
+            {[{id:"schedule",label:"📅 스케줄"},{id:"editor",label:"✏️ 상품 편집기"}].map((t)=>(
               <button key={t.id} onClick={()=>setC24SubTab(t.id)}
                 style={{padding:"10px 18px",border:"none",cursor:"pointer",fontSize:13,fontWeight:c24SubTab===t.id?800:500,
                   background:"none",color:c24SubTab===t.id?"#0C66E4":"var(--ink3)",
@@ -3934,22 +4371,22 @@ function Board() {
           {/* 수정 모달 */}
           {c24EditSchedule&&(
             <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setC24EditSchedule(null)}>
-              <div className="modal" style={{maxWidth:480}} onClick={(e)=>e.stopPropagation()}>
+              <div className="modal" style={{maxWidth:520}} onClick={(e)=>e.stopPropagation()}>
                 <div className="modal-head"><h3>스케줄 수정</h3><button className="x" onClick={()=>setC24EditSchedule(null)}>×</button></div>
                 <div className="modal-body">
                   <div style={{fontSize:13,fontWeight:700,color:"#0C66E4",marginBottom:14}}>#{c24EditSchedule.productNo} · {c24EditSchedule.productName}</div>
-                  <div className="r3" style={{marginBottom:12}}>
+                  <div className="r2" style={{marginBottom:12}}>
                     <div className="fld"><label>오픈 일시</label><input type="datetime-local" value={c24EditSchedule.openAt||""} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,openAt:e.target.value||null})} /></div>
                     <div className="fld"><label>종료 일시</label><input type="datetime-local" value={c24EditSchedule.closeAt||""} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAt:e.target.value||null})} /></div>
-                    <div className="fld"><label>종료 시 처리</label>
-                      <select value={c24EditSchedule.closeAction} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAction:e.target.value})}>
-                        <option value="soldout">품절처리 (판매중지)</option>
-                        <option value="hide">진열+판매 중지</option>
-                        <option value="selling_off">판매만 중지</option>
-                      </select>
-                    </div>
                   </div>
-                  <div className="r3">
+                  <div className="fld" style={{marginBottom:12}}><label>종료 시 처리</label>
+                    <select value={c24EditSchedule.closeAction} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,closeAction:e.target.value})}>
+                      <option value="soldout">품절처리 (판매중지)</option>
+                      <option value="hide">진열+판매 중지</option>
+                      <option value="selling_off">판매만 중지</option>
+                    </select>
+                  </div>
+                  <div className="r2">
                     <div className="fld"><label>오픈 시 판매상태</label>
                       <select value={c24EditSchedule.openSelling} onChange={(e)=>setC24EditSchedule({...c24EditSchedule,openSelling:e.target.value})}>
                         <option value="T">판매함</option>
@@ -3962,7 +4399,6 @@ function Board() {
                         <option value="F">진열안함</option>
                       </select>
                     </div>
-                    <div className="fld" />
                   </div>
                   <div style={{marginTop:12,padding:"10px 12px",background:"#FFF8E1",borderRadius:8,fontSize:12,color:"#7A5F00"}}>
                     ⚠ 수정하면 오픈·종료 완료 상태가 초기화되어 다시 실행됩니다.
@@ -3983,7 +4419,7 @@ function Board() {
             <div style={{background:"#1a1a2e",color:"#a8ff78",borderRadius:8,padding:12,fontSize:12,fontFamily:"monospace",maxHeight:200,overflowY:"auto",lineHeight:1.7}}>
               {c24Log.map((l,i)=><div key={i}>{l}</div>)}
             </div>
-            <button className="btn ghost" style={{marginTop:8,fontSize:12}} onClick={()=>setC24Log(['🗑 로그 초기화'])}>로그 지우기</button>
+            <button className="btn ghost" style={{marginTop:8,fontSize:12}} onClick={()=>{const cleared=['🗑 로그 초기화'];setC24Log(cleared);try{localStorage.setItem('c24_log',JSON.stringify(cleared));}catch(e){}}}>로그 지우기</button>
           </div>
         </>}
 
@@ -4043,7 +4479,7 @@ function Board() {
                                 onBlur={(e)=>{
                                   const v=e.target.value.trim();
                                   if(v&&v!==s.text){
-                                    commit((d)=>({...d,edSavedSummaries:(d.edSavedSummaries||[]).map((x)=>x.id===s.id?{...x,text:v}:x),updatedAt:Date.now()}),[]);
+                                    commit((d)=>({...d,edSavedSummaries:(d.edSavedSummaries||[]).map((x)=>x.id===s.id?{...x,text:v}:x),edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                                   }
                                   setEdSummaryEditId(null);
                                 }}
@@ -4059,7 +4495,7 @@ function Board() {
                             <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:"2px 6px"}}
                               onClick={()=>setEdSummaryEditId(s.id)}>수정</button>
                             <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:"2px 6px"}}
-                              onClick={()=>{if(window.confirm("삭제할까요?"))commit((d)=>({...d,edSavedSummaries:(d.edSavedSummaries||[]).filter((x)=>x.id!==s.id),updatedAt:Date.now()}),[]);}}>삭제</button>
+                              onClick={()=>{if(window.confirm("삭제할까요?"))commit((d)=>({...d,edSavedSummaries:(d.edSavedSummaries||[]).filter((x)=>x.id!==s.id),edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);}}>삭제</button>
                           </div>
                         </div>
                       ))}
@@ -4079,7 +4515,7 @@ function Board() {
                       const text=(edSummary[edCat]||"").trim();
                       if(!text)return;
                       const label=edSumLabel.trim()||"저장된 요약설명";
-                      commit((d)=>({...d,edSavedSummaries:[...(d.edSavedSummaries||[]),{id:uid(),label,text,createdAt:Date.now()}],updatedAt:Date.now()}),[]);
+                      commit((d)=>({...d,edSavedSummaries:[...(d.edSavedSummaries||[]),{id:uid(),label,text,createdAt:Date.now()}],edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                       setEdSumLabel('');
                     }}>💾 저장</button>
                     <button className="btn ghost" style={{fontSize:12,padding:"5px 14px",flexShrink:0,color:"var(--ink3)"}} onClick={()=>setEdSummary({...edSummary,[edCat]:""})} title="초기화">✕</button>
@@ -4101,18 +4537,22 @@ function Board() {
                           e.target.value="";
                         }} />
                       </label>
+                      <button style={{fontSize:11,color:"#0C66E4",fontWeight:700,border:"1px solid #0C66E4",borderRadius:5,padding:"3px 10px",background:"none",cursor:"pointer"}} onClick={async()=>{
+                        const u=window.prompt("교체할 이미지 링크(URL)를 입력하세요");
+                        if(u)await replaceMasterImageFromUrl(i,u);
+                      }}>🔗 링크로 교체</button>
                       <button style={{fontSize:11,color:"var(--danger)",fontWeight:700,border:"1px solid var(--danger)",borderRadius:5,padding:"3px 10px",background:"none",cursor:"pointer"}} onClick={()=>{
                         const imgs=((data.edMasterImages||{})[edCat]||[]).filter((_,j)=>j!==i);
-                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                         const nc={...edChanged};delete nc[i];setEdChanged(nc);
                       }}>삭제</button>
                       <button style={{fontSize:13,background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",padding:"2px 5px"}} disabled={i===0} onClick={()=>{
                         const imgs=[...((data.edMasterImages||{})[edCat]||[])];[imgs[i-1],imgs[i]]=[imgs[i],imgs[i-1]];
-                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                       }}>▲</button>
                       <button style={{fontSize:13,background:"none",border:"none",cursor:"pointer",color:"var(--ink3)",padding:"2px 5px"}} disabled={i===((data.edMasterImages||{})[edCat]||[]).length-1} onClick={()=>{
                         const imgs=[...((data.edMasterImages||{})[edCat]||[])];[imgs[i],imgs[i+1]]=[imgs[i+1],imgs[i]];
-                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},updatedAt:Date.now()}),[]);
+                        commit((d)=>({...d,edMasterImages:{...(d.edMasterImages||{}),[edCat]:imgs},edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                       }}>▼</button>
                     </div>
                     <div style={{padding:10,textAlign:"center",background:"#fff"}}>
@@ -4131,6 +4571,13 @@ function Board() {
                     e.target.value="";
                   }} />
                 </label>
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <input value={edUrlInput} onChange={(e)=>setEdUrlInput(e.target.value)}
+                    placeholder="🔗 이미지 링크(URL)로 추가 — 큰 파일은 카페24 디자인>파일업로더에 올린 뒤 링크를 붙여넣으세요"
+                    style={{flex:1,fontSize:12,border:"1px solid var(--line2)",borderRadius:7,padding:"8px 10px"}}
+                    onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter")return;e.preventDefault();addMasterImageFromUrl(edUrlInput);setEdUrlInput("");}} />
+                  <button className="btn ghost" style={{fontSize:12,padding:"5px 14px",flexShrink:0}} onClick={()=>{addMasterImageFromUrl(edUrlInput);setEdUrlInput("");}}>추가</button>
+                </div>
 
                 {/* 전송 버튼 */}
                 {(((data.edMasterImages||{})[edCat]||[]).length>0||edSummary[edCat])&&(
@@ -4211,7 +4658,7 @@ function Board() {
                     </div>
                     <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:13,cursor:"pointer"}} onClick={()=>{
                       const next={...(data.edProducts||{}),[edCat]:((data.edProducts||{})[edCat]||[]).filter((x)=>x.code!==p.code)};
-                      commit((d)=>({...d,edProducts:next,updatedAt:Date.now()}),[]);
+                      commit((d)=>({...d,edProducts:next,edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                     }}>×</button>
                   </div>
                 );})}
@@ -4224,7 +4671,7 @@ function Board() {
                     const cur=(data.edProducts||{})[edCat]||[];
                     if(cur.some((x)=>x.code===code))return;
                     const next={...(data.edProducts||{}),[edCat]:[...cur,{code,name:edAddName.trim()||code,lastSentAt:null}]};
-                    commit((d)=>({...d,edProducts:next,updatedAt:Date.now()}),[]);
+                    commit((d)=>({...d,edProducts:next,edUpdatedAt:Date.now(),updatedAt:Date.now()}),[]);
                     setEdAddCode('');setEdAddName('');
                   }}>+ 추가</button>
                 </div>
@@ -4250,10 +4697,6 @@ function Board() {
               </div>
             )}
           </div>
-        )}
-
-        {c24SubTab==="ytlink"&&(
-          <YtLinkPanel c24Api={c24Api} c24TokenValid={c24TokenValid} c24GetProduct={c24GetProduct} c24SearchByCode={c24SearchByCode} />
         )}
 
       </div>
@@ -4508,13 +4951,51 @@ function Board() {
         );
       })()}
 
-      {lightbox&&(
-        <div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
-          <img src={lightbox} alt="" style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.5)",objectFit:"contain"}} onClick={(e)=>e.stopPropagation()} />
-          <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:20,right:24,background:"none",border:"none",color:"#fff",fontSize:32,cursor:"pointer",lineHeight:1}}>×</button>
-          <a href={lightbox} download="image" onClick={(e)=>e.stopPropagation()} style={{position:"fixed",bottom:24,right:24,background:"#0C66E4",color:"#fff",borderRadius:8,padding:"8px 18px",fontSize:13,fontWeight:700,textDecoration:"none"}}>⬇ 다운로드</a>
+      {lightbox&&(()=>{
+        const isGallery=typeof lightbox==="object"&&lightbox!==null;
+        const images=isGallery?lightbox.images:[lightbox];
+        const idx=isGallery?lightbox.index:0;
+        const src=images[idx];
+        const go=(delta)=>{setLbZoom(1);setLbPan({x:0,y:0});setLightbox({images,index:(idx+delta+images.length)%images.length});};
+        const closeLb=()=>{setLightbox(null);setLbZoom(1);setLbPan({x:0,y:0});};
+        const zoomAt=(next)=>{const z=Math.min(4,Math.max(1,next));setLbZoom(z);if(z<=1)setLbPan({x:0,y:0});};
+        return (
+        <div onClick={closeLb} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:lbZoom>1?"grab":"zoom-out",overflow:"hidden"}}
+          onWheel={(e)=>{e.preventDefault();zoomAt(lbZoom+(e.deltaY<0?0.3:-0.3));}}>
+          <img src={src} alt=""
+            style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:10,boxShadow:"0 8px 40px rgba(0,0,0,.5)",objectFit:"contain",
+              transform:`translate(${lbPan.x}px,${lbPan.y}px) scale(${lbZoom})`,transition:lbDragRef.current?.active?"none":"transform .15s",
+              cursor:lbZoom>1?"grab":"zoom-in",touchAction:"none"}}
+            onClick={(e)=>{
+              e.stopPropagation();
+              const dr=lbDragRef.current;
+              if(dr&&dr.moved){lbDragRef.current=null;return;}
+              lbDragRef.current=null;
+              zoomAt(lbZoom>1?1:2.2);
+            }}
+            onMouseDown={(e)=>{if(lbZoom<=1)return;e.preventDefault();lbDragRef.current={sx:e.clientX,sy:e.clientY,ox:lbPan.x,oy:lbPan.y,moved:false,active:true};}}
+            onMouseMove={(e)=>{const dr=lbDragRef.current;if(!dr||!dr.active)return;const dx=e.clientX-dr.sx,dy=e.clientY-dr.sy;if(Math.abs(dx)>3||Math.abs(dy)>3)dr.moved=true;setLbPan({x:dr.ox+dx,y:dr.oy+dy});}}
+            onMouseUp={()=>{if(lbDragRef.current)lbDragRef.current.active=false;}}
+            onMouseLeave={()=>{if(lbDragRef.current)lbDragRef.current.active=false;}}
+            onTouchStart={(e)=>{if(lbZoom<=1)return;const t=e.touches[0];lbDragRef.current={sx:t.clientX,sy:t.clientY,ox:lbPan.x,oy:lbPan.y,moved:false,active:true};}}
+            onTouchMove={(e)=>{const dr=lbDragRef.current;if(!dr||!dr.active)return;const t=e.touches[0];const dx=t.clientX-dr.sx,dy=t.clientY-dr.sy;if(Math.abs(dx)>3||Math.abs(dy)>3)dr.moved=true;setLbPan({x:dr.ox+dx,y:dr.oy+dy});}}
+            onTouchEnd={()=>{if(lbDragRef.current)lbDragRef.current.active=false;}} />
+          <div style={{position:"fixed",bottom:images.length>1?64:24,left:"50%",transform:"translateX(-50%)",display:"flex",gap:6,alignItems:"center",background:"rgba(0,0,0,.5)",borderRadius:20,padding:"5px 8px"}} onClick={(e)=>e.stopPropagation()}>
+            <button onClick={()=>zoomAt(lbZoom-0.5)} style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",width:28,height:28,borderRadius:"50%",cursor:"pointer",fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+            <span style={{color:"#fff",fontSize:12,fontWeight:700,minWidth:38,textAlign:"center"}}>{Math.round(lbZoom*100)}%</span>
+            <button onClick={()=>zoomAt(lbZoom+0.5)} style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",width:28,height:28,borderRadius:"50%",cursor:"pointer",fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+            {lbZoom>1&&<button onClick={()=>{setLbZoom(1);setLbPan({x:0,y:0});}} style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:11,fontWeight:700,borderRadius:14,padding:"0 10px",height:28,cursor:"pointer"}}>초기화</button>}
+          </div>
+          {images.length>1&&<>
+            <button onClick={(e)=>{e.stopPropagation();go(-1);}} style={{position:"fixed",left:16,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:28,width:48,height:48,borderRadius:"50%",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+            <button onClick={(e)=>{e.stopPropagation();go(1);}} style={{position:"fixed",right:16,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:28,width:48,height:48,borderRadius:"50%",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
+            <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,.5)",color:"#fff",borderRadius:20,padding:"6px 16px",fontSize:13,fontWeight:700}}>{idx+1} / {images.length}</div>
+          </>}
+          <button onClick={closeLb} style={{position:"fixed",top:20,right:24,background:"none",border:"none",color:"#fff",fontSize:32,cursor:"pointer",lineHeight:1}}>×</button>
+          <a href={src} download="image" onClick={(e)=>e.stopPropagation()} style={{position:"fixed",bottom:24,right:24,background:"#0C66E4",color:"#fff",borderRadius:8,padding:"8px 18px",fontSize:13,fontWeight:700,textDecoration:"none"}}>⬇ 다운로드</a>
         </div>
-      )}
+        );
+      })()}
 
       {memoDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMemoDraft(null)}><div className="modal">
@@ -4537,6 +5018,46 @@ function Board() {
             <span className="spacer" />
             <button className="btn ghost" onClick={()=>setMemoDraft(null)}>닫기</button>
             <button className="btn-save" onClick={saveMemo}>저장</button>
+          </div>
+        </div></div>
+      )}
+
+      {reportDraft&&(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setReportDraft(null)}><div className="modal" style={{maxWidth:720}}>
+          <h2>{reportDraft.id?"일보고 수정":"새 일보고"}</h2>
+          <div className="modal-body">
+            <div className="fld" style={{maxWidth:220}}><label>날짜</label>
+              <input type="date" value={reportDraft.date||todayStr()} onChange={(e)=>setReportDraft({...reportDraft,date:e.target.value})} />
+              {reportDraft.date&&<div style={{fontSize:12,color:"var(--pri)",fontWeight:700,marginTop:4}}>{dowKr(reportDraft.date)}요일</div>}
+            </div>
+            <div className="r3">
+              <div className="fld"><label>대분류 (선택)</label><input list="report-cats" value={reportDraft.cat||""} onChange={(e)=>setReportDraft({...reportDraft,cat:e.target.value})} placeholder="예) 마케팅" />
+                <datalist id="report-cats">{reportCatNames.map((c)=><option key={c} value={c} />)}</datalist>
+              </div>
+              <div className="fld"><label>중분류 (선택)</label><input list="report-subs" value={reportDraft.sub||""} onChange={(e)=>setReportDraft({...reportDraft,sub:e.target.value})} placeholder="예) 브랜드검색" />
+                <datalist id="report-subs">{reportSubNames(reportDraft.cat||"").map((s)=><option key={s} value={s} />)}</datalist>
+              </div>
+              <div className="fld"><label>소분류 (선택)</label><input value={reportDraft.title||""} onChange={(e)=>setReportDraft({...reportDraft,title:e.target.value})} placeholder="예) 키워드 아이디어" /></div>
+            </div>
+            <div className="fld"><label>내용</label>
+              <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={reportAddBullet}>• 점 추가</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={()=>reportIndent(1)}>→ 들여쓰기</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={()=>reportIndent(-1)}>← 내어쓰기</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontWeight:800}} onClick={reportBold}>B 굵게</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontStyle:"italic"}} onClick={reportItalic}>I 기울임</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",textDecoration:"underline"}} onClick={reportUnderline}>U 밑줄</button>
+              </div>
+              <textarea ref={reportTaRef} autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} placeholder={"여기에 입력한 뒤, 줄을 클릭하고 위 버튼으로 점·들여쓰기·굵게·기울임·밑줄을 적용하세요"} style={{minHeight:280,fontFamily:"inherit"}} />
+            </div>
+          </div>
+          <div className="modal-foot">
+            {reportDraft.id&&<button className="del" onClick={()=>removeReport(reportDraft)}>삭제</button>}
+            {reportDraft.id&&<button className="btn ghost" onClick={()=>duplicateReport(reportDraft)}>복사</button>}
+            <span className="spacer" />
+            <button className="btn-save" style={{background:"#1F845A"}} onClick={()=>saveReport(false)}>💾 중간 저장</button>
+            <button className="btn ghost" onClick={()=>setReportDraft(null)}>닫기</button>
+            <button className="btn-save" onClick={()=>saveReport(true)}>저장</button>
           </div>
         </div></div>
       )}
@@ -4984,187 +5505,6 @@ function Board() {
             <button className="btn" onClick={saveDraft} style={{background:"#0C66E4",color:"#fff"}}>저장</button>         </div>
         </div></div>
       )}
-    </div>
-  );
-}
-
-// ── 유튜브 비밀링크 상품 자동생성 ────────────────────────────────
-function YtLinkPanel({c24Api, c24TokenValid, c24GetProduct, c24SearchByCode}) {
-
-  const [ytName, setYtName] = React.useState("");
-  const [dateRange, setDateRange] = React.useState("");
-  const [targetProductCode, setTargetProductCode] = React.useState("");
-  const [optionCode, setOptionCode] = React.useState("");
-  const [pasteText, setPasteText] = React.useState("");
-  const [msg, setMsg] = React.useState("");
-  const [sending, setSending] = React.useState(false);
-  const [preview, setPreview] = React.useState(null);
-  const [created, setCreated] = React.useState(null);
-
-  const parsePaste = (text) => {
-    const nameMatch = text.match(/유튜버명[:：]\s*(.+)/);
-    const dateMatch = text.match(/날짜[:：]\s*(.+)/);
-    if(nameMatch) setYtName(nameMatch[1].trim());
-    if(dateMatch) setDateRange(dateMatch[1].trim());
-  };
-
-  const productName = ytName ? `[${ytName} 전용 비밀링크] 단백질쉐이크 대용량 10종` : "";
-  const summaryDesc = `<strong>🧡${ytName} 전용 비밀링크!</strong> ~최대 특가 63% SALE!🧡<br>\n✔︎ 📢${dateRange} 단, 7일간만! <br>\n✔︎ 최저가 링크!  <strong> 한 통 당 최대 19,733원💵</strong> <br>\n✔︎ 현재 페이지에서만 구매 가능한 혜택😱<br>\n✔︎ 단백질 쉐이크 유목민 정.착.템!<br>`;
-  const opt1Name = `{🔥${ytName} PICK!🔥}[6개+파우치 7포] 대용량 쉐이크 6개 {🎁사은품🎁 파우치 7포 증정} ((d3))`;
-
-  const makePreview = () => {
-    if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
-    setPreview(true);setMsg("");
-  };
-
-  const handleCreate = async () => {
-    if(!ytName||!dateRange){setMsg("❌ 유튜버명과 날짜를 입력해주세요");return;}
-    if(!targetProductCode){setMsg("❌ 복사된 상품코드를 입력해주세요");return;}
-    if(!c24TokenValid()){setMsg("❌ 카페24 로그인 필요");return;}
-    setSending(true);setCreated(null);
-    try {
-      // 1) 상품코드 → product_no
-      setMsg("1/4 상품 조회 중...");
-      const found = await c24SearchByCode(targetProductCode.trim().toUpperCase());
-      if(!found){setMsg("❌ 상품을 찾을 수 없습니다");setSending(false);return;}
-      const newNo = found.product_no;
-      const newCode = found.product_code||targetProductCode;
-      if(!newNo){setMsg("❌ product_no 없음");setSending(false);return;}
-
-      // 2) 상세 조회
-      setMsg("2/4 상세 정보 조회 중...");
-      const detail = await c24GetProduct(newNo);
-
-      // 3) variants 조회 - 옵션코드 자동 추출
-      setMsg("3/4 옵션 조회 중...");
-      const varRes = await c24Api({action:"getVariants", productNo:newNo});
-      const variants = varRes?.variants||[];
-      setMsg("variants: "+JSON.stringify(variants).slice(0,200));
-      await new Promise(r=>setTimeout(r,2000)); // 2초 표시
-
-      // 옵션1 품목코드 자동 추출 (PICK이 들어간 옵션)
-      const opt1 = variants.find(v=>(v.option_value||"").includes("PICK"));
-      const opt1Code = opt1?.variant_code||opt1?.code||"";
-      const opt1Name_new = `{🔥${ytName} PICK!🔥}[6개+파우치 7포] 대용량 쉐이크 6개 {🎁사은품🎁 파우치 7포 증정} ((d3))`;
-
-      // 4) 상세설명 - opt1Code로 교체
-      let desc = detail?.description||"";
-      if(opt1Code){
-        desc = desc.replace(/code="[A-Z0-9]+"/g, `code="${opt1Code}"`);
-      }
-      const depth3 = `<div id="opt-depth3-spec" style="display:none !important;">\n\t<!--\n        [STEP3 개별화] 샘플\n        <p code="옵션 코드">내용1,내용2,내용3</p>\n    -->\n\t<p code="${opt1Code||'P0000BCI000C'}">딸기맛 파우치 7포,초코맛 파우치 7포,말차맛 파우치 7포,쿠키앤크림맛 파우치 7포,스윗콘플레이크맛 파우치 7포,곡물맛 파우치 7포, 티라미수&amp;마카다미아맛 45g x 7포, 트리플베리요거트맛 45g x 7포</p>\n</div>`;
-      if(desc.includes('id="opt-depth3-spec"'))
-        desc = desc.replace(/<div id="opt-depth3-spec"[\s\S]*?<\/div>/, depth3);
-      else desc = depth3+"\n"+desc;
-
-      // 5) 상품명 + 간략설명 + 상세설명 수정
-      setMsg("4/4 상품 수정 중...");
-      const updRes = await c24Api({action:"update", productNo:newNo, payload:{
-        product_name: `[${ytName} 전용 비밀링크] 단백질쉐이크 대용량 10종`,
-        summary_description: `<strong>🧡${ytName} 전용 비밀링크!</strong> ~최대 특가 63% SALE!🧡<br>\n✔︎ 📢${dateRange} 단, 7일간만! <br>\n✔︎ 최저가 링크!  <strong> 한 통 당 최대 19,733원💵</strong> <br>\n✔︎ 현재 페이지에서만 구매 가능한 혜택😱<br>\n✔︎ 단백질 쉐이크 유목민 정.착.템!<br>`,
-        description: desc,
-      }});
-      if(!updRes.product){setMsg("❌ 상품 수정 실패: "+JSON.stringify(updRes).slice(0,200));setSending(false);return;}
-
-      // 6) 옵션명 수정 (PICK 들어간 것만)
-      let optUpdated=0;
-      if(opt1&&opt1Code){
-        const vr = await c24Api({action:"updateVariant", productNo:newNo, variantCode:opt1Code, payload:{option_value:opt1Name_new}});
-        if(vr.variant) optUpdated=1;
-        else setMsg("⚠ 옵션수정 응답: "+JSON.stringify(vr).slice(0,150));
-      }
-
-      setCreated({no:newNo, code:newCode});
-      setTargetProductCode("");
-      setMsg(`✅ 완료! ${newCode} — 상품명/설명 수정, 옵션 ${optUpdated}개 수정 (opt1: ${opt1Code||"없음"})`);
-    } catch(e){
-      setMsg("❌ 오류: "+e.message);
-    }
-    setSending(false);
-  };
-
-  return (
-    <div style={{maxWidth:680,margin:"0 auto",padding:"0 0 40px"}}>
-      {/* 붙여넣기 공간 */}
-      <div className="panel" style={{padding:18,marginBottom:14}}>
-        <label style={{fontWeight:700,fontSize:13,display:"block",marginBottom:8}}>
-          📋 정보 붙여넣기
-          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>유튜버명/날짜를 붙여넣으면 자동 입력</span>
-        </label>
-        <textarea value={pasteText} onChange={(e)=>{setPasteText(e.target.value);parsePaste(e.target.value);}}
-          placeholder={"유튜버명: 카나미누\n날짜: 09/07(토) ~ 09/14(토)"}
-          style={{width:"100%",height:80,fontSize:12,border:"1px solid var(--line2)",borderRadius:8,padding:"9px 12px",resize:"vertical",fontFamily:"inherit"}} />
-      </div>
-
-      {/* 복사된 상품번호 입력 */}
-      <div className="panel" style={{padding:18,marginBottom:14,border:"1.5px solid #0C66E4",background:"#E9F2FF"}}>
-        <label style={{fontWeight:700,fontSize:13,display:"block",marginBottom:6}}>
-          📦 복사된 상품번호
-          <span style={{fontSize:11,fontWeight:400,color:"var(--ink3)",marginLeft:6}}>카페24에서 P0000BCP 복사 후 새 상품번호 입력</span>
-        </label>
-        <input value={targetProductCode} onChange={(e)=>setTargetProductCode(e.target.value.trim())}
-          placeholder="예: 760"
-          style={{width:"100%",fontSize:14,border:"1px solid var(--line2)",borderRadius:7,padding:"9px 12px",fontFamily:"monospace",fontWeight:700}} />
-        <div style={{fontSize:11,color:"#0C66E4",marginTop:6}}>
-          카페24 관리자 → 상품 목록 → P0000BCP 체크 → 복사 → 새 상품의 URL에서 product_no 숫자 확인
-        </div>
-      </div>
-
-      {/* 입력 폼 */}
-      <div className="panel" style={{padding:18,marginBottom:14}}>
-        <div style={{display:"flex",gap:12,marginBottom:12}}>
-          <div className="fld" style={{flex:1}}>
-            <label>유튜버명 <span style={{color:"#CA3521",fontSize:11}}>*</span></label>
-            <input value={ytName} onChange={(e)=>setYtName(e.target.value)} placeholder="카나미누" />
-          </div>
-          <div className="fld" style={{flex:2}}>
-            <label>날짜 <span style={{color:"#CA3521",fontSize:11}}>*</span></label>
-            <input value={dateRange} onChange={(e)=>setDateRange(e.target.value)} placeholder="09/07(토) ~ 09/14(토)" />
-          </div>
-        </div>
-        <div className="fld" style={{marginBottom:12}}>
-          <label>옵션 1번 품목코드 <span style={{color:"var(--ink3)",fontSize:11}}>(선택 — 입력하면 상세설명 HTML의 code 값 자동 교체)</span></label>
-          <input value={optionCode} onChange={(e)=>setOptionCode(e.target.value.trim().toUpperCase())}
-            placeholder="예: P0000BDQ000C"
-            style={{fontFamily:"monospace",textTransform:"uppercase"}} />
-        </div>
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-          <button className="btn ghost" onClick={makePreview}>👁 미리보기</button>
-          <button className="btn-save" style={{background:"#1F845A",padding:"9px 24px"}} disabled={sending} onClick={handleCreate}>
-            {sending?"생성 중...":"🚀 카페24에 상품 생성"}
-          </button>
-        </div>
-      </div>
-
-      {/* 메시지 */}
-      {msg&&<div style={{padding:"10px 14px",borderRadius:9,marginBottom:12,
-        background:msg.startsWith("✅")?"#DCFFF1":msg.includes("중")?"#E9F2FF":"#FFECEB",
-        color:msg.startsWith("✅")?"#1F845A":msg.includes("중")?"#0C66E4":"#CA3521",fontSize:13}}>
-        {msg}
-        {created&&<div style={{marginTop:6}}>
-          <a href={`https://slowrocket.cafe24.com/disp/admin/shop1/product/ProductRegister?product_no=${created.no}`}
-            target="_blank" rel="noreferrer" style={{color:"#0C66E4",fontWeight:700,textDecoration:"underline"}}>
-            → 카페24 상품 편집 바로가기 ({created.code})
-          </a>
-        </div>}
-      </div>}
-
-      {/* 미리보기 */}
-      {preview&&ytName&&dateRange&&<div className="panel" style={{padding:18}}>
-        <div style={{fontWeight:800,fontSize:13,color:"#0C66E4",marginBottom:14}}>미리보기</div>
-        <div style={{marginBottom:10}}>
-          <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:4}}>상품명</div>
-          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:13}}>{productName}</div>
-        </div>
-        <div style={{marginBottom:10}}>
-          <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:4}}>상품 간략설명</div>
-          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:12,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:summaryDesc}} />
-        </div>
-        <div>
-          <div style={{fontSize:11,fontWeight:700,color:"var(--ink3)",marginBottom:4}}>1번 옵션명</div>
-          <div style={{padding:"8px 12px",background:"var(--bg)",borderRadius:7,fontSize:12}}>{opt1Name}</div>
-        </div>
-      </div>}
     </div>
   );
 }
