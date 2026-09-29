@@ -1,0 +1,90 @@
+name: Firebase 일일 백업
+
+on:
+  schedule:
+    - cron: '0 15 * * *'  # 매일 KST 00:00 (UTC 15:00) 자동 실행
+  workflow_dispatch:       # 수동 실행 버튼
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write      # 백업 파일 커밋 권한
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Firestore 데이터 백업
+        uses: actions/github-script@v7
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const FIREBASE_URL = `https://firestore.googleapis.com/v1/projects/${process.env.FIREBASE_PROJECT_ID}/databases/(default)/documents/board/main`;
+
+            // Firestore REST API로 전체 문서 조회
+            const res = await fetch(`${FIREBASE_URL}?key=${process.env.FIREBASE_API_KEY}`);
+            if (!res.ok) throw new Error(`Firestore GET 실패: ${res.status}`);
+            const doc = await res.json();
+
+            // Firestore 값 파싱
+            function parseValue(v) {
+              if (!v) return null;
+              if (v.stringValue !== undefined) return v.stringValue;
+              if (v.integerValue !== undefined) return parseInt(v.integerValue);
+              if (v.booleanValue !== undefined) return v.booleanValue;
+              if (v.doubleValue !== undefined) return v.doubleValue;
+              if (v.nullValue !== undefined) return null;
+              if (v.arrayValue) return (v.arrayValue.values || []).map(parseValue);
+              if (v.mapValue) {
+                const obj = {};
+                for (const [k, val] of Object.entries(v.mapValue.fields || {})) obj[k] = parseValue(val);
+                return obj;
+              }
+              return null;
+            }
+
+            const fields = doc.fields || {};
+            const data = {};
+            for (const [k, v] of Object.entries(fields)) data[k] = parseValue(v);
+
+            // refs 이미지(base64) 제외 → 파일 크기 절약
+            if (Array.isArray(data.refs)) {
+              data.refs = data.refs.map(r => ({
+                ...r,
+                images: (r.images || []).map(img => ({ ...img, src: '[base64 omitted]' }))
+              }));
+            }
+
+            // 백업 폴더 생성
+            const dir = 'backups';
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+
+            // 날짜 (KST)
+            const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+            const dateStr = kst.toISOString().slice(0, 10);
+            const filename = path.join(dir, `${dateStr}.json`);
+
+            fs.writeFileSync(filename, JSON.stringify(data, null, 2), 'utf8');
+            console.log(`백업 완료: ${filename} (필드 수: ${Object.keys(data).length})`);
+
+            // 30일 이전 백업 파일 삭제
+            const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000 + 9 * 60 * 60 * 1000);
+            const cutoffStr = cutoff.toISOString().slice(0, 10);
+            fs.readdirSync(dir)
+              .filter(f => f.endsWith('.json') && f.slice(0, 10) < cutoffStr)
+              .forEach(f => { fs.unlinkSync(path.join(dir, f)); console.log(`삭제: ${f}`); });
+
+      - name: 변경사항 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backups/
+          git diff --staged --quiet || git commit -m "backup: $(date -u '+%Y-%m-%d') Firestore 자동 백업"
+          git push
