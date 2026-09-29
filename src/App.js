@@ -5401,7 +5401,6 @@ function Board() {
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
             <h2 style={{margin:0}}>{draft._new?"새 업무":"업무 상세"}</h2>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              {canEdit&&<button className="btn-save" style={{fontSize:12,padding:"5px 14px",background:"#1F845A"}} onClick={()=>saveDraft(false)}>💾 중간 저장</button>}
               <button style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"var(--ink3)",lineHeight:1}} onClick={()=>setDraft(null)}>×</button>
             </div>
           </div>
