@@ -2341,6 +2341,14 @@ function Board() {
   },[data.stockData,stockTab,allAlertItems]); // eslint-disable-line react-hooks/exhaustive-deps
   const inboundPlans=useMemo(()=>(data.inboundPlans||[]).filter((p)=>!p.deleted),[data.inboundPlans]);
   const activeInbounds=useMemo(()=>inboundPlans.filter((p)=>p.status!=="입고 완료"),[inboundPlans]);
+  // 재고 표의 입고 예정일 매칭: SKU 우선, SKU가 없는 상품(네이버)은 상품명으로 매칭
+  const normName=(n)=>(n||"").replace(/\s+/g," ").trim().toLowerCase();
+  const findInboundPlan=(item,channel)=>{
+    const list=activeInbounds.filter((p)=>p.channel===channel);
+    if(item.sku){const bySku=list.find((p)=>p.sku&&p.sku===item.sku);if(bySku)return bySku;}
+    const nm=normName(item.name);
+    return nm?list.find((p)=>normName(p.productName)===nm)||null:null;
+  };
   const addInboundPlan=(plan)=>{commit((d)=>({...d,inboundPlans:[...(d.inboundPlans||[]),{...plan,id:uid(),createdAt:Date.now(),createdBy:me||"익명",logs:[{ts:Date.now(),text:"입고 예정 등록",by:me||"익명"}]}],updatedAt:Date.now()}),[]);};
   const updateInboundPlan=(id,patch)=>{commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,...patch,updatedAt:Date.now()}:p),updatedAt:Date.now()}),[]);};
   const deleteInboundPlan=(id)=>{commit((d)=>({...d,inboundPlans:(d.inboundPlans||[]).map((p)=>p.id===id?{...p,deleted:true,updatedAt:Date.now()}:p),updatedAt:Date.now()}),[]);};
@@ -4138,7 +4146,7 @@ function Board() {
                           </td>
                           <td style={{textAlign:"center"}}>
                             {(()=>{
-                              const plan=item.sku?inboundPlans.find((p)=>p.sku&&p.sku===item.sku&&p.channel===stockTab&&p.status!=="입고 완료"):null;
+                              const plan=findInboundPlan(item,stockTab);
                               if(plan)return<span style={{fontSize:12,color:"#0C66E4",fontWeight:700}}>{plan.expectedDate||"날짜 미정"}<br/><span style={{fontSize:10,color:"var(--ink3)",fontWeight:400}}>{plan.status}</span></span>;
                               return canEdit?<button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer"}} onClick={()=>{setInboundDraft({productName:item.name,sku:item.sku||"",channel:stockTab,expectedDate:"",qty:"",status:"입고 준비 중",issues:[],images:[]});setInboundModal("add");}}>+ 입고등록</button>:"-";
                             })()}
