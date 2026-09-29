@@ -1179,6 +1179,20 @@ function Board() {
       if(snap.exists()){
         const p=snap.data();
         if(p&&Array.isArray(p.tasks)){
+          // 하루 1회 localStorage 자동 백업 (이미지 제외하여 용량 절약)
+          try{
+            const bkKey=`wb_daily_backup_${todayStr()}`;
+            if(!localStorage.getItem(bkKey)){
+              const bkData=JSON.parse(JSON.stringify(p));
+              // refs 이미지 제외
+              if(Array.isArray(bkData.refs))bkData.refs=bkData.refs.map((r)=>({...r,images:(r.images||[]).map((img)=>({...img,src:'[img]'}))}));
+              try{localStorage.setItem(bkKey,JSON.stringify(bkData));
+                // 어제 백업은 삭제
+                const yd=new Date();yd.setDate(yd.getDate()-1);const ydStr=yd.toISOString().slice(0,10);
+                localStorage.removeItem(`wb_daily_backup_${ydStr}`);
+              }catch(e){}
+            }
+          }catch(e){}
           const merged=mergeData(p,emptyData());
           // SKU 필터 적용
           if(merged.stockData){
@@ -1224,6 +1238,8 @@ function Board() {
       const merged=mergeData(base,optimistic);
       if(logEntries&&logEntries.length)merged.log=[...logEntries,...(merged.log||[])].slice(0,LOG_CAP);
       merged.updatedAt=Date.now();
+      // 안전망: remote에 있지만 merged에 없는 필드는 보존 (구버전 코드가 알 수 없는 필드를 지우는 것 방지)
+      if(remote){Object.keys(remote).forEach((k)=>{if(!(k in merged))merged[k]=remote[k];});}
       await setDoc(BOARD_REF(),merged); setData(merged); setSaveState("saved"); setTimeout(()=>setSaveState("idle"),1500);
     } catch(e){setSaveState("error");} finally{busyRef.current=false;}
   }, []);
