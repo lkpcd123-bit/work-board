@@ -5064,7 +5064,43 @@ function Board() {
                 <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontStyle:"italic"}} onClick={reportItalic}>I 기울임</button>
                 <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",textDecoration:"underline"}} onClick={reportUnderline}>U 밑줄</button>
               </div>
-              <textarea ref={reportTaRef} autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})} placeholder={"여기에 입력한 뒤, 줄을 클릭하고 위 버튼으로 점·들여쓰기·굵게·기울임·밑줄을 적용하세요"} style={{minHeight:280,fontFamily:"inherit"}} />
+              <textarea ref={reportTaRef} autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})}
+                onKeyDown={(e)=>{
+                  if(e.nativeEvent.isComposing)return;
+                  // Tab → 들여쓰기 / Shift+Tab → 내어쓰기
+                  if(e.key==="Tab"){e.preventDefault();reportIndent(e.shiftKey?-1:1);return;}
+                  // Ctrl+B → 굵게
+                  if((e.ctrlKey||e.metaKey)&&e.key==="b"){e.preventDefault();reportBold();return;}
+                  // Ctrl+I → 기울임
+                  if((e.ctrlKey||e.metaKey)&&e.key==="i"){e.preventDefault();reportItalic();return;}
+                  // Ctrl+U → 밑줄
+                  if((e.ctrlKey||e.metaKey)&&e.key==="u"){e.preventDefault();reportUnderline();return;}
+                  // Enter: 현재 줄이 "- "로 시작하면 다음 줄도 "- " 자동 추가 (빈 줄이면 종료)
+                  if(e.key==="Enter"&&!e.shiftKey){
+                    const ta=reportTaRef.current; if(!ta)return;
+                    const val=reportDraft.text||"";
+                    const pos=ta.selectionStart;
+                    const lineStart=val.lastIndexOf("\n",pos-1)+1;
+                    const line=val.slice(lineStart,pos);
+                    const m=line.match(/^(\s*)(- )/);
+                    if(m){
+                      e.preventDefault();
+                      const indent=m[1];
+                      if(line.trim()==="- "){
+                        // 빈 항목이면 bullet 제거
+                        const next=val.slice(0,lineStart)+"\n"+val.slice(pos);
+                        setReportDraft({...reportDraft,text:next});
+                        setTimeout(()=>{ta.focus();const p=lineStart+1;ta.setSelectionRange(p,p);},0);
+                      } else {
+                        const insert="\n"+indent+"- ";
+                        const next=val.slice(0,pos)+insert+val.slice(pos);
+                        setReportDraft({...reportDraft,text:next});
+                        setTimeout(()=>{ta.focus();const p=pos+insert.length;ta.setSelectionRange(p,p);},0);
+                      }
+                    }
+                  }
+                }}
+                placeholder={"단축키: Tab 들여쓰기 · Shift+Tab 내어쓰기 · Ctrl+B 굵게 · Ctrl+I 기울임 · Ctrl+U 밑줄 · 줄 앞 '- ' 입력 후 Enter → 점 자동 이어짐"} style={{minHeight:280,fontFamily:"inherit"}} />
             </div>
           </div>
           <div className="modal-foot">
