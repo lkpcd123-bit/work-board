@@ -440,6 +440,131 @@ const renderOutlineText = (text) => {
     return <div key={i} style={{ lineHeight: 1.6 }}>{renderFormattedSpans(line)}</div>;
   });
 };
+
+// ── 일보고 WYSIWYG 에디터: 저장 포맷은 기존 마크다운 그대로, 화면만 서식 적용 ──
+const rteEsc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const rteInline = (s) => rteEsc(s)
+  .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+  .replace(/__([^_]+)__/g, "<u>$1</u>")
+  .replace(/\*([^*]+)\*/g, "<i>$1</i>")
+  .replace(/^ +/, (sp) => "&nbsp;".repeat(sp.length));
+const mdToEditorHtml = (md) => {
+  let html = "", depth = 0;
+  (md || "").split("\n").forEach((line) => {
+    const m = line.match(/^(\s*)(?:[-•]|\*(?=\s))\s?(.*)$/);
+    if (m) {
+      const target = Math.floor(m[1].replace(/\t/g, "  ").length / 2) + 1;
+      while (depth < target) { html += "<ul>"; depth++; }
+      while (depth > target) { html += "</ul>"; depth--; }
+      html += "<li>" + (rteInline(m[2]) || "<br>") + "</li>";
+    } else {
+      while (depth > 0) { html += "</ul>"; depth--; }
+      html += "<div>" + (rteInline(line) || "<br>") + "</div>";
+    }
+  });
+  while (depth > 0) { html += "</ul>"; depth--; }
+  return html;
+};
+const editorToMd = (root) => {
+  const lines = []; let buf = "", prefix = "", open = false, fresh = false;
+  const push = () => { if (open && !(fresh && !buf && !prefix)) lines.push(prefix + buf); buf = ""; prefix = ""; open = false; fresh = false; };
+  const start = (p) => { push(); prefix = p; open = true; fresh = !p; };
+  const BLOCK = { DIV: 1, P: 1, LI: 1, UL: 1, OL: 1, BLOCKQUOTE: 1, H1: 1, H2: 1, H3: 1 };
+  const walk = (n, depth) => {
+    if (n.nodeType === 3) { n.nodeValue.replace(/\u00a0/g, " ").replace(/\u200b/g, "").split("\n").forEach((part, i) => { if (i > 0) push(); open = true; fresh = false; buf += part; }); return; }
+    if (n.nodeType !== 1) return;
+    const tag = n.tagName;
+    if (tag === "BR") {
+      const isLast = !n.nextSibling && (n.parentNode === root || BLOCK[n.parentNode.tagName]);
+      fresh = false;
+      if (isLast) { open = true; return; }
+      open = true; push(); open = true; return;
+    }
+    if (tag === "UL" || tag === "OL") { push(); n.childNodes.forEach((c) => walk(c, depth + 1)); return; }
+    if (tag === "LI") { start("  ".repeat(Math.max(0, depth - 1)) + "- "); n.childNodes.forEach((c) => walk(c, depth)); push(); return; }
+    if (BLOCK[tag]) { start(""); n.childNodes.forEach((c) => walk(c, depth)); push(); return; }
+    const st = n.style || {};
+    const fw = st.fontWeight;
+    const mark = (tag === "B" || tag === "STRONG" || fw === "bold" || +fw >= 600) ? "**"
+      : (tag === "I" || tag === "EM" || st.fontStyle === "italic") ? "*"
+      : (tag === "U" || (st.textDecoration || "").includes("underline") || (st.textDecorationLine || "").includes("underline")) ? "__" : "";
+    const from = buf.length, lc = lines.length;
+    n.childNodes.forEach((c) => walk(c, depth));
+    if (mark && lines.length === lc) {
+      const inner = buf.slice(from);
+      const mm = inner.match(/^(\s*)([\s\S]*?)(\s*)$/);
+      if (mm[2]) buf = buf.slice(0, from) + mm[1] + mark + mm[2] + mark + mm[3];
+    }
+  };
+  root.childNodes.forEach((c) => walk(c, 0));
+  push();
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  return lines.join("\n");
+};
+function RichReportEditor({ value, onChange, apiRef, placeholder }) {
+  const ref = useRef(null);
+  const lastMd = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    if (value !== lastMd.current) { ref.current.innerHTML = mdToEditorHtml(value); lastMd.current = value; }
+  }, [value]);
+  useEffect(() => {
+    try { document.execCommand("styleWithCSS", false, false); document.execCommand("defaultParagraphSeparator", false, "div"); } catch (e) {}
+    const el = ref.current; if (!el) return;
+    el.focus();
+    const r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }, []);
+  const sync = () => { if (!ref.current) return; const md = editorToMd(ref.current); lastMd.current = md; onChange(md); };
+  const inList = () => {
+    const s = window.getSelection(); if (!s || !s.anchorNode) return false;
+    let n = s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentNode;
+    while (n && n !== ref.current) { if (n.tagName === "LI") return true; n = n.parentNode; }
+    return false;
+  };
+  const exec = (cmd, arg = null) => { ref.current && ref.current.focus(); document.execCommand(cmd, false, arg); sync(); };
+  const indent = (dir) => {
+    if (inList()) exec(dir > 0 ? "indent" : "outdent");
+    else if (dir > 0) exec("insertText", "\u00a0\u00a0");
+  };
+  if (apiRef) apiRef.current = {
+    bold: () => exec("bold"), italic: () => exec("italic"), underline: () => exec("underline"),
+    bullet: () => exec("insertUnorderedList"), indent,
+  };
+  const onKeyDown = (e) => {
+    if (e.nativeEvent.isComposing) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (e.key === "Tab") { e.preventDefault(); indent(e.shiftKey ? -1 : 1); return; }
+    if (mod && (e.key === "b" || e.key === "B")) { e.preventDefault(); exec("bold"); return; }
+    if (mod && (e.key === "i" || e.key === "I")) { e.preventDefault(); exec("italic"); return; }
+    if (mod && (e.key === "u" || e.key === "U")) { e.preventDefault(); exec("underline"); return; }
+    // 줄 맨 앞에서 "- " 입력 → 글머리 목록으로 변환
+    if (e.key === " " && !inList()) {
+      const s = window.getSelection(); if (!s || !s.isCollapsed) return;
+      const r = s.getRangeAt(0).cloneRange();
+      let blk = s.anchorNode; while (blk && blk !== ref.current && !(blk.nodeType === 1 && (blk.tagName === "DIV" || blk.tagName === "P"))) blk = blk.parentNode;
+      const pre = document.createRange(); pre.selectNodeContents(blk || ref.current); pre.setEnd(r.endContainer, r.endOffset);
+      if (pre.toString().replace(/\u00a0/g, " ").trim() === "-" && /-$/.test(pre.toString())) {
+        e.preventDefault();
+        document.execCommand("delete");
+        exec("insertUnorderedList");
+      }
+    }
+  };
+  const onPaste = (e) => {
+    e.preventDefault();
+    const t = (e.clipboardData || window.clipboardData).getData("text/plain");
+    document.execCommand("insertText", false, t);
+    sync();
+  };
+  return (
+    <div style={{ position: "relative" }}>
+      {!(value || "").trim() && <div className="rte-ph">{placeholder}</div>}
+      <div ref={ref} className="rte" contentEditable suppressContentEditableWarning
+        onInput={sync} onKeyDown={onKeyDown} onPaste={onPaste} onBlur={sync} />
+    </div>
+  );
+}
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
@@ -979,6 +1104,13 @@ const CSS = `
 .memopath{font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:3px;}
 .memotitle{font-size:14.5px;font-weight:800;margin-bottom:4px;}
 .memotext{font-size:13.5px;color:var(--ink2);line-height:1.55;white-space:pre-wrap;word-break:break-word;}
+.rte{min-height:280px;max-height:60vh;overflow-y:auto;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:9px 11px;font-size:14.5px;line-height:1.6;color:var(--ink);word-break:break-word;white-space:pre-wrap;}
+.rte:focus{outline:2px solid var(--pri);outline-offset:-1px;background:#fff;}
+.rte ul{margin:0;padding-left:22px;list-style:disc;}
+.rte ul ul{list-style:circle;}
+.rte ul ul ul{list-style:square;}
+.rte li{margin:1px 0;}
+.rte-ph{position:absolute;top:10px;left:12px;right:12px;font-size:13px;color:var(--ink3);pointer-events:none;line-height:1.5;}
 .memosubs{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px;}
 
 `;
@@ -1730,59 +1862,11 @@ function Board() {
   },[reportItems,reportCatFilter,reportQuery]);
   const reportCatOptions=useMemo(()=>["전체",...new Set(reportItems.map((x)=>x.cat||"미분류"))],[reportItems]);
   // 버튼으로 서식 넣기 (모바일엔 Tab 키가 없어서 버튼 방식이 훨씬 편함)
-  const reportAddBullet=()=>{
-    const ta=reportTaRef.current; if(!ta)return;
-    const val=reportDraft.text||"";
-    const pos=ta.selectionStart;
-    const needsNl=pos>0&&val[pos-1]!=="\n";
-    const insert=(needsNl?"\n":"")+"- ";
-    const next=val.slice(0,pos)+insert+val.slice(pos);
-    setReportDraft({...reportDraft,text:next});
-    setTimeout(()=>{ta.focus();const p=pos+insert.length;ta.setSelectionRange(p,p);},0);
-  };
-  const reportIndent=(dir)=>{
-    const ta=reportTaRef.current; if(!ta)return;
-    const val=reportDraft.text||"";
-    const pos=ta.selectionStart;
-    const lineStart=val.lastIndexOf("\n",pos-1)+1;
-    let lineEnd=val.indexOf("\n",lineStart); if(lineEnd===-1)lineEnd=val.length;
-    const line=val.slice(lineStart,lineEnd);
-    let newLine,delta;
-    if(dir>0){newLine="  "+line;delta=2;}
-    else if(line.startsWith("  ")){newLine=line.slice(2);delta=-2;}
-    else if(line.startsWith(" ")){newLine=line.slice(1);delta=-1;}
-    else{newLine=line;delta=0;}
-    const next=val.slice(0,lineStart)+newLine+val.slice(lineEnd);
-    setReportDraft({...reportDraft,text:next});
-    setTimeout(()=>{ta.focus();const p=Math.max(lineStart,pos+delta);ta.setSelectionRange(p,p);},0);
-  };
-  const reportBold=()=>{
-    const ta=reportTaRef.current; if(!ta)return;
-    const val=reportDraft.text||"";
-    const start=ta.selectionStart,end=ta.selectionEnd;
-    const sel=val.slice(start,end)||"굵은 글자";
-    const next=val.slice(0,start)+"**"+sel+"**"+val.slice(end);
-    setReportDraft({...reportDraft,text:next});
-    setTimeout(()=>{ta.focus();ta.setSelectionRange(start+2,start+2+sel.length);},0);
-  };
-  const reportItalic=()=>{
-    const ta=reportTaRef.current; if(!ta)return;
-    const val=reportDraft.text||"";
-    const start=ta.selectionStart,end=ta.selectionEnd;
-    const sel=val.slice(start,end)||"기울임 글자";
-    const next=val.slice(0,start)+"*"+sel+"*"+val.slice(end);
-    setReportDraft({...reportDraft,text:next});
-    setTimeout(()=>{ta.focus();ta.setSelectionRange(start+1,start+1+sel.length);},0);
-  };
-  const reportUnderline=()=>{
-    const ta=reportTaRef.current; if(!ta)return;
-    const val=reportDraft.text||"";
-    const start=ta.selectionStart,end=ta.selectionEnd;
-    const sel=val.slice(start,end)||"밑줄 글자";
-    const next=val.slice(0,start)+"__"+sel+"__"+val.slice(end);
-    setReportDraft({...reportDraft,text:next});
-    setTimeout(()=>{ta.focus();ta.setSelectionRange(start+2,start+2+sel.length);},0);
-  };
+  const reportAddBullet=()=>reportTaRef.current&&reportTaRef.current.bullet();
+  const reportIndent=(dir)=>reportTaRef.current&&reportTaRef.current.indent(dir);
+  const reportBold=()=>reportTaRef.current&&reportTaRef.current.bold();
+  const reportItalic=()=>reportTaRef.current&&reportTaRef.current.italic();
+  const reportUnderline=()=>reportTaRef.current&&reportTaRef.current.underline();
   const saveReport=(close=true)=>{
     const text=(reportDraft.text||"").trim();
     if(!text){alert("일보고 내용을 입력하세요.");return;}
@@ -5057,50 +5141,16 @@ function Board() {
             </div>
             <div className="fld"><label>내용</label>
               <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={reportAddBullet}>• 점 추가</button>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={()=>reportIndent(1)}>→ 들여쓰기</button>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onClick={()=>reportIndent(-1)}>← 내어쓰기</button>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontWeight:800}} onClick={reportBold}>B 굵게</button>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontStyle:"italic"}} onClick={reportItalic}>I 기울임</button>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",textDecoration:"underline"}} onClick={reportUnderline}>U 밑줄</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onMouseDown={(e)=>e.preventDefault()} onClick={reportAddBullet}>• 점 추가</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onMouseDown={(e)=>e.preventDefault()} onClick={()=>reportIndent(1)}>→ 들여쓰기</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onMouseDown={(e)=>e.preventDefault()} onClick={()=>reportIndent(-1)}>← 내어쓰기</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontWeight:800}} onMouseDown={(e)=>e.preventDefault()} onClick={reportBold}>B 굵게</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontStyle:"italic"}} onMouseDown={(e)=>e.preventDefault()} onClick={reportItalic}>I 기울임</button>
+                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",textDecoration:"underline"}} onMouseDown={(e)=>e.preventDefault()} onClick={reportUnderline}>U 밑줄</button>
               </div>
-              <textarea ref={reportTaRef} autoFocus value={reportDraft.text||""} onChange={(e)=>setReportDraft({...reportDraft,text:e.target.value})}
-                onKeyDown={(e)=>{
-                  if(e.nativeEvent.isComposing)return;
-                  // Tab → 들여쓰기 / Shift+Tab → 내어쓰기
-                  if(e.key==="Tab"){e.preventDefault();reportIndent(e.shiftKey?-1:1);return;}
-                  // Ctrl+B → 굵게
-                  if((e.ctrlKey||e.metaKey)&&e.key==="b"){e.preventDefault();reportBold();return;}
-                  // Ctrl+I → 기울임
-                  if((e.ctrlKey||e.metaKey)&&e.key==="i"){e.preventDefault();reportItalic();return;}
-                  // Ctrl+U → 밑줄
-                  if((e.ctrlKey||e.metaKey)&&e.key==="u"){e.preventDefault();reportUnderline();return;}
-                  // Enter: 현재 줄이 "- "로 시작하면 다음 줄도 "- " 자동 추가 (빈 줄이면 종료)
-                  if(e.key==="Enter"&&!e.shiftKey){
-                    const ta=reportTaRef.current; if(!ta)return;
-                    const val=reportDraft.text||"";
-                    const pos=ta.selectionStart;
-                    const lineStart=val.lastIndexOf("\n",pos-1)+1;
-                    const line=val.slice(lineStart,pos);
-                    const m=line.match(/^(\s*)(- )/);
-                    if(m){
-                      e.preventDefault();
-                      const indent=m[1];
-                      if(line.trim()==="- "){
-                        // 빈 항목이면 bullet 제거
-                        const next=val.slice(0,lineStart)+"\n"+val.slice(pos);
-                        setReportDraft({...reportDraft,text:next});
-                        setTimeout(()=>{ta.focus();const p=lineStart+1;ta.setSelectionRange(p,p);},0);
-                      } else {
-                        const insert="\n"+indent+"- ";
-                        const next=val.slice(0,pos)+insert+val.slice(pos);
-                        setReportDraft({...reportDraft,text:next});
-                        setTimeout(()=>{ta.focus();const p=pos+insert.length;ta.setSelectionRange(p,p);},0);
-                      }
-                    }
-                  }
-                }}
-                placeholder={"단축키: Tab 들여쓰기 · Shift+Tab 내어쓰기 · Ctrl+B 굵게 · Ctrl+I 기울임 · Ctrl+U 밑줄 · 줄 앞 '- ' 입력 후 Enter → 점 자동 이어짐"} style={{minHeight:280,fontFamily:"inherit"}} />
+              <RichReportEditor apiRef={reportTaRef} value={reportDraft.text||""}
+                onChange={(md)=>setReportDraft((d)=>d?{...d,text:md}:d)}
+                placeholder={"단축키: '- ' 입력 → 글머리 · Tab 들여쓰기 · Shift+Tab 내어쓰기 · Ctrl+B 굵게 · Ctrl+I 기울임 · Ctrl+U 밑줄"} />
             </div>
           </div>
           <div className="modal-foot">
