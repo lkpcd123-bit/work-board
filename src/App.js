@@ -395,8 +395,8 @@ const resizeImage=(file,maxW=800,maxH=800,quality=0.75)=>new Promise((resolve)=>
       if(h>maxH){w=Math.round(w*maxH/h);h=maxH;}
       const canvas=document.createElement("canvas");
       canvas.width=w;canvas.height=h;
-      canvas.getContext("2d").drawImage(img,0,0,w,h);
-      resolve(canvas.toDataURL(file.type.includes("png")?"image/png":"image/jpeg",quality));
+      const cx=canvas.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,w,h);cx.drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL("image/jpeg",quality)); // PNG는 용량이 5~10배라 JPEG로 통일 (Firestore 문서 1MiB 한도)
     };
     img.src=e.target.result;
   };
@@ -1296,6 +1296,7 @@ function Board() {
   const [issueFilter, setIssueFilter] = useState("open");
   const dataRef = useRef(data); dataRef.current = data;
   const busyRef = useRef(false);
+  const errShownRef = useRef(false);
   const pendingRef = useRef(0);          // 진행 중인 저장 요청 수
   const queueRef = useRef(Promise.resolve()); // 저장 요청 직렬화 큐
   const addingRef = useRef(false);
@@ -1385,8 +1386,15 @@ function Board() {
       if(remote){Object.keys(remote).forEach((k)=>{if(!(k in merged))merged[k]=remote[k];});}
       await setDoc(BOARD_REF(),merged);
       // 뒤따르는 저장이 남아 있으면 화면을 덮어쓰지 않는다 (마지막 저장이 최신 상태로 반영)
-      if(pendingRef.current===1){dataRef.current=merged;setData(merged);setSaveState("saved");setTimeout(()=>setSaveState("idle"),1500);}
-    } catch(e){setSaveState("error");} finally{pendingRef.current=Math.max(0,pendingRef.current-1);if(pendingRef.current===0)busyRef.current=false;}
+      if(pendingRef.current===1){errShownRef.current=false;dataRef.current=merged;setData(merged);setSaveState("saved");setTimeout(()=>setSaveState("idle"),1500);}
+    } catch(e){
+      setSaveState("error");
+      if(!errShownRef.current){
+        errShownRef.current=true;
+        let kb="?";try{kb=Math.round(new Blob([JSON.stringify(dataRef.current)]).size/1024);}catch(_){}
+        alert(`⚠ 저장에 실패했습니다. 이 화면의 변경 내용은 서버에 저장되지 않았고, 새로고침하면 사라집니다.\n\n원인: ${e?.code||""} ${e?.message||e}\n현재 데이터 크기: 약 ${kb}KB (Firestore 문서 한도 1,024KB)\n\n새로고침하지 말고 [JSON 내려받기]로 먼저 백업해 주세요.`);
+      }
+    } finally{pendingRef.current=Math.max(0,pendingRef.current-1);if(pendingRef.current===0)busyRef.current=false;}
     };
     queueRef.current=queueRef.current.then(job,job);
     return queueRef.current;
