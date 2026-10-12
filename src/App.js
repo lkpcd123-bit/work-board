@@ -385,6 +385,16 @@ function IssueInput({planId,onAdd}){
     </div>
   );
 }
+// Firestore 문서 1MiB 한도 대응: 150KB 넘는 base64 이미지를 JPEG 1000px/q0.7로 재압축할 [원본,축소본] 목록 반환 (이미 작으면 없음)
+const shrinkBigImages=async(d)=>{
+  const big=[...new Set(JSON.stringify(d).match(/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]{150000,}/g)||[])];
+  const pairs=[];
+  for(const old of big){
+    const nu=await new Promise((res)=>{const im=new Image();im.onerror=()=>res(old);im.onload=()=>{if(old.startsWith("data:image/jpeg")&&Math.max(im.width,im.height)<=1000)return res(old);const k=Math.min(1,1000/Math.max(im.width,im.height));const c=document.createElement("canvas");c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",0.7));};im.src=old;});
+    if(nu.length<old.length)pairs.push([old,nu]);
+  }
+  return pairs;
+};
 const resizeImage=(file,maxW=800,maxH=800,quality=0.75)=>new Promise((resolve)=>{
   const reader=new FileReader();
   reader.onload=(e)=>{
@@ -1401,6 +1411,15 @@ function Board() {
   }, []);
 
   const mkLog=(action,task,detail)=>({id:uid(),ts:Date.now(),who:me||"익명",taskId:task?.id||null,taskTitle:task?.title||"",action,detail:detail||""});
+
+  // 로그인 후 1회: 큰 이미지 재압축 → 문서 용량 확보 (최신 데이터에 치환 적용이라 그 사이 편집은 보존)
+  useEffect(()=>{
+    if(!ready||!me||!canEdit)return;
+    shrinkBigImages(dataRef.current).then((pairs)=>{
+      if(!pairs.length)return;
+      commit((d)=>{let t=JSON.stringify(d);pairs.forEach(([o,n])=>{t=t.split(o).join(n);});return JSON.parse(t);},[mkLog("이미지 용량 최적화",null,`${pairs.length}개 재압축`)]);
+    });
+  },[ready,me]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const live=useMemo(()=>data.tasks.filter((t)=>!t.deleted&&!t.archived&&(t.boardId||"공용")===curBoard),[data.tasks,curBoard]);
   const archived=useMemo(()=>data.tasks.filter((t)=>!t.deleted&&t.archived&&(t.boardId||"공용")===curBoard),[data.tasks,curBoard]);
