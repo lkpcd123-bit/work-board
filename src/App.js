@@ -575,6 +575,72 @@ function RichReportEditor({ value, onChange, apiRef, placeholder }) {
     </div>
   );
 }
+// ── 메모 서식: **굵게** {r}빨강{/r} {c}가운데  "• " "- " "1. " 목록(탭=들여쓰기)  | 표 | ──
+const renderNoteInline = (t) => t.split(/(\*\*.+?\*\*|\{r\}.+?\{\/r\})/g).map((p, i) => {
+  if (p.length > 4 && p.startsWith("**") && p.endsWith("**")) return <b key={i}>{renderNoteInline(p.slice(2, -2))}</b>;
+  if (p.startsWith("{r}") && p.endsWith("{/r}")) return <span key={i} style={{ color: "#CA3521", fontWeight: 700 }}>{renderNoteInline(p.slice(3, -4))}</span>;
+  return <React.Fragment key={i}>{p}</React.Fragment>;
+});
+const renderNoteText = (text) => {
+  const lines = (text || "").replace(/\r/g, "").split("\n");
+  const isRow = (l) => /^\s*\|.*\|\s*$/.test(l || "");
+  const cells = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (isRow(lines[i]) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] || "")) {
+      const head = cells(lines[i]), rows = [];
+      i += 2;
+      while (i < lines.length && isRow(lines[i])) { rows.push(cells(lines[i])); i++; }
+      i--;
+      out.push(
+        <div key={i} className="note-tbl-wrap"><table className="note-tbl">
+          <thead><tr>{head.map((c, k) => <th key={k}>{renderNoteInline(c)}</th>)}</tr></thead>
+          <tbody>{rows.map((r, a) => <tr key={a}>{r.map((c, k) => <td key={k}>{renderNoteInline(c)}</td>)}</tr>)}</tbody>
+        </table></div>
+      );
+      continue;
+    }
+    let line = lines[i], center = false;
+    if (line.startsWith("{c}")) { center = true; line = line.slice(3); }
+    if (!line.trim()) { out.push(<div key={i} style={{ height: 8 }} />); continue; }
+    const lead = line.match(/^[\t ]*/)[0];
+    const level = (lead.match(/\t/g) || []).length + Math.floor(lead.replace(/\t/g, "").length / 2);
+    const rest = line.slice(lead.length);
+    const m = rest.match(/^(•|-|\d+\.)\s+(.*)$/);
+    if (m) {
+      out.push(
+        <div key={i} style={{ paddingLeft: level * 18, display: "flex", gap: 6, lineHeight: 1.6 }}>
+          <span style={{ flexShrink: 0, color: "var(--ink3)" }}>{/^\d/.test(m[1]) ? m[1] : level % 2 ? "◦" : "•"}</span>
+          <span style={{ minWidth: 0 }}>{renderNoteInline(m[2])}</span>
+        </div>
+      );
+      continue;
+    }
+    const isHead = /^\*\*[^*]+\*\*$/.test(rest.trim());
+    out.push(<div key={i} style={{ lineHeight: 1.6, textAlign: center ? "center" : "left", paddingLeft: level * 18, ...(isHead ? { marginTop: 6, fontSize: "1.05em" } : null) }}>{renderNoteInline(rest)}</div>);
+  }
+  return out;
+};
+// 입력 단축키: Tab/Shift+Tab = 줄 들여쓰기·내어쓰기, 목록 줄에서 Enter = 같은 기호 이어쓰기(빈 목록 줄이면 종료)
+const noteKeyDown = (e, val, set) => {
+  if (e.nativeEvent.isComposing) return;
+  const ta = e.target, pos = ta.selectionStart;
+  const put = (next, p) => { set(next); setTimeout(() => ta.setSelectionRange(p, p), 0); };
+  const ls = val.lastIndexOf("\n", pos - 1) + 1;
+  if (e.key === "Tab") {
+    e.preventDefault();
+    if (!e.shiftKey) put(val.slice(0, ls) + "\t" + val.slice(ls), pos + 1);
+    else if (val[ls] === "\t") put(val.slice(0, ls) + val.slice(ls + 1), Math.max(ls, pos - 1));
+    return;
+  }
+  if (e.key === "Enter" && !e.shiftKey && pos === ta.selectionEnd) {
+    const m = val.slice(ls, pos).match(/^(\t*)(•|-)\s(.*)$/);
+    if (!m) return;
+    e.preventDefault();
+    if (!m[3].trim()) put(val.slice(0, ls) + "\n" + val.slice(pos), ls + 1);
+    else { const ins = "\n" + m[1] + m[2] + " "; put(val.slice(0, pos) + ins + val.slice(pos), pos + ins.length); }
+  }
+};
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
@@ -1117,6 +1183,11 @@ const CSS = `
 .memopath{font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:3px;}
 .memotitle{font-size:14.5px;font-weight:800;margin-bottom:4px;}
 .memotext{font-size:13.5px;color:var(--ink2);line-height:1.55;white-space:pre-wrap;word-break:break-word;}
+.note-tbl-wrap{overflow-x:auto;margin:4px 0;white-space:normal;}
+.note-tbl{border-collapse:collapse;font-size:13px;}
+.note-tbl th,.note-tbl td{border:1px solid var(--line2);padding:5px 10px;text-align:left;vertical-align:top;}
+.note-tbl th{background:#F1F2F4;font-weight:700;}
+.note-preview{border:1px dashed var(--line2);border-radius:8px;padding:10px 12px;margin-top:8px;font-size:13.5px;color:var(--ink);word-break:break-word;}
 .rte{min-height:280px;max-height:60vh;overflow-y:auto;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:9px 11px;font-size:14.5px;line-height:1.6;color:var(--ink);word-break:break-word;white-space:pre-wrap;}
 .rte:focus{outline:2px solid var(--pri);outline-offset:-1px;background:#fff;}
 .rte ul{margin:0;padding-left:22px;list-style:disc;}
@@ -3590,7 +3661,7 @@ function Board() {
                     <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setMemoDraft({...m,subs:[...(m.subs||[])]})}>
                       {(m.cat||m.sub)&&<div className="memopath">{[m.cat,m.sub].filter(Boolean).join(" > ")}</div>}
                       {m.title&&<div className="memotitle">{m.title}</div>}
-                      <div className="memotext">{m.text}</div>
+                      <div className="memotext">{renderNoteText(m.text)}</div>
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0}}>
                       <button className="riedit" onClick={()=>setMemoExpand({...memoExpand,[m.id]:!expanded})}>{(m.subs||[]).length>0?`하위 ${(m.subs||[]).length}`:"+하위"}</button>
@@ -5213,7 +5284,12 @@ function Board() {
               </div>
               <div className="fld"><label>소분류 (선택)</label><input value={memoDraft.title||""} onChange={(e)=>setMemoDraft({...memoDraft,title:e.target.value})} placeholder="예) 키워드 아이디어" /></div>
             </div>
-            <div className="fld"><label>내용</label><textarea autoFocus value={memoDraft.text||""} onChange={(e)=>setMemoDraft({...memoDraft,text:e.target.value})} placeholder="메모 내용을 입력하세요" style={{minHeight:100}} /></div>
+            <div className="fld"><label>내용</label>
+              <textarea autoFocus value={memoDraft.text||""} onChange={(e)=>setMemoDraft({...memoDraft,text:e.target.value})}
+                onKeyDown={(e)=>noteKeyDown(e,memoDraft.text||"",(t)=>setMemoDraft((d)=>d?{...d,text:t}:d))}
+                placeholder={"메모 내용을 입력하세요\n**굵게**  {r}빨강{/r}  {c}가운데  · 줄 앞 '• ' 또는 '- ' → 목록, Tab → 들여쓰기, | 표 | 지원"} style={{minHeight:140}} />
+              {(memoDraft.text||"").trim()&&<div className="note-preview"><div style={{fontSize:11,color:"var(--ink3)",marginBottom:6}}>미리보기</div><div className="memotext">{renderNoteText(memoDraft.text)}</div></div>}
+            </div>
           </div>
           <div className="modal-foot">
             {memoDraft.id&&<button className="del" onClick={()=>removeMemo(memoDraft)}>삭제</button>}
