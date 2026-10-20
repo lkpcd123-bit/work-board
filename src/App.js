@@ -594,6 +594,7 @@ function mergeData(r,l) {
   const inbMap=new Map(); [...(r.inboundPlans||[]),...(l.inboundPlans||[])].forEach(t=>{const p=inbMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))inbMap.set(t.id,t);});
   const roMap=new Map(); [...(r.reorderRequests||[]),...(l.reorderRequests||[])].forEach(t=>{const p=roMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))roMap.set(t.id,t);});
   const refMap=new Map(); [...(r.refs||[]),...(l.refs||[])].forEach(t=>{const p=refMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))refMap.set(t.id,t);});
+  const c24kMap=new Map(); [...(r.cafe24_schedules_kualo||[]),...(l.cafe24_schedules_kualo||[])].forEach(t=>{const p=c24kMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))c24kMap.set(t.id,t);});
   const c24Map=new Map(); [...(r.cafe24_schedules||[]),...(l.cafe24_schedules||[])].forEach(t=>{const p=c24Map.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))c24Map.set(t.id,t);});
   const notifMap=new Map(); [...(r.notifications||[]),...(l.notifications||[])].forEach(t=>{const p=notifMap.get(t.id);if(!p||(t.updatedAt||t.ts||0)>=(p.updatedAt||p.ts||0))notifMap.set(t.id,t);});
   const uc=(l.channelsUpdatedAt||0)>=(r.channelsUpdatedAt||0);
@@ -636,6 +637,8 @@ function mergeData(r,l) {
     reorderRequests:[...roMap.values()],
     inboundPlans:[...inbMap.values()],
     cafe24_schedules:[...c24Map.values()],
+    cafe24_schedules_kualo:[...c24kMap.values()],
+    cafe24_token_data_kualo:((l.cafe24_token_data_kualo?.expiry||0)>=(r.cafe24_token_data_kualo?.expiry||0)?l.cafe24_token_data_kualo:r.cafe24_token_data_kualo)||{},
     cafe24_token_data:((l.cafe24_token_data?.expiry||0)>=(r.cafe24_token_data?.expiry||0)?l.cafe24_token_data:r.cafe24_token_data)||{},
     notifications:[...notifMap.values()],
     edProducts:((l.edUpdatedAt||0)>=(r.edUpdatedAt||0))?l.edProducts||{보틀:[],대용량:[],파우치:[]}:r.edProducts||{보틀:[],대용량:[],파우치:[]},
@@ -1228,10 +1231,13 @@ function Board() {
   const [lbZoom, setLbZoom] = useState(1);
   const [lbPan, setLbPan] = useState({x:0,y:0});
   const lbDragRef = useRef(null);
-  const [c24Token, setC24Token] = useState(()=>localStorage.getItem('c24_token')||'');
-  const [c24Expiry, setC24Expiry] = useState(()=>parseInt(localStorage.getItem('c24_expiry')||'0'));
-  const [c24RefreshToken, setC24RefreshToken] = useState(()=>localStorage.getItem('c24_refresh_token')||'');
-  const [c24Schedules, setC24Schedules] = useState(()=>{try{return JSON.parse(localStorage.getItem('c24_schedules')||'[]');}catch(e){return[];}});
+  // 카페24 브랜드: slowrocket(기본) / kualo — 로그인·토큰·스케줄 저장소를 브랜드별로 분리 (키 뒤에 _kualo)
+  const [c24Brand, setC24Brand] = useState(()=>{try{return localStorage.getItem('c24_brand')==='kualo'?'kualo':'slowrocket';}catch(e){return 'slowrocket';}});
+  const c24Sfx=c24Brand==='kualo'?'_kualo':'';
+  const [c24Token, setC24Token] = useState(()=>localStorage.getItem('c24_token'+c24Sfx)||'');
+  const [c24Expiry, setC24Expiry] = useState(()=>parseInt(localStorage.getItem('c24_expiry'+c24Sfx)||'0'));
+  const [c24RefreshToken, setC24RefreshToken] = useState(()=>localStorage.getItem('c24_refresh_token'+c24Sfx)||'');
+  const [c24Schedules, setC24Schedules] = useState(()=>{try{return JSON.parse(localStorage.getItem('c24_schedules'+c24Sfx)||'[]');}catch(e){return[];}});
   const [c24SelProduct, setC24SelProduct] = useState(null);
   const [c24SearchResult, setC24SearchResult] = useState([]);
   const [c24SearchLoading, setC24SearchLoading] = useState(false);
@@ -1241,7 +1247,7 @@ function Board() {
   const [c24OpenSelling, setC24OpenSelling] = useState('T');
   const [c24OpenDisplay, setC24OpenDisplay] = useState('T');
   const [c24CloseAction, setC24CloseAction] = useState('soldout');
-  const [c24Log, setC24Log] = useState(()=>{try{return JSON.parse(localStorage.getItem('c24_log')||'[]');}catch(e){return[];}});
+  const [c24Log, setC24Log] = useState(()=>{try{return JSON.parse(localStorage.getItem('c24_log'+c24Sfx)||'[]');}catch(e){return[];}});
   const [c24EditSchedule, setC24EditSchedule] = useState(null);
   const [c24SubTab, setC24SubTab] = useState('schedule');
   // 상품 편집기
@@ -1978,54 +1984,81 @@ function Board() {
   const C24_MALL='slowrocket';
   const C24_CLIENT_ID='XUlWW7h7N9claZtHu37zhA';
   const C24_REDIRECT='https://work-board-one.vercel.app';
-  const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`].slice(-100);try{localStorage.setItem('c24_log',JSON.stringify(next));}catch(e){}return next;});
+  const c24AddLog=(msg)=>setC24Log((l)=>{const t=new Date().toLocaleTimeString();const next=[...l,`[${t}] ${msg}`].slice(-100);try{localStorage.setItem('c24_log'+c24Sfx,JSON.stringify(next));}catch(e){}return next;});
   // 다른 컴퓨터/GitHub Actions가 갱신한 스케줄을 Firestore에서 받아와 반영 (localStorage는 최초 로딩용 캐시일 뿐)
   useEffect(()=>{
-    if(Array.isArray(data.cafe24_schedules)){
-      const list=data.cafe24_schedules.filter((s)=>!s.deleted);
+    if(Array.isArray(data['cafe24_schedules'+c24Sfx])){
+      const list=data['cafe24_schedules'+c24Sfx].filter((s)=>!s.deleted);
       setC24Schedules(list);
-      try{localStorage.setItem('c24_schedules',JSON.stringify(list));}catch(e){}
+      try{localStorage.setItem('c24_schedules'+c24Sfx,JSON.stringify(list));}catch(e){}
     }
-  },[data.cafe24_schedules]);
+  },[data['cafe24_schedules'+c24Sfx],c24Brand]); // eslint-disable-line react-hooks/exhaustive-deps
   const c24TokenValid=()=>c24TokenRef.current&&c24Expiry>Date.now();
   // 토큰 state가 바뀔 때 ref도 동기화
   useEffect(()=>{c24TokenRef.current=c24Token;},[c24Token]);
   // 다른 컴퓨터/세션에서 인증한 토큰을 Firestore에서 받아와 반영 (localStorage는 최초 로딩용 캐시일 뿐)
   useEffect(()=>{
-    const td=data.cafe24_token_data;
+    const td=data['cafe24_token_data'+c24Sfx];
     if(td&&td.access_token&&td.expiry&&td.expiry>c24Expiry){
       setC24Token(td.access_token);
       setC24Expiry(td.expiry);
       if(td.refresh_token)setC24RefreshToken(td.refresh_token);
       try{
-        localStorage.setItem('c24_token',td.access_token);
-        localStorage.setItem('c24_expiry',td.expiry);
-        if(td.refresh_token)localStorage.setItem('c24_refresh_token',td.refresh_token);
+        localStorage.setItem('c24_token'+c24Sfx,td.access_token);
+        localStorage.setItem('c24_expiry'+c24Sfx,td.expiry);
+        if(td.refresh_token)localStorage.setItem('c24_refresh_token'+c24Sfx,td.refresh_token);
       }catch(e){}
     }
-  },[data.cafe24_token_data]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[data['cafe24_token_data'+c24Sfx],c24Brand]); // eslint-disable-line react-hooks/exhaustive-deps
   const c24SaveSchedules=(list)=>{
     setC24Schedules(list);
-    localStorage.setItem('c24_schedules',JSON.stringify(list));
+    localStorage.setItem('c24_schedules'+c24Sfx,JSON.stringify(list));
     // Firebase에 동기화 (GitHub Actions에서 사용)
-    commit((d)=>({...d,cafe24_schedules:list,updatedAt:Date.now()}),[]);
+    commit((d)=>({...d,['cafe24_schedules'+c24Sfx]:list,updatedAt:Date.now()}),[]);
   };
-  const c24StartOAuth=()=>{
-    const url=`https://${C24_MALL}.cafe24api.com/api/v2/oauth/authorize?response_type=code&client_id=${C24_CLIENT_ID}&redirect_uri=${encodeURIComponent(C24_REDIRECT)}&scope=mall.read_product%2Cmall.write_product`;
-    window.location.href=url;
+  const c24StartOAuth=async()=>{
+    let mall=C24_MALL,cid=C24_CLIENT_ID,redir=C24_REDIRECT;
+    if(c24Brand==='kualo'){
+      try{
+        const r=await fetch('/api/cafe24-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'config',brand:'kualo'})});
+        const c=await r.json();
+        if(!c.client_id){alert(c.message||'쿠알로 인증 설정을 불러오지 못했습니다.');return;}
+        mall=c.mall;cid=c.client_id;redir=c.redirect_uri;
+      }catch(e){alert('쿠알로 인증 설정 조회 실패: '+e.message);return;}
+    }
+    try{localStorage.setItem('c24_brand',c24Brand);}catch(e){}
+    window.location.href=`https://${mall}.cafe24api.com/api/v2/oauth/authorize?response_type=code&client_id=${cid}&redirect_uri=${encodeURIComponent(redir)}&scope=mall.read_product%2Cmall.write_product&state=${c24Brand}`;
+  };
+  // 브랜드 전환: 해당 브랜드의 토큰/스케줄/로그로 화면 상태 교체 (이후 Firestore 값은 동기화 effect가 반영)
+  const c24SwitchBrand=(b)=>{
+    if(b===c24Brand)return;
+    const sx=b==='kualo'?'_kualo':'';
+    const ls=(k)=>{try{return localStorage.getItem(k+sx);}catch(e){return null;}};
+    try{localStorage.setItem('c24_brand',b);}catch(e){}
+    const td=data['cafe24_token_data'+sx]||{};
+    const fl=data['cafe24_schedules'+sx];
+    let sch=[];try{sch=JSON.parse(ls('c24_schedules')||'[]');}catch(e){}
+    if(Array.isArray(fl))sch=fl.filter((x)=>!x.deleted);
+    let lg=[];try{lg=JSON.parse(ls('c24_log')||'[]');}catch(e){}
+    setC24Brand(b);
+    setC24Token(ls('c24_token')||td.access_token||'');
+    setC24Expiry(parseInt(ls('c24_expiry')||td.expiry||'0'));
+    setC24RefreshToken(ls('c24_refresh_token')||td.refresh_token||'');
+    setC24Schedules(sch);setC24Log(lg);
+    setC24SubTab('schedule');setC24SelProduct(null);setC24SearchResult([]);
   };
   const c24SaveToken=(access,expiry,refresh)=>{
     setC24Token(access);setC24Expiry(expiry);
-    localStorage.setItem('c24_token',access);
-    localStorage.setItem('c24_expiry',expiry);
-    if(refresh){setC24RefreshToken(refresh);localStorage.setItem('c24_refresh_token',refresh);}
+    localStorage.setItem('c24_token'+c24Sfx,access);
+    localStorage.setItem('c24_expiry'+c24Sfx,expiry);
+    if(refresh){setC24RefreshToken(refresh);localStorage.setItem('c24_refresh_token'+c24Sfx,refresh);}
     // Firebase에 토큰 동기화 (GitHub Actions에서 사용)
-    commit((d)=>({...d,cafe24_token_data:{access_token:access,expiry,refresh_token:refresh||localStorage.getItem('c24_refresh_token')||''},updatedAt:Date.now()}),[]);
+    commit((d)=>({...d,['cafe24_token_data'+c24Sfx]:{access_token:access,expiry,refresh_token:refresh||localStorage.getItem('c24_refresh_token'+c24Sfx)||''},updatedAt:Date.now()}),[]);
   };
   const c24ExchangeCode=async(code)=>{
     c24AddLog('🔄 인증 코드 수신, 토큰 교환 중...');
     try{
-      const res=await fetch('/api/cafe24-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,grant_type:'authorization_code'})});
+      const res=await fetch('/api/cafe24-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,grant_type:'authorization_code',brand:c24Brand})});
       const data=await res.json();
       if(data.access_token){
         const expiry=Date.now()+(data.expires_in||7200)*1000;
@@ -2036,17 +2069,17 @@ function Board() {
   };
   const c24RefreshAccessToken=async()=>{
     // refresh token은 서버(GitHub Actions)와 공유하는 일회용 값 → 낡은 localStorage 대신 Firestore 최신 값 기준으로 갱신
-    let td=null;try{const snap=await getDoc(BOARD_REF());td=snap.exists()?snap.data().cafe24_token_data:null;}catch(e){}
+    let td=null;try{const snap=await getDoc(BOARD_REF());td=snap.exists()?snap.data()['cafe24_token_data'+c24Sfx]:null;}catch(e){}
     if(td&&td.access_token&&td.expiry-Date.now()>600000){ // 서버가 이미 갱신해 둠 → 그대로 사용
       setC24Token(td.access_token);setC24Expiry(td.expiry);
-      try{localStorage.setItem('c24_token',td.access_token);localStorage.setItem('c24_expiry',td.expiry);if(td.refresh_token)localStorage.setItem('c24_refresh_token',td.refresh_token);}catch(e){}
+      try{localStorage.setItem('c24_token'+c24Sfx,td.access_token);localStorage.setItem('c24_expiry'+c24Sfx,td.expiry);if(td.refresh_token)localStorage.setItem('c24_refresh_token'+c24Sfx,td.refresh_token);}catch(e){}
       return true;
     }
-    const refresh=td?.refresh_token||localStorage.getItem('c24_refresh_token');
+    const refresh=td?.refresh_token||localStorage.getItem('c24_refresh_token'+c24Sfx);
     if(!refresh){c24AddLog('⚠ Refresh Token 없음 - 재로그인 필요');return false;}
     c24AddLog('🔄 토큰 자동 갱신 중...');
     try{
-      const res=await fetch('/api/cafe24-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({grant_type:'refresh_token',refresh_token:refresh})});
+      const res=await fetch('/api/cafe24-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({grant_type:'refresh_token',refresh_token:refresh,brand:c24Brand})});
       const data=await res.json();
       if(data.access_token){
         const expiry=Date.now()+(data.expires_in||7200)*1000;
@@ -2061,7 +2094,7 @@ function Board() {
     if(!t)return;
     const expiry=Date.now()+7200000;
     setC24Token(t.trim());setC24Expiry(expiry);
-    localStorage.setItem('c24_token',t.trim());localStorage.setItem('c24_expiry',expiry);
+    localStorage.setItem('c24_token'+c24Sfx,t.trim());localStorage.setItem('c24_expiry'+c24Sfx,expiry);
     c24AddLog('✅ 토큰 수동 입력 완료');
   };
   const c24SearchProduct=async()=>{
@@ -2069,7 +2102,7 @@ function Board() {
     if(!c24ProductCode.trim()){alert('상품코드를 입력해주세요. (예: P0000BBC)');return;}
     setC24SearchLoading(true);setC24SearchResult([]);
     try{
-      const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'search',token:c24Token,productCode:c24ProductCode.trim().toUpperCase()})});
+      const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'search',brand:c24Brand,token:c24Token,productCode:c24ProductCode.trim().toUpperCase()})});
       const data=await res.json();
       const product=data.product;
       if(product){
@@ -2081,7 +2114,7 @@ function Board() {
   };
   // 마스터 이미지 추가 - 카페24에 즉시 업로드 후 URL만 저장
   const c24Api=async(body)=>{
-    const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,token:c24TokenRef.current})});
+    const res=await fetch('/api/cafe24-product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,brand:c24Brand,token:c24TokenRef.current})});
     return res.json();
   };
 
@@ -2305,6 +2338,12 @@ function Board() {
       return;
     }
     if(code){
+      const st=params.get('state')==='kualo'?'kualo':'slowrocket';
+      if(st!==c24Brand){ // 다른 브랜드로 인증하고 돌아온 경우: 브랜드를 맞춘 뒤 같은 주소로 다시 로드
+        try{localStorage.setItem('c24_brand',st);}catch(e){}
+        window.location.reload();
+        return;
+      }
       setView('cafe24');
       window.history.replaceState({},'',window.location.pathname);
       c24ExchangeCode(code);
@@ -4330,24 +4369,29 @@ function Board() {
 
       {view==="cafe24"&&(
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div style={{display:"flex",gap:8}}>
+            {[{id:"slowrocket",label:"슬로우로켓"},{id:"kualo",label:"쿠알로"}].map((b)=>(
+              <button key={b.id} className={"chip"+(c24Brand===b.id?" sel":"")} onClick={()=>c24SwitchBrand(b.id)}>{b.label}</button>
+            ))}
+          </div>
           {/* 인증 */}
           <div className="panel">
-            <h3 style={{marginBottom:12}}>🔐 카페24 인증</h3>
+            <h3 style={{marginBottom:12}}>🔐 카페24 인증 · {c24Brand==="kualo"?"쿠알로":"슬로우로켓"}</h3>
             {c24TokenValid()
               ?<div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                   <span style={{color:"var(--ok)",fontWeight:700,fontSize:13}}>✅ 인증됨 · {Math.round((c24Expiry-Date.now())/60000)}분 후 만료 (자동 갱신됨)</span>
-                  <button className="btn ghost" onClick={()=>{setC24Token('');setC24Expiry(0);setC24RefreshToken('');localStorage.removeItem('c24_token');localStorage.removeItem('c24_expiry');localStorage.removeItem('c24_refresh_token');c24AddLog('🔓 로그아웃');}}>로그아웃</button>
+                  <button className="btn ghost" onClick={()=>{setC24Token('');setC24Expiry(0);setC24RefreshToken('');localStorage.removeItem('c24_token'+c24Sfx);localStorage.removeItem('c24_expiry'+c24Sfx);localStorage.removeItem('c24_refresh_token'+c24Sfx);c24AddLog('🔓 로그아웃');}}>로그아웃</button>
                 </div>
               :<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                   <button className="btn-save" onClick={c24StartOAuth}>카페24 로그인 &amp; 권한 허용</button>
                   <button className="btn ghost" onClick={c24ManualToken}>토큰 직접 입력</button>
-                  <span style={{fontSize:12,color:"var(--ink3)",alignSelf:"center"}}>* slowrocket.cafe24.com 관리자 계정 필요</span>
+                  <span style={{fontSize:12,color:"var(--ink3)",alignSelf:"center"}}>* {c24Brand==="kualo"?"쿠알로 카페24 몰":"slowrocket.cafe24.com"} 관리자 계정 필요</span>
                 </div>}
           </div>
 
           {/* 서브탭 */}
           <div style={{display:"flex",gap:0,borderBottom:"2px solid var(--line)",marginBottom:0}}>
-            {[{id:"schedule",label:"📅 스케줄"},{id:"editor",label:"✏️ 상품 편집기"}].map((t)=>(
+            {[{id:"schedule",label:"📅 스케줄"},{id:"editor",label:"✏️ 상품 편집기"}].filter((t)=>c24Brand!=="kualo"||t.id==="schedule").map((t)=>(
               <button key={t.id} onClick={()=>setC24SubTab(t.id)}
                 style={{padding:"10px 18px",border:"none",cursor:"pointer",fontSize:13,fontWeight:c24SubTab===t.id?800:500,
                   background:"none",color:c24SubTab===t.id?"#0C66E4":"var(--ink3)",
@@ -4578,7 +4622,7 @@ function Board() {
             <div style={{background:"#1a1a2e",color:"#a8ff78",borderRadius:8,padding:12,fontSize:12,fontFamily:"monospace",maxHeight:200,overflowY:"auto",lineHeight:1.7}}>
               {c24Log.map((l,i)=><div key={i}>{l}</div>)}
             </div>
-            <button className="btn ghost" style={{marginTop:8,fontSize:12}} onClick={()=>{const cleared=['🗑 로그 초기화'];setC24Log(cleared);try{localStorage.setItem('c24_log',JSON.stringify(cleared));}catch(e){}}}>로그 지우기</button>
+            <button className="btn ghost" style={{marginTop:8,fontSize:12}} onClick={()=>{const cleared=['🗑 로그 초기화'];setC24Log(cleared);try{localStorage.setItem('c24_log'+c24Sfx,JSON.stringify(cleared));}catch(e){}}}>로그 지우기</button>
           </div>
         </>}
 

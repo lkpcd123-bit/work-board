@@ -5,8 +5,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
-  const { action, token, productCode, productNo, payload, imageBase64, imageName, imageUrl } = req.body || {};
-  const MALL_ID = 'slowrocket';
+  const { action, token, productCode, productNo, payload, imageBase64, imageName, imageUrl, brand } = req.body || {};
+  const MALL_ID = brand === 'kualo' ? process.env.C24K_MALL_ID : 'slowrocket';
+  if (!MALL_ID) { res.status(500).json({ error: 'missing_env', message: 'Vercel 환경변수 C24K_MALL_ID 를 먼저 설정하세요.' }); return; }
   const BASE = `https://${MALL_ID}.cafe24api.com/api/v2/admin`;
   const H = {
     'Authorization': `Bearer ${token}`,

@@ -7,11 +7,29 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    const { code, grant_type, refresh_token } = body;
-    const CLIENT_ID = 'XUlWW7h7N9claZtHu37zhA';
-    const CLIENT_SECRET = 'nlcR1GFrJpdiFVbUsmt2BD';
-    const MALL_ID = 'slowrocket';
-    const REDIRECT_URI = 'https://work-board-one.vercel.app';
+    const { code, grant_type, refresh_token, brand, action } = body;
+    let CLIENT_ID = 'XUlWW7h7N9claZtHu37zhA';
+    let CLIENT_SECRET = 'nlcR1GFrJpdiFVbUsmt2BD';
+    let MALL_ID = 'slowrocket';
+    let REDIRECT_URI = 'https://work-board-one.vercel.app';
+
+    // 쿠알로: 별도 카페24 몰/앱이라 로그인·토큰이 따로 필요 → Vercel 환경변수(C24K_*)로 주입
+    if (brand === 'kualo') {
+      CLIENT_ID = process.env.C24K_CLIENT_ID;
+      CLIENT_SECRET = process.env.C24K_CLIENT_SECRET;
+      MALL_ID = process.env.C24K_MALL_ID;
+      REDIRECT_URI = process.env.C24K_REDIRECT_URI || REDIRECT_URI;
+      if (!CLIENT_ID || !CLIENT_SECRET || !MALL_ID) {
+        res.status(500).json({ error: 'missing_env', message: 'Vercel 환경변수 C24K_MALL_ID / C24K_CLIENT_ID / C24K_CLIENT_SECRET 을 먼저 설정하세요.' });
+        return;
+      }
+    }
+
+    // 로그인 버튼용 공개 설정 (secret 제외)
+    if (action === 'config') {
+      res.status(200).json({ mall: MALL_ID, client_id: CLIENT_ID, redirect_uri: REDIRECT_URI });
+      return;
+    }
 
     if (grant_type !== 'refresh_token' && !code) {
       res.status(400).json({ error: 'missing_code', message: 'code 파라미터가 없습니다 (요청 본문 파싱 실패 가능성 포함)' });
