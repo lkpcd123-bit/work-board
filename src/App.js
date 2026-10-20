@@ -2035,7 +2035,14 @@ function Board() {
     }catch(e){c24AddLog('❌ 오류: '+e.message);}
   };
   const c24RefreshAccessToken=async()=>{
-    const refresh=localStorage.getItem('c24_refresh_token');
+    // refresh token은 서버(GitHub Actions)와 공유하는 일회용 값 → 낡은 localStorage 대신 Firestore 최신 값 기준으로 갱신
+    let td=null;try{const snap=await getDoc(BOARD_REF());td=snap.exists()?snap.data().cafe24_token_data:null;}catch(e){}
+    if(td&&td.access_token&&td.expiry-Date.now()>600000){ // 서버가 이미 갱신해 둠 → 그대로 사용
+      setC24Token(td.access_token);setC24Expiry(td.expiry);
+      try{localStorage.setItem('c24_token',td.access_token);localStorage.setItem('c24_expiry',td.expiry);if(td.refresh_token)localStorage.setItem('c24_refresh_token',td.refresh_token);}catch(e){}
+      return true;
+    }
+    const refresh=td?.refresh_token||localStorage.getItem('c24_refresh_token');
     if(!refresh){c24AddLog('⚠ Refresh Token 없음 - 재로그인 필요');return false;}
     c24AddLog('🔄 토큰 자동 갱신 중...');
     try{

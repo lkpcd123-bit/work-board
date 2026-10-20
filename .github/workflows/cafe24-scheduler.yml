@@ -5,6 +5,11 @@ on:
     - cron: '*/5 * * * *'  # 5분마다 실행 (매분 설정은 GitHub이 임의로 걸러서 몇 시간씩 밀림)
   workflow_dispatch:      # 수동 실행 버튼
 
+# refresh token은 일회용이라 실행이 겹치면 서로의 토큰을 무효화함 → 한 번에 하나만 실행
+concurrency:
+  group: cafe24-scheduler
+  cancel-in-progress: false
+
 jobs:
   run-scheduler:
     runs-on: ubuntu-latest
@@ -178,17 +183,36 @@ jobs:
 
             if (!accessToken || expiry - Date.now() < 600000) {
               console.log('토큰 갱신 중...');
-              const newToken = await refreshToken(tokenData.refresh_token);
-              accessToken = newToken.access_token;
-              expiry = Date.now() + (newToken.expires_in || 7200) * 1000;
-              const newTokenData = {
-                ...tokenData,
-                access_token: accessToken,
-                expiry,
-                refresh_token: newToken.refresh_token || tokenData.refresh_token,
-              };
-              await firestoreUpdate({ cafe24_token_data: toFirestoreValue(newTokenData) });
-              console.log('토큰 갱신 완료');
+              let base = tokenData, newToken = null;
+              try {
+                newToken = await refreshToken(base.refresh_token);
+              } catch (e) {
+                // 웹앱 등 다른 곳이 먼저 갱신했을 수 있음 → Firestore 최신 토큰으로 1회 재확인
+                const latest = parseValue(((await firestoreGet()).fields || {}).cafe24_token_data) || {};
+                if (latest.access_token && latest.expiry - Date.now() > 600000) {
+                  accessToken = latest.access_token; expiry = latest.expiry;
+                  console.log('다른 곳에서 이미 갱신된 토큰 사용');
+                } else if (latest.refresh_token && latest.refresh_token !== base.refresh_token) {
+                  base = latest;
+                  newToken = await refreshToken(base.refresh_token);
+                } else throw e;
+              }
+              if (newToken) {
+                accessToken = newToken.access_token;
+                expiry = Date.now() + (newToken.expires_in || 7200) * 1000;
+                const newTokenData = {
+                  ...base,
+                  access_token: accessToken,
+                  expiry,
+                  refresh_token: newToken.refresh_token || base.refresh_token,
+                };
+                // 새 refresh token은 이 저장이 유일한 기록 → 실패하면 토큰 체인이 끊기므로 재시도
+                for (let i = 0; ; i++) {
+                  try { await firestoreUpdate({ cafe24_token_data: toFirestoreValue(newTokenData) }); break; }
+                  catch (e) { if (i >= 3) throw e; await new Promise(r => setTimeout(r, 1000 * (i + 1))); }
+                }
+                console.log('토큰 갱신 완료');
+              }
             }
 
             // 스케줄 실행
