@@ -167,6 +167,8 @@ jobs:
 
             // ── 메인 로직 ──────────────────────────────────────────
             const now = new Date();
+            // 스케줄 시각(openAt/closeAt)은 시간대 표시 없는 한국 시간 → 러너(UTC)에서 9시간 밀리지 않게 +09:00로 해석
+            const kst = (t) => new Date(/(Z|[+-]\d{2}:?\d{2})$/i.test(t) ? t : t + '+09:00');
             console.log(`[${now.toISOString()}] 스케줄 체크 시작`);
 
             const doc = await firestoreGet();
@@ -224,7 +226,7 @@ jobs:
               const item = { ...s };
 
               // 오픈 처리
-              if (item.openAt && !item.openDone && new Date(item.openAt) <= now) {
+              if (item.openAt && !item.openDone && kst(item.openAt) <= now) {
                 console.log(`🟢 오픈 실행: #${item.productNo} ${item.productName}`);
                 const payload = { selling: item.openSelling || 'T', display: item.openDisplay || 'T' };
                 const ok = await updateProduct(accessToken, item.productNo, payload);
@@ -233,7 +235,7 @@ jobs:
               }
 
               // 종료 처리
-              if (item.closeAt && !item.closeDone && new Date(item.closeAt) <= now) {
+              if (item.closeAt && !item.closeDone && kst(item.closeAt) <= now) {
                 console.log(`🔴 종료 실행: #${item.productNo} ${item.productName} (처리: ${item.closeAction || 'soldout'})`);
                 let ok;
                 if (item.closeAction === 'hide') {
