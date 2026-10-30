@@ -4571,7 +4571,9 @@ function Board() {
                 done:{border:"1.5px solid #1F845A",bg:"#DCFFF1",badge:"#1F845A",badgeColor:"#fff",label:"완료",icon:"✅"},
                 error:{border:"1.5px solid #CA3521",bg:"#FFECEB",badge:"#CA3521",badgeColor:"#fff",label:"오류",icon:"❌"},
               };
-              return c24Schedules.map((s)=>{
+              // 종료일 빠른 순 (종료일 없는 건 맨 뒤). 'YYYY-MM-DDTHH:mm' 문자열이라 사전순 = 시간순
+              const byClose=(a,b)=>(a.closeAt?0:1)-(b.closeAt?0:1)||(a.closeAt<b.closeAt?-1:a.closeAt>b.closeAt?1:0);
+              return [...c24Schedules].sort(byClose).map((s)=>{
                 const phase=getPhase(s);
                 const ps=phaseStyle[phase];
                 // 타임라인 진행률 계산
