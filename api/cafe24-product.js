@@ -11,7 +11,8 @@ export default async function handler(req, res) {
   const BASE = `https://${MALL_ID}.cafe24api.com/api/v2/admin`;
   const H = {
     'Authorization': `Bearer ${token}`,
-    'X-Cafe24-Api-Version': '2026-03-01',
+    // 쿠알로 앱은 신규 앱이라 2026-03-01 버전이 거부됨(400) → 앱 기본 버전 사용. 슬로우로켓은 기존 버전 유지
+    'X-Cafe24-Api-Version': brand === 'kualo' ? '2026-09-01' : '2026-03-01',
     'Content-Type': 'application/json',
   };
 
