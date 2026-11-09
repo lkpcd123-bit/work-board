@@ -897,6 +897,9 @@ const CSS = `
 .addrow{display:flex;gap:7px;margin-top:8px;}
 .addrow input{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;}
 .hinput{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;font-family:inherit;resize:vertical;min-height:38px;max-height:160px;line-height:1.5;}
+.modal.mly{max-width:760px;}
+.mly .hinput{min-height:140px;max-height:480px;}
+.mly .fld textarea{min-height:140px;}
 .addrow button{background:var(--pri);color:#fff;padding:8px 14px;font-size:13.5px;font-weight:600;border-radius:6px;}
 .cmt{border-left:3px solid var(--line2);padding:5px 0 5px 11px;margin-bottom:10px;}
 .cmt .ch2{font-size:12px;color:var(--ink3);margin-bottom:4px;font-weight:500;}
@@ -5346,7 +5349,7 @@ function Board() {
       )}
 
       {mlyDraft&&(
-        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMlyDraft(null)}><div className="modal">
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMlyDraft(null)}><div className="modal mly">
           <h2>{mlyDraft._new?"새 월간 항목":"월간 항목 상세"} · {mlyDraft.month}</h2>
           <div className="modal-body">
             <div className="fld"><label>제목</label><input autoFocus value={mlyDraft.title} onChange={(e)=>setMlyDraft({...mlyDraft,title:e.target.value})} placeholder="예) 월 마감 재고 확인" /></div>
