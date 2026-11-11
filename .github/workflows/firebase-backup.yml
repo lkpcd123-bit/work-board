@@ -58,7 +58,7 @@ jobs:
             if (Array.isArray(data.refs)) {
               data.refs = data.refs.map(r => ({
                 ...r,
-                images: (r.images || []).map(img => ({ ...img, src: '[base64 omitted]' }))
+                images: (r.images || []).map(img => ({ ...img, src: String(img.src || '').startsWith('data:') ? '[base64 omitted]' : img.src }))
               }));
             }
 

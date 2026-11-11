@@ -384,15 +384,25 @@ function IssueInput({planId,onAdd}){
     </div>
   );
 }
-// Firestore 문서 1MiB 한도 대응: 150KB 넘는 base64 이미지를 JPEG 1000px/q0.7로 재압축할 [원본,축소본] 목록 반환 (이미 작으면 없음)
-const shrinkBigImages=async(d)=>{
-  const big=[...new Set(JSON.stringify(d).match(/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]{150000,}/g)||[])];
-  const pairs=[];
-  for(const old of big){
-    const nu=await new Promise((res)=>{const im=new Image();im.onerror=()=>res(old);im.onload=()=>{if(old.startsWith("data:image/jpeg")&&Math.max(im.width,im.height)<=1000)return res(old);const k=Math.min(1,1000/Math.max(im.width,im.height));const c=document.createElement("canvas");c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",0.7));};im.src=old;});
-    if(nu.length<old.length)pairs.push([old,nu]);
+// 큰 base64 이미지는 구글 드라이브에 올리고 문서에는 URL만 저장 (Firestore 1MiB 한도 대응). 실패하면 base64 그대로 두고 1분 뒤 재시도
+const IMG_RE=/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]{8000,}/g;
+const hasBigImg=(d)=>(JSON.stringify(d).match(IMG_RE)||[]).length>0;
+const driveCache=new Map();let driveDownUntil=0;
+const externalizeImages=async(d)=>{
+  const found=[...new Set(JSON.stringify(d).match(IMG_RE)||[])];
+  if(!found.length||Date.now()<driveDownUntil)return d;
+  let t=JSON.stringify(d);
+  for(const u of found){
+    if(!driveCache.has(u)){
+      try{
+        const r=await fetch("/api/drive-upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dataUrl:u})});
+        const j=await r.json();if(!r.ok||!j.url)throw new Error(j.error||r.status);
+        driveCache.set(u,j.url);
+      }catch(e){driveDownUntil=Date.now()+60000;break;}
+    }
+    t=t.split(u).join(driveCache.get(u));
   }
-  return pairs;
+  return JSON.parse(t);
 };
 const resizeImage=(file,maxW=800,maxH=800,quality=0.75)=>new Promise((resolve)=>{
   const reader=new FileReader();
@@ -1321,7 +1331,7 @@ function Board() {
       merged.updatedAt=Date.now();
       // 안전망: remote에 있지만 merged에 없는 필드는 보존 (구버전 코드가 알 수 없는 필드를 지우는 것 방지)
       if(remote){Object.keys(remote).forEach((k)=>{if(!(k in merged))merged[k]=remote[k];});}
-      const out=slimDeleted(merged); // 삭제 항목 내용 비우기 (1MiB 한도)
+      const out=await externalizeImages(slimDeleted(merged)); // 삭제 항목 비우기 + 큰 이미지는 드라이브로 (1MiB 한도)
       await setDoc(BOARD_REF(),out);
       // 뒤따르는 저장이 남아 있으면 화면을 덮어쓰지 않는다 (마지막 저장이 최신 상태로 반영)
       if(pendingRef.current===1){errShownRef.current=false;dataRef.current=out;setData(out);setSaveState("saved");setTimeout(()=>setSaveState("idle"),1500);}
@@ -1340,19 +1350,10 @@ function Board() {
 
   const mkLog=(action,task,detail)=>({id:uid(),ts:Date.now(),who:me||"익명",taskId:task?.id||null,taskTitle:task?.title||"",action,detail:detail||""});
 
-  // 로그인 후 1회: 큰 이미지 재압축 → 문서 용량 확보 (최신 데이터에 치환 적용이라 그 사이 편집은 보존)
-  useEffect(()=>{
-    if(!ready||!me||!canEdit)return;
-    shrinkBigImages(dataRef.current).then((pairs)=>{
-      if(!pairs.length)return;
-      commit((d)=>{let t=JSON.stringify(d);pairs.forEach(([o,n])=>{t=t.split(o).join(n);});return JSON.parse(t);},[mkLog("이미지 용량 최적화",null,`${pairs.length}개 재압축`)]);
-    });
-  },[ready,me]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // 로그인 후 1회: 삭제된 항목이 내용을 들고 있으면 비워서 저장 (문서 용량 확보)
   useEffect(()=>{
     if(!ready||!me||!canEdit)return;
-    if(slimDeleted(dataRef.current)!==dataRef.current)commit((d)=>d,[]);
+    if(slimDeleted(dataRef.current)!==dataRef.current||hasBigImg(dataRef.current))commit((d)=>d,[]);
   },[ready,me]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const live=useMemo(()=>data.tasks.filter((t)=>!t.deleted&&!t.archived&&(t.boardId||"공용")===curBoard),[data.tasks,curBoard]);
