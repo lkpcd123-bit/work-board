@@ -34,7 +34,6 @@ const COLUMNS = [
   { id: "issuecol", label: "이슈" },
   { id: "done", label: "완료" },
 ];
-const BOARDS = ["공용","김현민"];
 const CKTABS = [{id:"checklist",label:"체크리스트"},{id:"event",label:"행사 원복"},{id:"product",label:"상품 원복"}];
 const DEFAULT_CHANNELS = [
   { id: "공통", color: "#7A8189" },
@@ -420,161 +419,6 @@ const readFileAsBase64=(file)=>new Promise((resolve)=>{
   reader.readAsDataURL(file);
 });
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
-const dowKr = (dateStr) => { if(!dateStr) return ""; const d=new Date(dateStr+"T00:00:00"); return ["일","월","화","수","목","금","토"][d.getDay()]; };
-// ── 일보고 등 "- 항목 / 들여쓰기 / **굵게** / *기울임* / __밑줄__" 아웃라인 텍스트 렌더링 ──
-const OUTLINE_BULLETS = ["•", "◦", "–", "–"];
-const renderFormattedSpans = (text) => {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__)/g);
-  return parts.map((p, i) => {
-    if (p.startsWith("**") && p.endsWith("**") && p.length > 3) return <b key={i}>{p.slice(2, -2)}</b>;
-    if (p.startsWith("__") && p.endsWith("__") && p.length > 3) return <u key={i}>{p.slice(2, -2)}</u>;
-    if (p.startsWith("*") && p.endsWith("*") && p.length > 1) return <i key={i}>{p.slice(1, -1)}</i>;
-    return <React.Fragment key={i}>{p}</React.Fragment>;
-  });
-};
-const renderOutlineText = (text) => {
-  const lines = (text || "").split("\n");
-  return lines.map((line, i) => {
-    const m = line.match(/^(\s*)[-•*]\s?(.*)$/);
-    if (m) {
-      const indent = m[1].replace(/\t/g, "  ").length;
-      const level = Math.min(Math.floor(indent / 2), OUTLINE_BULLETS.length - 1);
-      return (
-        <div key={i} style={{ paddingLeft: level * 20, display: "flex", gap: 6, lineHeight: 1.6 }}>
-          <span style={{ flexShrink: 0, color: "var(--ink3)" }}>{OUTLINE_BULLETS[level]}</span>
-          <span>{renderFormattedSpans(m[2])}</span>
-        </div>
-      );
-    }
-    if (!line.trim()) return <div key={i} style={{ height: 6 }} />;
-    return <div key={i} style={{ lineHeight: 1.6 }}>{renderFormattedSpans(line)}</div>;
-  });
-};
-
-// ── 일보고 WYSIWYG 에디터: 저장 포맷은 기존 마크다운 그대로, 화면만 서식 적용 ──
-const rteEsc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const rteInline = (s) => rteEsc(s)
-  .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
-  .replace(/__([^_]+)__/g, "<u>$1</u>")
-  .replace(/\*([^*]+)\*/g, "<i>$1</i>")
-  .replace(/^ +/, (sp) => "&nbsp;".repeat(sp.length));
-const mdToEditorHtml = (md) => {
-  let html = "", depth = 0;
-  (md || "").split("\n").forEach((line) => {
-    const m = line.match(/^(\s*)(?:[-•]|\*(?=\s))\s?(.*)$/);
-    if (m) {
-      const target = Math.floor(m[1].replace(/\t/g, "  ").length / 2) + 1;
-      while (depth < target) { html += "<ul>"; depth++; }
-      while (depth > target) { html += "</ul>"; depth--; }
-      html += "<li>" + (rteInline(m[2]) || "<br>") + "</li>";
-    } else {
-      while (depth > 0) { html += "</ul>"; depth--; }
-      html += "<div>" + (rteInline(line) || "<br>") + "</div>";
-    }
-  });
-  while (depth > 0) { html += "</ul>"; depth--; }
-  return html;
-};
-const editorToMd = (root) => {
-  const lines = []; let buf = "", prefix = "", open = false, fresh = false;
-  const push = () => { if (open && !(fresh && !buf && !prefix)) lines.push(prefix + buf); buf = ""; prefix = ""; open = false; fresh = false; };
-  const start = (p) => { push(); prefix = p; open = true; fresh = !p; };
-  const BLOCK = { DIV: 1, P: 1, LI: 1, UL: 1, OL: 1, BLOCKQUOTE: 1, H1: 1, H2: 1, H3: 1 };
-  const walk = (n, depth) => {
-    if (n.nodeType === 3) { n.nodeValue.replace(/\u00a0/g, " ").replace(/\u200b/g, "").split("\n").forEach((part, i) => { if (i > 0) push(); open = true; fresh = false; buf += part; }); return; }
-    if (n.nodeType !== 1) return;
-    const tag = n.tagName;
-    if (tag === "BR") {
-      const isLast = !n.nextSibling && (n.parentNode === root || BLOCK[n.parentNode.tagName]);
-      fresh = false;
-      if (isLast) { open = true; return; }
-      open = true; push(); open = true; return;
-    }
-    if (tag === "UL" || tag === "OL") { push(); n.childNodes.forEach((c) => walk(c, depth + 1)); return; }
-    if (tag === "LI") { start("  ".repeat(Math.max(0, depth - 1)) + "- "); n.childNodes.forEach((c) => walk(c, depth)); push(); return; }
-    if (BLOCK[tag]) { start(""); n.childNodes.forEach((c) => walk(c, depth)); push(); return; }
-    const st = n.style || {};
-    const fw = st.fontWeight;
-    const mark = (tag === "B" || tag === "STRONG" || fw === "bold" || +fw >= 600) ? "**"
-      : (tag === "I" || tag === "EM" || st.fontStyle === "italic") ? "*"
-      : (tag === "U" || (st.textDecoration || "").includes("underline") || (st.textDecorationLine || "").includes("underline")) ? "__" : "";
-    const from = buf.length, lc = lines.length;
-    n.childNodes.forEach((c) => walk(c, depth));
-    if (mark && lines.length === lc) {
-      const inner = buf.slice(from);
-      const mm = inner.match(/^(\s*)([\s\S]*?)(\s*)$/);
-      if (mm[2]) buf = buf.slice(0, from) + mm[1] + mark + mm[2] + mark + mm[3];
-    }
-  };
-  root.childNodes.forEach((c) => walk(c, 0));
-  push();
-  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
-  return lines.join("\n");
-};
-function RichReportEditor({ value, onChange, apiRef, placeholder }) {
-  const ref = useRef(null);
-  const lastMd = useRef(null);
-  useEffect(() => {
-    if (!ref.current) return;
-    if (value !== lastMd.current) { ref.current.innerHTML = mdToEditorHtml(value); lastMd.current = value; }
-  }, [value]);
-  useEffect(() => {
-    try { document.execCommand("styleWithCSS", false, false); document.execCommand("defaultParagraphSeparator", false, "div"); } catch (e) {}
-    const el = ref.current; if (!el) return;
-    el.focus();
-    const r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
-    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
-  }, []);
-  const sync = () => { if (!ref.current) return; const md = editorToMd(ref.current); lastMd.current = md; onChange(md); };
-  const inList = () => {
-    const s = window.getSelection(); if (!s || !s.anchorNode) return false;
-    let n = s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentNode;
-    while (n && n !== ref.current) { if (n.tagName === "LI") return true; n = n.parentNode; }
-    return false;
-  };
-  const exec = (cmd, arg = null) => { ref.current && ref.current.focus(); document.execCommand(cmd, false, arg); sync(); };
-  const indent = (dir) => {
-    if (inList()) exec(dir > 0 ? "indent" : "outdent");
-    else if (dir > 0) exec("insertText", "\u00a0\u00a0");
-  };
-  if (apiRef) apiRef.current = {
-    bold: () => exec("bold"), italic: () => exec("italic"), underline: () => exec("underline"),
-    bullet: () => exec("insertUnorderedList"), indent,
-  };
-  const onKeyDown = (e) => {
-    if (e.nativeEvent.isComposing) return;
-    const mod = e.ctrlKey || e.metaKey;
-    if (e.key === "Tab") { e.preventDefault(); indent(e.shiftKey ? -1 : 1); return; }
-    if (mod && (e.key === "b" || e.key === "B")) { e.preventDefault(); exec("bold"); return; }
-    if (mod && (e.key === "i" || e.key === "I")) { e.preventDefault(); exec("italic"); return; }
-    if (mod && (e.key === "u" || e.key === "U")) { e.preventDefault(); exec("underline"); return; }
-    // 줄 맨 앞에서 "- " 입력 → 글머리 목록으로 변환
-    if (e.key === " " && !inList()) {
-      const s = window.getSelection(); if (!s || !s.isCollapsed) return;
-      const r = s.getRangeAt(0).cloneRange();
-      let blk = s.anchorNode; while (blk && blk !== ref.current && !(blk.nodeType === 1 && (blk.tagName === "DIV" || blk.tagName === "P"))) blk = blk.parentNode;
-      const pre = document.createRange(); pre.selectNodeContents(blk || ref.current); pre.setEnd(r.endContainer, r.endOffset);
-      if (pre.toString().replace(/\u00a0/g, " ").trim() === "-" && /-$/.test(pre.toString())) {
-        e.preventDefault();
-        document.execCommand("delete");
-        exec("insertUnorderedList");
-      }
-    }
-  };
-  const onPaste = (e) => {
-    e.preventDefault();
-    const t = (e.clipboardData || window.clipboardData).getData("text/plain");
-    document.execCommand("insertText", false, t);
-    sync();
-  };
-  return (
-    <div style={{ position: "relative" }}>
-      {!(value || "").trim() && <div className="rte-ph">{placeholder}</div>}
-      <div ref={ref} className="rte" contentEditable suppressContentEditableWarning
-        onInput={sync} onKeyDown={onKeyDown} onPaste={onPaste} onBlur={sync} />
-    </div>
-  );
-}
 // ── 메모 서식: **굵게** {r}빨강{/r} {c}가운데  "• " "- " "1. " 목록(탭=들여쓰기)  | 표 | ──
 const renderNoteInline = (t) => t.split(/(\*\*.+?\*\*|\{r\}.+?\{\/r\})/g).map((p, i) => {
   if (p.length > 4 && p.startsWith("**") && p.endsWith("**")) return <b key={i}>{renderNoteInline(p.slice(2, -2))}</b>;
@@ -1191,13 +1035,6 @@ const CSS = `
 .note-tbl th,.note-tbl td{border:1px solid var(--line2);padding:5px 10px;text-align:left;vertical-align:top;}
 .note-tbl th{background:#F1F2F4;font-weight:700;}
 .note-preview{border:1px dashed var(--line2);border-radius:8px;padding:10px 12px;margin-top:8px;font-size:13.5px;color:var(--ink);word-break:break-word;}
-.rte{min-height:280px;max-height:60vh;overflow-y:auto;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:9px 11px;font-size:14.5px;line-height:1.6;color:var(--ink);word-break:break-word;white-space:pre-wrap;}
-.rte:focus{outline:2px solid var(--pri);outline-offset:-1px;background:#fff;}
-.rte ul{margin:0;padding-left:22px;list-style:disc;}
-.rte ul ul{list-style:circle;}
-.rte ul ul ul{list-style:square;}
-.rte li{margin:1px 0;}
-.rte-ph{position:absolute;top:10px;left:12px;right:12px;font-size:13px;color:var(--ink3);pointer-events:none;line-height:1.5;}
 .memosubs{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px;}
 
 `;
@@ -1210,7 +1047,6 @@ const ALL_TABS=[
   {id:"monthly",label:"월간 업무"},
   {id:"checklist",label:"체크리스트"},
   {id:"memo",label:"메모"},
-  {id:"report",label:"일보고"},
   {id:"mindmap",label:"마인드맵"},
   {id:"ref",label:"래퍼런스"},
   {id:"schedule",label:"시간표"},
@@ -1292,13 +1128,6 @@ function Board() {
   const [memoDrag, setMemoDrag] = useState(null);
   const [memoSubText, setMemoSubText] = useState({});
   const [memoSubEditId, setMemoSubEditId] = useState(null);
-  const [reportQuery, setReportQuery] = useState("");
-  const [reportCatFilter, setReportCatFilter] = useState("전체");
-  const [reportDraft, setReportDraft] = useState(null);
-  const [reportExpand, setReportExpand] = useState({});
-  const [reportSubText, setReportSubText] = useState({});
-  const reportTaRef = useRef(null);
-  const [reportSubEditId, setReportSubEditId] = useState(null);
   const [notifOn, setNotifOn] = useState(typeof Notification !== "undefined" && Notification.permission === "granted");
   const [notifBoxOpen, setNotifBoxOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
@@ -1375,7 +1204,7 @@ function Board() {
   const [subTarget, setSubTarget] = useState(null);
   const [grpBy, setGrpBy] = useState("status");
   const [collapsed, setCollapsed] = useState({});
-  const [curBoard, setCurBoard] = useState("공용");
+  const curBoard = "김현민"; // 공용 보드는 제거됨 (공용 업무 데이터는 그대로 보존, 화면에서만 숨김)
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [issueDetail, setIssueDetail] = useState(null);
@@ -1973,56 +1802,6 @@ function Board() {
     commit((d)=>({...d,memoItems:(d.memoItems||[]).map((x)=>x.id===memoId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
   };
 
-  /* ── 일보고 (메모와 동일 구조) ── */
-  const reportItems=useMemo(()=>(data.reportItems||[]).filter((x)=>!x.deleted),[data.reportItems]);
-  const reportCatNames=useMemo(()=>[...new Set(reportItems.map((x)=>x.cat).filter(Boolean))].sort(),[reportItems]);
-  const reportSubNames=useMemo(()=>(cat)=>[...new Set(reportItems.filter((x)=>x.cat===cat).map((x)=>x.sub).filter(Boolean))].sort(),[reportItems]);
-  const reportFiltered=useMemo(()=>{
-    let list=reportItems;
-    if(reportCatFilter!=="전체")list=list.filter((x)=>(x.cat||"미분류")===reportCatFilter);
-    const q=reportQuery.trim().toLowerCase();
-    if(q)list=list.filter((x)=>`${x.cat||""} ${x.sub||""} ${x.title||""} ${x.text||""} ${(x.subs||[]).map((s)=>s.text).join(" ")}`.toLowerCase().includes(q));
-    return list.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
-  },[reportItems,reportCatFilter,reportQuery]);
-  const reportCatOptions=useMemo(()=>["전체",...new Set(reportItems.map((x)=>x.cat||"미분류"))],[reportItems]);
-  // 버튼으로 서식 넣기 (모바일엔 Tab 키가 없어서 버튼 방식이 훨씬 편함)
-  const reportAddBullet=()=>reportTaRef.current&&reportTaRef.current.bullet();
-  const reportIndent=(dir)=>reportTaRef.current&&reportTaRef.current.indent(dir);
-  const reportBold=()=>reportTaRef.current&&reportTaRef.current.bold();
-  const reportItalic=()=>reportTaRef.current&&reportTaRef.current.italic();
-  const reportUnderline=()=>reportTaRef.current&&reportTaRef.current.underline();
-  const saveReport=(close=true)=>{
-    const text=(reportDraft.text||"").trim();
-    if(!text){alert("일보고 내용을 입력하세요.");return;}
-    const now=Date.now();
-    const date=reportDraft.date||todayStr();
-    if(reportDraft.id){
-      commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportDraft.id?{...x,cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,date,updatedAt:now}:x)}),[mkLog("일보고 수정",null,text.slice(0,30))]);
-    }else{
-      const rec={id:uid(),cat:(reportDraft.cat||"").trim(),sub:(reportDraft.sub||"").trim(),title:(reportDraft.title||"").trim(),text,date,subs:[],createdAt:now,updatedAt:now,createdBy:me};
-      commit((d)=>({...d,reportItems:[...(d.reportItems||[]),rec]}),[mkLog("일보고 생성",null,text.slice(0,30))]);
-      if(!close)setReportDraft({...reportDraft,id:rec.id,date,createdAt:now,updatedAt:now});
-    }
-    if(close)setReportDraft(null);
-  };
-  const removeReport=(m)=>{commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===m.id?{...x,deleted:true,updatedAt:Date.now()}:x)}),[mkLog("일보고 삭제",null,(m.text||"").slice(0,30))]);setReportDraft(null);};
-  const duplicateReport=(m)=>{
-    const now=Date.now();
-    const copy={id:uid(),cat:m.cat,sub:m.sub,title:m.title?m.title+" (복사)":"",text:m.text,date:todayStr(),subs:[],createdAt:now,updatedAt:now,createdBy:me};
-    commit((d)=>({...d,reportItems:[...(d.reportItems||[]),copy]}),[mkLog("일보고 복사",null,(copy.text||"").slice(0,30))]);
-  };
-  const addReportSub=(reportId,text)=>{
-    const t=text.trim();if(!t)return;
-    const sub={id:uid(),text:t,author:me||"익명",ts:Date.now()};
-    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:[...(x.subs||[]),sub],updatedAt:Date.now()}:x)}),[]);
-  };
-  const editReportSub=(reportId,subId,text)=>{
-    const t=text.trim();if(!t)return;
-    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:(x.subs||[]).map((s)=>s.id===subId?{...s,text:t,edited:true}:s),updatedAt:Date.now()}:x)}),[]);
-  };
-  const removeReportSub=(reportId,subId)=>{
-    commit((d)=>({...d,reportItems:(d.reportItems||[]).map((x)=>x.id===reportId?{...x,subs:(x.subs||[]).filter((s)=>s.id!==subId),updatedAt:Date.now()}:x)}),[]);
-  };
 
   /* ── 마인드맵 (계층형) ── */
   const mindmaps=useMemo(()=>(data.mindmaps||[]).filter((m)=>!m.deleted),[data.mindmaps]);
@@ -2821,7 +2600,7 @@ function Board() {
       </div>
       <div className="tabs">
         {visibleTabs.map((t)=>{
-          const badgeMap={board:live.length,routine:rItems.filter((it)=>!(it.checkins||{})[riDate]).length,monthly:mlyByMonth(mlyDate).filter((m)=>!m.done).length,checklist:checkitems.filter((c)=>!c.done).length,memo:memoItems.length,report:reportItems.length,issue:allIssues.filter((i)=>!i.resolved).length,archive:archived.length};
+          const badgeMap={board:live.length,routine:rItems.filter((it)=>!(it.checkins||{})[riDate]).length,monthly:mlyByMonth(mlyDate).filter((m)=>!m.done).length,checklist:checkitems.filter((c)=>!c.done).length,memo:memoItems.length,issue:allIssues.filter((i)=>!i.resolved).length,archive:archived.length};
           const n=badgeMap[t.id]??null;
           return(
           <button key={t.id}
@@ -2859,14 +2638,6 @@ function Board() {
       <div className="page">
 
       {view==="board"&&(<>
-        <div className="boardtabs">
-          {BOARDS.map((b)=>(
-            <button key={b} className={"boardtab"+(curBoard===b?" sel":"")} onClick={()=>setCurBoard(b)}>
-              {b==="공용"?"공용 보드":b+" 보드"}
-              <em>{data.tasks.filter((t)=>!t.deleted&&!t.archived&&(t.boardId||"공용")===b).length}</em>
-            </button>
-          ))}
-        </div>
         <div className="metrics">
           <button className="metric cl" onClick={()=>{setOnlyLate(false);}}><span className="k">전체</span><span className="v">{stats.total}</span></button>
           <div className="metric"><span className="k">진행중</span><span className="v">{stats.doing}</span></div>
@@ -3703,70 +3474,6 @@ function Board() {
         </div>
       )}
 
-      {view==="report"&&(
-        <div>
-          <div className="panel" style={{padding:14,marginBottom:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-              <div style={{fontSize:14,fontWeight:800}}>일보고</div>
-              {canEdit&&<button className="btn-save" onClick={()=>setReportDraft({cat:"",sub:"",title:"",text:"",date:todayStr()})}>+ 일보고 추가</button>}
-            </div>
-            <div style={{display:"flex",gap:7,marginTop:12,flexWrap:"wrap"}}>
-              <input className="inp" style={{flex:1,minWidth:160}} placeholder="검색 (분류·제목·내용·하위항목)" value={reportQuery} onChange={(e)=>setReportQuery(e.target.value)} />
-              <select className="sel" value={reportCatFilter} onChange={(e)=>setReportCatFilter(e.target.value)}>
-                {reportCatOptions.map((c)=><option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {reportFiltered.length===0&&<div className="empty">{reportQuery||reportCatFilter!=="전체"?"조건에 맞는 일보고가 없습니다":"일보고가 없습니다. + 일보고 추가로 시작하세요."}</div>}
-
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {reportFiltered.map((m)=>{
-              const expanded=!!reportExpand[m.id];
-              return (
-                <div key={m.id} className="memocard">
-                  <div className="memohead">
-                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>
-                      <div className="memopath">{m.date&&<b style={{color:"var(--pri)"}}>{m.date} ({dowKr(m.date)}){(m.cat||m.sub)?" · ":""}</b>}{[m.cat,m.sub].filter(Boolean).join(" > ")}</div>
-                      {m.title&&<div className="memotitle">{m.title}</div>}
-                      <div className="memotext">{renderOutlineText(m.text)}</div>
-                    </div>
-                    <div style={{display:"flex",gap:6,flexShrink:0}}>
-                      <button className="riedit" onClick={()=>setReportExpand({...reportExpand,[m.id]:!expanded})}>{(m.subs||[]).length>0?`하위 ${(m.subs||[]).length}`:"+하위"}</button>
-                      {canEdit&&<button className="riedit" onClick={()=>duplicateReport(m)}>복사</button>}
-                      {canEdit&&<button className="riedit" onClick={()=>setReportDraft({...m,subs:[...(m.subs||[])]})}>수정</button>}
-                    </div>
-                  </div>
-                  {expanded&&(
-                    <div className="memosubs">
-                      {(m.subs||[]).length===0&&<span className="hint">하위 항목이 없습니다</span>}
-                      {(m.subs||[]).map((s)=>(
-                        <div key={s.id} className="cmt">
-                          <div className="ch2"><b>{s.author}</b> · {fmtTs(s.ts)}{s.edited&&<span style={{color:"var(--ink3)"}}> (수정됨)</span>}</div>
-                          {reportSubEditId===s.id
-                            ? <textarea className="hinput" defaultValue={s.text} autoFocus style={{width:"100%",marginTop:4}}
-                                onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();editReportSub(m.id,s.id,e.target.value);setReportSubEditId(null);}}
-                                onBlur={(e)=>{editReportSub(m.id,s.id,e.target.value);setReportSubEditId(null);}} />
-                            : <p>{s.text}</p>}
-                          {canEdit&&reportSubEditId!==s.id&&<div style={{display:"flex",gap:10}}>
-                            <button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>setReportSubEditId(s.id)}>수정</button>
-                            <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:11,cursor:"pointer",padding:0}} onClick={()=>removeReportSub(m.id,s.id)}>삭제</button>
-                          </div>}
-                        </div>
-                      ))}
-                      {canEdit&&<div className="addrow">
-                        <textarea className="hinput" placeholder="하위 항목 입력 (Enter 추가, Shift+Enter 줄바꿈)"
-                          value={reportSubText[m.id]||""} onChange={(e)=>setReportSubText({...reportSubText,[m.id]:e.target.value})}
-                          onKeyDown={(e)=>{if(e.nativeEvent.isComposing||e.key!=="Enter"||e.shiftKey)return;e.preventDefault();addReportSub(m.id,reportSubText[m.id]||"");setReportSubText({...reportSubText,[m.id]:""});}} />
-                      </div>}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {view==="issue"&&(
         <div>
@@ -5306,47 +5013,6 @@ function Board() {
         </div></div>
       )}
 
-      {reportDraft&&(
-        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setReportDraft(null)}><div className="modal" style={{maxWidth:720}}>
-          <h2>{reportDraft.id?"일보고 수정":"새 일보고"}</h2>
-          <div className="modal-body">
-            <div className="fld" style={{maxWidth:220}}><label>날짜</label>
-              <input type="date" value={reportDraft.date||todayStr()} onChange={(e)=>setReportDraft({...reportDraft,date:e.target.value})} />
-              {reportDraft.date&&<div style={{fontSize:12,color:"var(--pri)",fontWeight:700,marginTop:4}}>{dowKr(reportDraft.date)}요일</div>}
-            </div>
-            <div className="r3">
-              <div className="fld"><label>대분류 (선택)</label><input list="report-cats" value={reportDraft.cat||""} onChange={(e)=>setReportDraft({...reportDraft,cat:e.target.value})} placeholder="예) 마케팅" />
-                <datalist id="report-cats">{reportCatNames.map((c)=><option key={c} value={c} />)}</datalist>
-              </div>
-              <div className="fld"><label>중분류 (선택)</label><input list="report-subs" value={reportDraft.sub||""} onChange={(e)=>setReportDraft({...reportDraft,sub:e.target.value})} placeholder="예) 브랜드검색" />
-                <datalist id="report-subs">{reportSubNames(reportDraft.cat||"").map((s)=><option key={s} value={s} />)}</datalist>
-              </div>
-              <div className="fld"><label>소분류 (선택)</label><input value={reportDraft.title||""} onChange={(e)=>setReportDraft({...reportDraft,title:e.target.value})} placeholder="예) 키워드 아이디어" /></div>
-            </div>
-            <div className="fld"><label>내용</label>
-              <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onMouseDown={(e)=>e.preventDefault()} onClick={reportAddBullet}>• 점 추가</button>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onMouseDown={(e)=>e.preventDefault()} onClick={()=>reportIndent(1)}>→ 들여쓰기</button>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px"}} onMouseDown={(e)=>e.preventDefault()} onClick={()=>reportIndent(-1)}>← 내어쓰기</button>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontWeight:800}} onMouseDown={(e)=>e.preventDefault()} onClick={reportBold}>B 굵게</button>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",fontStyle:"italic"}} onMouseDown={(e)=>e.preventDefault()} onClick={reportItalic}>I 기울임</button>
-                <button type="button" className="btn ghost" style={{fontSize:12,padding:"5px 12px",textDecoration:"underline"}} onMouseDown={(e)=>e.preventDefault()} onClick={reportUnderline}>U 밑줄</button>
-              </div>
-              <RichReportEditor apiRef={reportTaRef} value={reportDraft.text||""}
-                onChange={(md)=>setReportDraft((d)=>d?{...d,text:md}:d)}
-                placeholder={"단축키: '- ' 입력 → 글머리 · Tab 들여쓰기 · Shift+Tab 내어쓰기 · Ctrl+B 굵게 · Ctrl+I 기울임 · Ctrl+U 밑줄"} />
-            </div>
-          </div>
-          <div className="modal-foot">
-            {reportDraft.id&&<button className="del" onClick={()=>removeReport(reportDraft)}>삭제</button>}
-            {reportDraft.id&&<button className="btn ghost" onClick={()=>duplicateReport(reportDraft)}>복사</button>}
-            <span className="spacer" />
-            <button className="btn-save" style={{background:"#1F845A"}} onClick={()=>saveReport(false)}>💾 중간 저장</button>
-            <button className="btn ghost" onClick={()=>setReportDraft(null)}>닫기</button>
-            <button className="btn-save" onClick={()=>saveReport(true)}>저장</button>
-          </div>
-        </div></div>
-      )}
 
       {mlyDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMlyDraft(null)}><div className="modal mly">
