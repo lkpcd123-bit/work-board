@@ -492,6 +492,21 @@ const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Dat
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
 const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockOrderTs:{naver:0,coupang:0},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
+// Firestore 문서 1MiB 한도 대응: 삭제된 항목은 내용을 비우고 id/deleted/시각만 남긴다.
+// (묘비는 유지 → 다른 기기의 오래된 사본이 병합 때 되살아나지 않음. 원본 내용은 일일 백업에 남아 있음)
+const SLIM_KEYS = ["tasks","routines","checkitems","rItems","memoItems","monthlies","reportItems","mindmaps","refs","inboundPlans","reorderRequests","cafe24_schedules","cafe24_schedules_kualo"];
+const TOMB_KEYS = ["id","deleted","updatedAt","createdAt"];
+const slimDeleted = (d) => {
+  let n = d;
+  SLIM_KEYS.forEach((k) => {
+    const a = d[k];
+    const fat = (x) => x && x.deleted && Object.keys(x).some((f) => !TOMB_KEYS.includes(f));
+    if (!Array.isArray(a) || !a.some(fat)) return;
+    if (n === d) n = { ...d };
+    n[k] = a.map((x) => !fat(x) ? x : TOMB_KEYS.reduce((o, f) => (x[f] !== undefined ? { ...o, [f]: x[f] } : o), {}));
+  });
+  return n;
+};
 function mergeData(r,l) {
   r=r||emptyData(); l=l||emptyData();
   const map=new Map(); [...(r.tasks||[]),...(l.tasks||[])].forEach(t=>{const p=map.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))map.set(t.id,t);});
@@ -1306,9 +1321,10 @@ function Board() {
       merged.updatedAt=Date.now();
       // 안전망: remote에 있지만 merged에 없는 필드는 보존 (구버전 코드가 알 수 없는 필드를 지우는 것 방지)
       if(remote){Object.keys(remote).forEach((k)=>{if(!(k in merged))merged[k]=remote[k];});}
-      await setDoc(BOARD_REF(),merged);
+      const out=slimDeleted(merged); // 삭제 항목 내용 비우기 (1MiB 한도)
+      await setDoc(BOARD_REF(),out);
       // 뒤따르는 저장이 남아 있으면 화면을 덮어쓰지 않는다 (마지막 저장이 최신 상태로 반영)
-      if(pendingRef.current===1){errShownRef.current=false;dataRef.current=merged;setData(merged);setSaveState("saved");setTimeout(()=>setSaveState("idle"),1500);}
+      if(pendingRef.current===1){errShownRef.current=false;dataRef.current=out;setData(out);setSaveState("saved");setTimeout(()=>setSaveState("idle"),1500);}
     } catch(e){
       setSaveState("error");
       if(!errShownRef.current){
@@ -1331,6 +1347,12 @@ function Board() {
       if(!pairs.length)return;
       commit((d)=>{let t=JSON.stringify(d);pairs.forEach(([o,n])=>{t=t.split(o).join(n);});return JSON.parse(t);},[mkLog("이미지 용량 최적화",null,`${pairs.length}개 재압축`)]);
     });
+  },[ready,me]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 로그인 후 1회: 삭제된 항목이 내용을 들고 있으면 비워서 저장 (문서 용량 확보)
+  useEffect(()=>{
+    if(!ready||!me||!canEdit)return;
+    if(slimDeleted(dataRef.current)!==dataRef.current)commit((d)=>d,[]);
   },[ready,me]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const live=useMemo(()=>data.tasks.filter((t)=>!t.deleted&&!t.archived&&(t.boardId||"공용")===curBoard),[data.tasks,curBoard]);
@@ -3513,7 +3535,7 @@ function Board() {
                 </div>
                 <button className={"issbtn"+(i.resolved?"":" active")} onClick={()=>toggleAny(i)}>{i.resolved?"해결됨 ✓":"미해결"}</button>
                 {!i.routineId&&<button className="btn ghost" onClick={()=>{
-                  const t=data.tasks.find((x)=>x.id===i.taskId);if(t){setView("board");openTask(t);}
+                  const t=data.tasks.find((x)=>x.id===i.taskId);if(t&&!t.deleted){setView("board");openTask(t);}
                 }}>이동</button>}
               </div>
             ));
