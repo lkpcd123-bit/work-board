@@ -418,6 +418,9 @@ const readFileAsBase64=(file)=>new Promise((resolve)=>{
   reader.onload=(e)=>resolve(e.target.result);
   reader.readAsDataURL(file);
 });
+const REF_DEFAULT_CATS = ["디자인","마케팅","경쟁사","콘텐츠"];
+const effRefCats = (c) => (c && c.length ? c : REF_DEFAULT_CATS); // 저장된 분류가 비어 있으면 기본 분류 사용
+const chipStyle = (on, sm) => ({padding:sm?"3px 10px":"5px 12px",borderRadius:20,border:"1.5px solid",fontSize:sm?11:12,fontWeight:700,cursor:"pointer",borderColor:on?"#0C66E4":"var(--line)",background:on?"#0C66E4":"var(--bg)",color:on?"#fff":"var(--ink2)"});
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 // ── 메모 서식: **굵게** {r}빨강{/r} {c}가운데  "• " "- " "1. " 목록(탭=들여쓰기)  | 표 | ──
 const renderNoteInline = (t) => t.split(/(\*\*.+?\*\*|\{r\}.+?\{\/r\})/g).map((p, i) => {
@@ -2210,8 +2213,9 @@ function Board() {
 
   /* ── 래퍼런스 ── */
   const refs=useMemo(()=>(data.refs||[]).filter((r)=>!r.deleted),[data.refs]);
-  const refCats=useMemo(()=>data.refCats||["디자인","마케팅","경쟁사","콘텐츠"],[data.refCats]);
+  const refCats=useMemo(()=>effRefCats(data.refCats),[data.refCats]);
   const [refCatFilter, setRefCatFilter] = useState("전체");
+  const [refSubFilter, setRefSubFilter] = useState("전체");
   const [refQuery, setRefQuery] = useState("");
   const [refAddOpen, setRefAddOpen] = useState(false);
   const [refDraft, setRefDraft] = useState(null);
@@ -2222,15 +2226,17 @@ function Board() {
     let list=refs;
     if(refCatFilter==="즐겨찾기")list=list.filter((r)=>r.fav);
     else if(refCatFilter!=="전체")list=list.filter((r)=>r.cat===refCatFilter);
+    if(refSubFilter!=="전체")list=list.filter((r)=>(r.sub||"")===refSubFilter);
     const q=refQuery.trim().toLowerCase();
-    if(q)list=list.filter((r)=>`${r.title||""} ${r.memo||""} ${r.cat||""}`.toLowerCase().includes(q));
+    if(q)list=list.filter((r)=>`${r.title||""} ${r.memo||""} ${r.cat||""} ${r.sub||""}`.toLowerCase().includes(q));
     return list;
-  },[refs,refCatFilter,refQuery]);
+  },[refs,refCatFilter,refSubFilter,refQuery]);
+  const refSubOf=(cat)=>[...new Set(refs.filter((r)=>r.cat===cat).map((r)=>r.sub).filter(Boolean))].sort();
   const addRef=(item)=>{commit((d)=>({...d,refs:[{...item,id:uid(),createdAt:Date.now(),createdBy:me||"익명"},...(d.refs||[])],updatedAt:Date.now()}),[]);};
   const updateRef=(id,patch)=>{commit((d)=>({...d,refs:(d.refs||[]).map((r)=>r.id===id?{...r,...patch,updatedAt:Date.now()}:r),updatedAt:Date.now()}),[]);};
   const deleteRef=(id)=>{commit((d)=>({...d,refs:(d.refs||[]).map((r)=>r.id===id?{...r,deleted:true}:r),updatedAt:Date.now()}),[]);};
-  const addRefCat=(name)=>{const t=name.trim();if(!t||refCats.includes(t))return;commit((d)=>({...d,refCats:[...(d.refCats||[]),t],updatedAt:Date.now()}),[]);};
-  const deleteRefCat=(name)=>{commit((d)=>({...d,refCats:(d.refCats||[]).filter((c)=>c!==name),updatedAt:Date.now()}),[]);};
+  const addRefCat=(name)=>{const t=name.trim();if(!t||refCats.includes(t))return;commit((d)=>({...d,refCats:[...effRefCats(d.refCats),t],updatedAt:Date.now()}),[]);};
+  const deleteRefCat=(name)=>{commit((d)=>({...d,refCats:effRefCats(d.refCats).filter((c)=>c!==name),updatedAt:Date.now()}),[]);};
   const handleRefImages=async(files)=>{
     const imgs=await Promise.all(Array.from(files).map((f)=>resizeImage(f,1600,1600,0.9)));
     imgs.forEach((src)=>setRefDraft((d)=>({...d,images:[...(d?.images||[]),{id:uid(),src}]})));
@@ -3275,11 +3281,8 @@ function Board() {
               <input className="inp" style={{flex:1,minWidth:160}} placeholder="검색..." value={refQuery} onChange={(e)=>setRefQuery(e.target.value)} />
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {["전체","즐겨찾기",...refCats].map((c)=>(
-                  <button key={c} onClick={()=>setRefCatFilter(c)}
-                    style={{padding:"5px 12px",borderRadius:20,border:"1.5px solid",fontSize:12,fontWeight:700,cursor:"pointer",
-                      borderColor:refCatFilter===c?"#0C66E4":"var(--line)",
-                      background:refCatFilter===c?"#0C66E4":"var(--bg)",
-                      color:refCatFilter===c?"#fff":"var(--ink2)"}}>
+                  <button key={c} onClick={()=>{setRefCatFilter(c);setRefSubFilter("전체");}}
+                    style={chipStyle(refCatFilter===c)}>
                     {c==="즐겨찾기"?"⭐ "+c:c}
                   </button>
                 ))}
@@ -3287,6 +3290,12 @@ function Board() {
               </div>
               {canEdit&&<button className="btn-save" onClick={()=>{setRefDraft({title:"",cat:refCats[0]||"",memo:"",images:[],fav:false});setRefAddOpen(true);}}>+ 추가</button>}
             </div>
+            {refSubOf(refCatFilter).length>0&&(
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:10,alignItems:"center"}}>
+                <span style={{fontSize:11,color:"var(--ink3)"}}>중분류</span>
+                {["전체",...refSubOf(refCatFilter)].map((c)=><button key={c} onClick={()=>setRefSubFilter(c)} style={chipStyle(refSubFilter===c,true)}>{c}</button>)}
+              </div>
+            )}
             {/* 분류 관리 */}
             {refCatEdit&&(
               <div style={{marginTop:12,padding:12,background:"var(--bg)",borderRadius:8,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
@@ -3331,7 +3340,7 @@ function Board() {
                   ?<img src={r.images[0].src} alt={r.title} />
                   :<div style={{height:140,background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🖼</div>}
                 <div className="refbody">
-                  {r.cat&&<div className="refcat">{r.cat}</div>}
+                  {r.cat&&<div className="refcat">{r.cat}{r.sub?" > "+r.sub:""}</div>}
                   <div className="reftitle">{r.title||"제목 없음"}{(r.images||[]).length>1&&<span style={{fontSize:11,color:"var(--ink3)",fontWeight:400,marginLeft:6}}>🖼 {r.images.length}</span>}</div>
                   {r.memo&&<div className="refmemo">{r.memo}</div>}
                   <div className="reffoot">
@@ -3383,6 +3392,10 @@ function Board() {
                       {refCats.map((c)=><option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
+                  <div className="fld" style={{marginBottom:10}}><label>중분류 (선택)</label>
+                    <input list="ref-subs" value={refDraft.sub||""} onChange={(e)=>setRefDraft({...refDraft,sub:e.target.value})} placeholder="예) 상세페이지" />
+                    <datalist id="ref-subs">{refSubOf(refDraft.cat||"").map((x)=><option key={x} value={x} />)}</datalist>
+                  </div>
                   <div className="fld" style={{marginBottom:10}}><label>메모</label><textarea value={refDraft.memo||""} onChange={(e)=>setRefDraft({...refDraft,memo:e.target.value})} placeholder="출처, 참고사항, 활용 아이디어..." style={{height:80}} /></div>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <input type="checkbox" id="refFav" checked={!!refDraft.fav} onChange={(e)=>setRefDraft({...refDraft,fav:e.target.checked})} style={{width:"auto"}} />
@@ -3413,9 +3426,9 @@ function Board() {
             </div>
             <div style={{display:"flex",gap:7,marginTop:12,flexWrap:"wrap"}}>
               <input className="inp" style={{flex:1,minWidth:160}} placeholder="검색 (분류·제목·내용·하위항목)" value={memoQuery} onChange={(e)=>setMemoQuery(e.target.value)} />
-              <select className="sel" value={memoCatFilter} onChange={(e)=>setMemoCatFilter(e.target.value)}>
-                {memoCatOptions.map((c)=><option key={c} value={c}>{c}</option>)}
-              </select>
+            </div>
+            <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+              {memoCatOptions.map((c)=><button key={c} onClick={()=>setMemoCatFilter(c)} style={chipStyle(memoCatFilter===c)}>{c}</button>)}
             </div>
           </div>
 
