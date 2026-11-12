@@ -501,10 +501,28 @@ const noteKeyDown = (e, val, set) => {
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockOrderTs:{naver:0,coupang:0},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
+const emptyData = () => ({ promos:[],tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockOrderTs:{naver:0,coupang:0},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
 // Firestore 문서 1MiB 한도 대응: 삭제된 항목은 내용을 비우고 id/deleted/시각만 남긴다.
 // (묘비는 유지 → 다른 기기의 오래된 사본이 병합 때 되살아나지 않음. 원본 내용은 일일 백업에 남아 있음)
-const SLIM_KEYS = ["tasks","routines","checkitems","rItems","memoItems","monthlies","reportItems","mindmaps","refs","inboundPlans","reorderRequests","cafe24_schedules","cafe24_schedules_kualo"];
+// 행사 손익 자동 계산. ov[k]에 값이 있으면 그 값을 우선(직접 수정), 없으면 자동값
+const pNum=(v)=>{const n=parseFloat(String(v??"").replace(/,/g,""));return isFinite(n)?n:0;};
+const PROMO_PCT=["openRate","ctr","ctor","cvr","buyRate"];
+const promoCalc=(p)=>{
+  const sent=pNum(p.sent),read=pNum(p.read),click=pNum(p.click),orders=pNum(p.orders),rev=pNum(p.revenue),extra=pNum(p.extraCost);
+  const div=(a,b)=>b>0?a/b:null;
+  const ov=p.ov||{};
+  const has=(k)=>ov[k]!==undefined&&ov[k]!=="";
+  const auto={openRate:div(read,sent),ctr:div(click,sent),ctor:div(click,read),cvr:div(orders,click),buyRate:div(orders,sent),aov:div(rev,orders),sendCost:sent*pNum(p.unitCost)};
+  const v={};
+  Object.keys(auto).forEach((k)=>{v[k]=has(k)?pNum(ov[k])/(PROMO_PCT.includes(k)?100:1):auto[k];});
+  auto.profit=String(p.marginRate??"")===""?null:rev*pNum(p.marginRate)/100-v.sendCost-extra;
+  v.profit=has("profit")?pNum(ov.profit):auto.profit;
+  v.roas=div(rev,v.sendCost+extra);
+  return {...v,auto};
+};
+const fPct=(x)=>x==null?"-":(x*100).toFixed(1)+"%";
+const fWon=(x)=>x==null?"-":Math.round(x).toLocaleString();
+const SLIM_KEYS = ["tasks","routines","checkitems","rItems","memoItems","monthlies","reportItems","mindmaps","refs","promos","inboundPlans","reorderRequests","cafe24_schedules","cafe24_schedules_kualo"];
 const TOMB_KEYS = ["id","deleted","updatedAt","createdAt"];
 const slimDeleted = (d) => {
   let n = d;
@@ -532,6 +550,7 @@ function mergeData(r,l) {
   const inbMap=new Map(); [...(r.inboundPlans||[]),...(l.inboundPlans||[])].forEach(t=>{const p=inbMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))inbMap.set(t.id,t);});
   const roMap=new Map(); [...(r.reorderRequests||[]),...(l.reorderRequests||[])].forEach(t=>{const p=roMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))roMap.set(t.id,t);});
   const refMap=new Map(); [...(r.refs||[]),...(l.refs||[])].forEach(t=>{const p=refMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))refMap.set(t.id,t);});
+  const promoMap=new Map(); [...(r.promos||[]),...(l.promos||[])].forEach(t=>{const p=promoMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))promoMap.set(t.id,t);});
   const c24kMap=new Map(); [...(r.cafe24_schedules_kualo||[]),...(l.cafe24_schedules_kualo||[])].forEach(t=>{const p=c24kMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))c24kMap.set(t.id,t);});
   const c24Map=new Map(); [...(r.cafe24_schedules||[]),...(l.cafe24_schedules||[])].forEach(t=>{const p=c24Map.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))c24Map.set(t.id,t);});
   const notifMap=new Map(); [...(r.notifications||[]),...(l.notifications||[])].forEach(t=>{const p=notifMap.get(t.id);if(!p||(t.updatedAt||t.ts||0)>=(p.updatedAt||p.ts||0))notifMap.set(t.id,t);});
@@ -545,6 +564,7 @@ function mergeData(r,l) {
     tabFolders:((l.tabConfigUpdatedAt||0)>=(r.tabConfigUpdatedAt||0))?l.tabFolders||[]:r.tabFolders||[],
     tabConfigUpdatedAt:Math.max(l.tabConfigUpdatedAt||0,r.tabConfigUpdatedAt||0),
     refs:[...refMap.values()],
+    promos:[...promoMap.values()],
     refCats:((l.updatedAt||0)>=(r.updatedAt||0)?l.refCats:r.refCats)||["디자인","마케팅","경쟁사","콘텐츠"],
     stockData:(()=>{
       const mergeStockArr=(rArr,lArr,rOrderTs,lOrderTs)=>{
@@ -770,6 +790,18 @@ const CSS = `
 .addrow input{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;}
 .hinput{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;font-family:inherit;resize:vertical;min-height:38px;max-height:160px;line-height:1.5;}
 .modal.mly{max-width:760px;}
+.modal.promo{max-width:880px;}
+.psec{font-size:13.5px;font-weight:800;margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);}
+.psec:first-child{margin-top:0;padding-top:0;border-top:0;}
+.pres{display:flex;flex-wrap:wrap;gap:6px 16px;background:#F1F2F4;border-radius:8px;padding:12px 14px;font-size:13.5px;}
+.ptbl{border-collapse:collapse;font-size:13px;white-space:nowrap;width:100%;}
+.ptbl th{background:#F1F2F4;padding:8px 10px;font-size:12px;text-align:right;border-bottom:1px solid var(--line);}
+.ptbl td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;}
+.ptbl td.l{text-align:left;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
+.ptbl th:nth-child(-n+7),.ptbl td:nth-child(-n+7),.ptbl th:last-child{text-align:left;}
+.ptbl tbody tr{cursor:pointer;}
+.ptbl tbody tr:hover{background:#F7F8F9;}
+.ptbl tfoot td{font-weight:800;background:#FAFBFC;}
 .mly .hinput{min-height:140px;max-height:480px;}
 .mly .fld textarea{min-height:140px;}
 .addrow button{background:var(--pri);color:#fff;padding:8px 14px;font-size:13.5px;font-weight:600;border-radius:6px;}
@@ -2255,6 +2287,17 @@ function Board() {
     return list;
   },[refs,refCatFilter,refSubFilter,refQuery]);
   const refSubOf=(cat)=>[...new Set(refs.filter((r)=>r.cat===cat).map((r)=>r.sub).filter(Boolean))].sort();
+  const [refTab, setRefTab] = useState("ref");
+  const [promoDraft, setPromoDraft] = useState(null);
+  const promos=useMemo(()=>(data.promos||[]).filter((x)=>!x.deleted).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0)),[data.promos]);
+  const savePromo=()=>{
+    const {_new,...item}=promoDraft;
+    if(!(item.name||"").trim()){alert("행사명을 입력해 주세요.");return;}
+    if(_new)commit((d)=>({...d,promos:[{...item,id:uid(),createdAt:Date.now(),createdBy:me||"익명"},...(d.promos||[])],updatedAt:Date.now()}),[]);
+    else commit((d)=>({...d,promos:(d.promos||[]).map((x)=>x.id===item.id?{...item,updatedAt:Date.now()}:x),updatedAt:Date.now()}),[]);
+    setPromoDraft(null);
+  };
+  const deletePromo=(id)=>{if(!window.confirm("이 행사 기록을 삭제할까요?"))return;commit((d)=>({...d,promos:(d.promos||[]).map((x)=>x.id===id?{...x,deleted:true,updatedAt:Date.now()}:x),updatedAt:Date.now()}),[]);setPromoDraft(null);};
   const addRef=(item)=>{commit((d)=>({...d,refs:[{...item,id:uid(),createdAt:Date.now(),createdBy:me||"익명"},...(d.refs||[])],updatedAt:Date.now()}),[]);};
   const updateRef=(id,patch)=>{commit((d)=>({...d,refs:(d.refs||[]).map((r)=>r.id===id?{...r,...patch,updatedAt:Date.now()}:r),updatedAt:Date.now()}),[]);};
   const deleteRef=(id)=>{commit((d)=>({...d,refs:(d.refs||[]).map((r)=>r.id===id?{...r,deleted:true}:r),updatedAt:Date.now()}),[]);};
@@ -3298,6 +3341,44 @@ function Board() {
 
       {view==="ref"&&(
         <div>
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            <button onClick={()=>setRefTab("ref")} style={chipStyle(refTab==="ref")}>📚 래퍼런스</button>
+            <button onClick={()=>setRefTab("promo")} style={chipStyle(refTab==="promo")}>📊 행사 기획·손익</button>
+          </div>
+          {refTab==="promo"?(
+          <div className="panel" style={{padding:"14px 16px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+              <b style={{fontSize:15}}>행사 기획·손익</b>
+              <span style={{fontSize:12,color:"var(--ink3)"}}>{promos.length}건 · 행을 누르면 수정</span>
+              {canEdit&&<button className="btn" style={{marginLeft:"auto"}} onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{}})}>+ 행사 추가</button>}
+            </div>
+            {promos.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다.</div>:(
+            <div style={{overflowX:"auto"}}>
+              <table className="ptbl">
+                <thead><tr>{["날짜","행사명","채널","명분","타겟·세그먼트","구성","발송 시간","발송 수","읽음","클릭","오픈율","CTR","CTOR","CVR","주문고객","주문금액","구매전환율","객단가","비용","공헌이익","ROAS","특이사항"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {promos.map((x)=>{const c=promoCalc(x);return(
+                    <tr key={x.id} onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>
+                      <td>{x.date}{x.endDate&&x.endDate!==x.date?` ~ ${x.endDate.slice(5)}`:""}</td>
+                      <td className="l"><b>{x.name}</b></td><td>{x.channel}</td><td className="l">{x.reason}</td>
+                      <td className="l">{[x.target,x.segment].filter(Boolean).join(" / ")}</td><td className="l">{x.comp}</td>
+                      <td>{(x.sendAt||"").replace("T"," ")}</td>
+                      <td>{fWon(pNum(x.sent))}</td><td>{fWon(pNum(x.read))}</td><td>{fWon(pNum(x.click))}</td>
+                      <td>{fPct(c.openRate)}</td><td>{fPct(c.ctr)}</td><td>{fPct(c.ctor)}</td><td>{fPct(c.cvr)}</td>
+                      <td>{fWon(pNum(x.orders))}</td><td><b>{fWon(pNum(x.revenue))}</b></td><td>{fPct(c.buyRate)}</td><td>{fWon(c.aov)}</td>
+                      <td>{fWon(c.sendCost+pNum(x.extraCost))}</td>
+                      <td style={{fontWeight:800,color:c.profit==null?"var(--ink3)":c.profit<0?"#CA3521":"#1F845A"}}>{fWon(c.profit)}</td>
+                      <td>{c.roas==null?"-":Math.round(c.roas*100)+"%"}</td>
+                      <td className="l">{x.note}</td>
+                    </tr>);})}
+                </tbody>
+                <tfoot>{(()=>{const t=promos.reduce((a,x)=>{const c=promoCalc(x);return{sent:a.sent+pNum(x.sent),orders:a.orders+pNum(x.orders),rev:a.rev+pNum(x.revenue),cost:a.cost+c.sendCost+pNum(x.extraCost),profit:a.profit+(c.profit||0)};},{sent:0,orders:0,rev:0,cost:0,profit:0});return(
+                  <tr><td colSpan={7} className="l">합계</td><td>{fWon(t.sent)}</td><td colSpan={6}></td><td>{fWon(t.orders)}</td><td>{fWon(t.rev)}</td><td>{fPct(t.sent>0?t.orders/t.sent:null)}</td><td>{fWon(t.orders>0?t.rev/t.orders:null)}</td><td>{fWon(t.cost)}</td><td>{fWon(t.profit)}</td><td>{t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-"}</td><td></td></tr>);})()}
+                </tfoot>
+              </table>
+            </div>)}
+          </div>
+          ):(<>
           {/* 툴바 */}
           <div className="panel" style={{marginBottom:12,padding:"12px 16px"}}>
             <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
@@ -3437,6 +3518,7 @@ function Board() {
               </div>
             </div>
           )}
+          </>)}
         </div>
       )}
 
@@ -5049,6 +5131,49 @@ function Board() {
         </div></div>
       )}
 
+
+      {promoDraft&&(()=>{
+        const d=promoDraft,c=promoCalc(d);
+        const set=(k)=>(e)=>setPromoDraft({...d,[k]:e.target.value});
+        const g2={display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"},g4={display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"0 12px"};
+        const F=(label,k,props)=><div className="fld"><label>{label}</label><input value={d[k]||""} onChange={set(k)} {...props} /></div>;
+        const N=(label,k,ph)=>F(label,k,{type:"number",min:0,placeholder:ph||"0"});
+        // 자동 계산 칸: 비워 두면 자동값(placeholder), 직접 입력하면 그 값으로 고정
+        const A=(label,k,how)=>{const pct=PROMO_PCT.includes(k),a=c.auto[k];return(
+          <div className="fld"><label>{label} <span style={{fontWeight:500,color:"var(--ink3)"}}>{how}</span></label>
+            <input type="number" value={d.ov?.[k]??""} placeholder={a==null?"자동":`자동 ${pct?(a*100).toFixed(1)+"%":fWon(a)}`} onChange={(e)=>setPromoDraft({...d,ov:{...(d.ov||{}),[k]:e.target.value}})} style={d.ov?.[k]?{background:"#FFF7D6"}:undefined} /></div>);};
+        return(
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setPromoDraft(null)}><div className="modal promo">
+          <h2>{d._new?"새 행사":"행사 상세"}</h2>
+          <div className="modal-body">
+            <div className="psec">① 기획</div>
+            <div style={g2}>{F("행사명","name",{autoFocus:true,placeholder:"예) 11월 블랙프라이데이 알림톡"})}{F("채널","channel",{placeholder:"알림톡 / 문자 / 앱푸시 / 자사몰 …",list:"promo-ch"})}</div>
+            <datalist id="promo-ch">{["알림톡","친구톡","문자(LMS)","앱푸시","이메일","자사몰 기획전","네이버","쿠팡","올리브영"].map((o)=><option key={o} value={o} />)}</datalist>
+            <div style={g2}>{F("시작일","date",{type:"date"})}{F("종료일","endDate",{type:"date"})}</div>
+            <div className="fld"><label>명분 (왜 지금 이 행사를 하는가)</label><textarea value={d.reason||""} onChange={set("reason")} placeholder="예) 재구매 주기 도래 고객 리마인드, 신제품 출시 기념" /></div>
+            <div style={g2}>{F("타겟","target",{placeholder:"예) 최근 90일 구매 고객"})}{F("세그먼트","segment",{placeholder:"예) 락토컷 2회 이상 구매 / A그룹"})}</div>
+            <div className="fld"><label>구성 (상품·혜택)</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 락토컷 2박스 + 쉐이커, 15% 쿠폰" /></div>
+            {F("목표","goal",{placeholder:"예) 주문 300건 / 매출 1,500만"})}
+            <div className="psec">② 발송·성과 (입력)</div>
+            <div style={g4}>{F("발송 시간","sendAt",{type:"datetime-local"})}{N("실제 발송 수","sent")}{N("읽은 고객 수","read")}{N("클릭 고객 수","click")}</div>
+            <div style={g4}>{N("주문고객 수","orders")}{N("주문금액 (원)","revenue")}{N("건당 발송비 (원)","unitCost","예) 15")}{N("기타 비용 (원)","extraCost","사은품·쿠폰 등")}</div>
+            <div style={g4}>{N("공헌이익률 (%)","marginRate","예) 35")}</div>
+            <div className="psec">③ 자동 계산 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 비워 두면 자동, 값을 넣으면 그 값으로 고정(노란 칸)</span></div>
+            <div style={g4}>{A("오픈율 %","openRate","읽음÷발송")}{A("CTR %","ctr","클릭÷발송")}{A("CTOR %","ctor","클릭÷읽음")}{A("CVR %","cvr","주문÷클릭")}</div>
+            <div style={g4}>{A("구매전환율 %","buyRate","주문÷발송")}{A("객단가","aov","주문금액÷주문고객")}{A("발송비","sendCost","발송×건당")}{A("공헌이익","profit","매출×이익률−비용")}</div>
+            <div className="pres">
+              <span>오픈율 <b>{fPct(c.openRate)}</b></span><span>CTR <b>{fPct(c.ctr)}</b></span><span>CTOR <b>{fPct(c.ctor)}</b></span><span>CVR <b>{fPct(c.cvr)}</b></span><span>구매전환율 <b>{fPct(c.buyRate)}</b></span><span>객단가 <b>{fWon(c.aov)}</b></span><span>ROAS <b>{c.roas==null?"-":Math.round(c.roas*100)+"%"}</b></span>
+              <span>공헌이익 <b style={{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"}}>{c.profit==null?"이익률 입력 필요":fWon(c.profit)+"원"}</b></span>
+            </div>
+            <div className="fld" style={{marginTop:14}}><label>특이사항 · 회고</label><textarea value={d.note||""} onChange={set("note")} placeholder="잘된 점, 아쉬운 점, 다음에 바꿀 것" /></div>
+          </div>
+          <div className="modal-foot">
+            {!d._new&&canEdit&&<button className="btn ghost" style={{color:"#CA3521"}} onClick={()=>deletePromo(d.id)}>삭제</button>}
+            <button className="btn ghost" style={{marginLeft:"auto"}} onClick={()=>setPromoDraft(null)}>닫기</button>
+            {canEdit&&<button className="btn" onClick={savePromo}>저장</button>}
+          </div>
+        </div></div>);
+      })()}
 
       {mlyDraft&&(
         <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setMlyDraft(null)}><div className="modal mly">
