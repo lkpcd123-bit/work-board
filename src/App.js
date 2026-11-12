@@ -523,7 +523,24 @@ const promoCalc=(p)=>{
 // 전략 트리: 노드 {id,label,text,children}. fn은 노드를 받아 교체할 노드(배열이면 여러 개)나 null(삭제)을 반환
 const tUpd=(ns,id,fn)=>ns.flatMap((n)=>n.id===id?[].concat(fn(n)||[]):[{...n,children:tUpd(n.children||[],id,fn)}]);
 const tNew=(label,text="",children=[])=>({id:Math.random().toString(36).slice(2,10),label,text,children});
-const tSeg=()=>tNew("고객군","",["목적","목표","전략","전술"].map((l)=>tNew(l)));
+const tSeg=()=>tNew("고객군","",["명분","목적","목표","전략","전술"].map((l)=>tNew(l)));
+const tH=(label,hint,children=[])=>({...tNew(label,"",children),hint});
+const tC=(label)=>({...tNew(label),chk:true,done:false});
+// 기획양식 전체 틀 (hint는 입력칸 안내 문구)
+const tForm=()=>tNew("기획양식","",[
+  tH("목적과 목표","",[tH("목적(의도)","이 기획을 왜 하고 있는지"),tH("목표","이 기획을 통해서 무엇을 얻고 싶은지")]),
+  tH("전략과 전술","",[tH("전략","전쟁에서 어느 전장을 택할지"),tH("전술","그 전장에서 어떤 부대로 어떻게 싸울지")]),
+  tH("타겟 정의 & 전제 조건","",[tH("핵심 타겟","어떤 고객이 구매했으면 좋겠는가?"),tH("현재 상태(고객 문제)","현재 고객이 느끼고 있는 문제점이 무엇인가?"),tH("구매 트리거","상품을 구매 해야 하는 명분")]),
+  tH("사용할 수 있는 무기","",[tH("명분","행사를 진행하기 위한 이유"),tH("가격&혜택","가격과 혜택 구성을 표시"),tH("기간","행사 기간을 표시")]),
+  tH("세부 혜택 구성안","",["혜택01","혜택02","혜택03"].map((l)=>tH(l,"혜택 내용"))),
+  tH("베네핏","\"이 행사에서 제품을 사면 당신의 인생이 어떻게 달라질까(무엇이 좋은가)?\""),
+  tH("메인 명분","",[tH("문구","한 눈에 어떤 행사인지 알 수 있으며 직관적으로 후킹성을 가지고 있는 짧은 문장"),tH("이유","왜? 이 메인 명분인지 이유를 설명하시오")]),
+  tH("소구 카피","",[tH("카피","메인 명분을 설명하는 문장으로 한 번에 읽을 수 있어야 하며 후킹성 또한 가지고 있어야 하는 카피"),tH("이유","왜? 이 소구 카피인지 이유를 설명하시오")]),
+  tH("진행 구성","진행 순서·일정·채널별 구성"),
+  tH("체크리스트","",["목적이 한 줄로 설명되는가?","이 문구를 고객이 이해할까?","지금 이 정보가 ‘지금’ 필요한가?","상사가 지적했던 포인트가 반영됐는가?","이전 반려 사유를 다시 밟고 있진 않은가?"].map(tC)),
+  tH("피드백","상사·팀 피드백 기록"),
+  tH("주의사항","법적 문구·표시광고·재고·CS 유의점"),
+]);
 const fPct=(x)=>x==null?"-":(x*100).toFixed(1)+"%";
 const fWon=(x)=>x==null?"-":Math.round(x).toLocaleString();
 const SLIM_KEYS = ["tasks","routines","checkitems","rItems","memoItems","monthlies","reportItems","mindmaps","refs","promos","inboundPlans","reorderRequests","cafe24_schedules","cafe24_schedules_kualo"];
@@ -5164,18 +5181,24 @@ function Board() {
                 const R=(ns,depth)=>ns.map((n)=>(
                   <div key={n.id} style={{marginLeft:depth?18:0,borderLeft:depth?"2px solid var(--line)":"none",paddingLeft:depth?10:0,marginTop:6}}>
                     <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
-                      <input list="promo-lbl" value={n.label} onChange={(e)=>up(n.id,(x)=>({...x,label:e.target.value}))} style={{width:depth?84:112,flex:"none",fontWeight:800,color:depth?"#CA3521":"#0055CC"}} />
-                      <textarea rows={1} value={n.text} onChange={(e)=>up(n.id,(x)=>({...x,text:e.target.value}))} placeholder={depth?"내용":"예) 신규고객(가입 후 구매하지 않은 사람)"} style={{flex:1,minHeight:38}} />
+                      {n.chk?(<>
+                        <input type="checkbox" checked={!!n.done} onChange={(e)=>up(n.id,(x)=>({...x,done:e.target.checked}))} style={{width:18,flex:"none",marginTop:11}} />
+                        <input value={n.label} onChange={(e)=>up(n.id,(x)=>({...x,label:e.target.value}))} style={{flex:1,textDecoration:n.done?"line-through":"none"}} />
+                      </>):(<>
+                        <input list="promo-lbl" value={n.label} onChange={(e)=>up(n.id,(x)=>({...x,label:e.target.value}))} style={{width:Math.max(depth?84:112,Math.min(240,(n.label||"").length*14+24)),flex:"none",fontWeight:800,color:depth?"#CA3521":"#0055CC"}} />
+                        <textarea rows={1} value={n.text} onChange={(e)=>up(n.id,(x)=>({...x,text:e.target.value}))} placeholder={n.hint||(depth?"내용":"예) 신규고객(가입 후 구매하지 않은 사람)")} style={{flex:1,minHeight:38}} />
+                      </>)}
                       <button type="button" title="하위 단계 추가" className="btn ghost" style={{padding:"6px 9px"}} onClick={()=>up(n.id,(x)=>({...x,children:[...(x.children||[]),tNew("")]}))}>↳</button>
-                      <button type="button" title="같은 단계에 추가" className="btn ghost" style={{padding:"6px 9px"}} onClick={()=>up(n.id,(x)=>[x,tNew(x.label)])}>＋</button>
+                      <button type="button" title="같은 단계에 추가" className="btn ghost" style={{padding:"6px 9px"}} onClick={()=>up(n.id,(x)=>[x,n.chk?tC(""):tNew(x.label)])}>＋</button>
                       <button type="button" title="삭제" className="btn ghost" style={{padding:"6px 9px",color:"#CA3521"}} onClick={()=>up(n.id,()=>null)}>×</button>
                     </div>
                     {R(n.children||[],depth+1)}
                   </div>));
                 return(<>
-                  <datalist id="promo-lbl">{["고객군","목적","목표","전략","전술","KPI","혜택","메시지","비고"].map((o)=><option key={o} value={o} />)}</datalist>
+                  <datalist id="promo-lbl">{["고객군","명분","목적","목표","전략","전술","KPI","혜택","메시지","비고"].map((o)=><option key={o} value={o} />)}</datalist>
                   {R(d.tree||[],0)}
-                  <button type="button" className="btn ghost" style={{marginTop:10}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tSeg()]})}>+ 고객군 추가 (목적·목표·전략·전술 틀 포함)</button>
+                  <button type="button" className="btn ghost" style={{marginTop:10}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tSeg()]})}>+ 고객군 추가 (명분·목적·목표·전략·전술)</button>
+                  <button type="button" className="btn ghost" style={{marginTop:10,marginLeft:8}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tForm()]})}>📋 기획양식 전체 틀 불러오기</button>
                 </>);
               })()}
             </div>
