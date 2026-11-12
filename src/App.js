@@ -520,6 +520,10 @@ const promoCalc=(p)=>{
   v.roas=div(rev,v.sendCost+extra);
   return {...v,auto};
 };
+// 전략 트리: 노드 {id,label,text,children}. fn은 노드를 받아 교체할 노드(배열이면 여러 개)나 null(삭제)을 반환
+const tUpd=(ns,id,fn)=>ns.flatMap((n)=>n.id===id?[].concat(fn(n)||[]):[{...n,children:tUpd(n.children||[],id,fn)}]);
+const tNew=(label,text="",children=[])=>({id:Math.random().toString(36).slice(2,10),label,text,children});
+const tSeg=()=>tNew("고객군","",["목적","목표","전략","전술"].map((l)=>tNew(l)));
 const fPct=(x)=>x==null?"-":(x*100).toFixed(1)+"%";
 const fWon=(x)=>x==null?"-":Math.round(x).toLocaleString();
 const SLIM_KEYS = ["tasks","routines","checkitems","rItems","memoItems","monthlies","reportItems","mindmaps","refs","promos","inboundPlans","reorderRequests","cafe24_schedules","cafe24_schedules_kualo"];
@@ -5154,6 +5158,27 @@ function Board() {
             <div style={g2}>{F("타겟","target",{placeholder:"예) 최근 90일 구매 고객"})}{F("세그먼트","segment",{placeholder:"예) 락토컷 2회 이상 구매 / A그룹"})}</div>
             <div className="fld"><label>구성 (상품·혜택)</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 락토컷 2박스 + 쉐이커, 15% 쿠폰" /></div>
             {F("목표","goal",{placeholder:"예) 주문 300건 / 매출 1,500만"})}
+            <div className="fld"><label>전략 트리 <span style={{fontWeight:500,color:"var(--ink3)"}}>고객군 → 목적·목표·전략·전술 …로 단계별로 내려가며 작성</span></label>
+              {(()=>{
+                const up=(id,fn)=>setPromoDraft({...d,tree:tUpd(d.tree||[],id,fn)});
+                const R=(ns,depth)=>ns.map((n)=>(
+                  <div key={n.id} style={{marginLeft:depth?18:0,borderLeft:depth?"2px solid var(--line)":"none",paddingLeft:depth?10:0,marginTop:6}}>
+                    <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
+                      <input list="promo-lbl" value={n.label} onChange={(e)=>up(n.id,(x)=>({...x,label:e.target.value}))} style={{width:depth?84:112,flex:"none",fontWeight:800,color:depth?"#CA3521":"#0055CC"}} />
+                      <textarea rows={1} value={n.text} onChange={(e)=>up(n.id,(x)=>({...x,text:e.target.value}))} placeholder={depth?"내용":"예) 신규고객(가입 후 구매하지 않은 사람)"} style={{flex:1,minHeight:38}} />
+                      <button type="button" title="하위 단계 추가" className="btn ghost" style={{padding:"6px 9px"}} onClick={()=>up(n.id,(x)=>({...x,children:[...(x.children||[]),tNew("")]}))}>↳</button>
+                      <button type="button" title="같은 단계에 추가" className="btn ghost" style={{padding:"6px 9px"}} onClick={()=>up(n.id,(x)=>[x,tNew(x.label)])}>＋</button>
+                      <button type="button" title="삭제" className="btn ghost" style={{padding:"6px 9px",color:"#CA3521"}} onClick={()=>up(n.id,()=>null)}>×</button>
+                    </div>
+                    {R(n.children||[],depth+1)}
+                  </div>));
+                return(<>
+                  <datalist id="promo-lbl">{["고객군","목적","목표","전략","전술","KPI","혜택","메시지","비고"].map((o)=><option key={o} value={o} />)}</datalist>
+                  {R(d.tree||[],0)}
+                  <button type="button" className="btn ghost" style={{marginTop:10}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tSeg()]})}>+ 고객군 추가 (목적·목표·전략·전술 틀 포함)</button>
+                </>);
+              })()}
+            </div>
             <div className="psec">② 발송·성과 (입력)</div>
             <div style={g4}>{F("발송 시간","sendAt",{type:"datetime-local"})}{N("실제 발송 수","sent")}{N("읽은 고객 수","read")}{N("클릭 고객 수","click")}</div>
             <div style={g4}>{N("주문고객 수","orders")}{N("주문금액 (원)","revenue")}{N("건당 발송비 (원)","unitCost","예) 15")}{N("기타 비용 (원)","extraCost","사은품·쿠폰 등")}</div>
