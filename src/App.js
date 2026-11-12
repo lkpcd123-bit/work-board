@@ -3353,7 +3353,7 @@ function Board() {
           <div className="panel" style={{padding:"14px 16px"}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
               <b style={{fontSize:15}}>행사 기획·손익</b>
-              <button className="btn" onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{}})}>+ 행사 추가</button>
+              <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{}})}>+ 행사 추가</button>
               <span style={{fontSize:12,color:"var(--ink3)"}}>{promos.length}건 · 행을 누르면 수정</span>
             </div>
             {promos.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다.</div>:(
@@ -5195,7 +5195,7 @@ function Board() {
           <div className="modal-foot">
             {!d._new&&canEdit&&<button className="btn ghost" style={{color:"#CA3521"}} onClick={()=>deletePromo(d.id)}>삭제</button>}
             <button className="btn ghost" style={{marginLeft:"auto"}} onClick={()=>setPromoDraft(null)}>닫기</button>
-            {canEdit&&<button className="btn" onClick={savePromo}>저장</button>}
+            <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={savePromo}>저장</button>
           </div>
         </div></div>);
       })()}
