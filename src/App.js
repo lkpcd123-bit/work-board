@@ -528,10 +528,7 @@ const tH=(label,hint,children=[])=>({...tNew(label,"",children),hint});
 const tC=(label)=>({...tNew(label),chk:true,done:false});
 // 기획양식 전체 틀 (hint는 입력칸 안내 문구)
 const tForm=()=>tNew("기획양식","",[
-  tH("목적과 목표","",[tH("목적(의도)","이 기획을 왜 하고 있는지"),tH("목표","이 기획을 통해서 무엇을 얻고 싶은지")]),
-  tH("전략과 전술","",[tH("전략","전쟁에서 어느 전장을 택할지"),tH("전술","그 전장에서 어떤 부대로 어떻게 싸울지")]),
-  tH("타겟 정의 & 전제 조건","",[tH("핵심 타겟","어떤 고객이 구매했으면 좋겠는가?"),tH("현재 상태(고객 문제)","현재 고객이 느끼고 있는 문제점이 무엇인가?"),tH("구매 트리거","상품을 구매 해야 하는 명분")]),
-  tH("사용할 수 있는 무기","",[tH("명분","행사를 진행하기 위한 이유"),tH("가격&혜택","가격과 혜택 구성을 표시"),tH("기간","행사 기간을 표시")]),
+  tH("타겟 정의 & 전제 조건","",[tH("현재 상태(고객 문제)","현재 고객이 느끼고 있는 문제점이 무엇인가?"),tH("구매 트리거","상품을 구매 해야 하는 명분")]),
   tH("세부 혜택 구성안","",["혜택01","혜택02","혜택03"].map((l)=>tH(l,"혜택 내용"))),
   tH("베네핏","\"이 행사에서 제품을 사면 당신의 인생이 어떻게 달라질까(무엇이 좋은가)?\""),
   tH("메인 명분","",[tH("문구","한 눈에 어떤 행사인지 알 수 있으며 직관적으로 후킹성을 가지고 있는 짧은 문장"),tH("이유","왜? 이 메인 명분인지 이유를 설명하시오")]),
@@ -3370,7 +3367,7 @@ function Board() {
           <div className="panel" style={{padding:"14px 16px"}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
               <b style={{fontSize:15}}>행사 기획·손익</b>
-              <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{}})}>+ 행사 추가</button>
+              <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{},tree:[tSeg()]})}>+ 행사 추가</button>
               <span style={{fontSize:12,color:"var(--ink3)"}}>{promos.length}건 · 행을 누르면 수정</span>
             </div>
             {promos.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다.</div>:(
@@ -3381,7 +3378,7 @@ function Board() {
                   {promos.map((x)=>{const c=promoCalc(x);return(
                     <tr key={x.id} onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>
                       <td>{x.date}{x.endDate&&x.endDate!==x.date?` ~ ${x.endDate.slice(5)}`:""}</td>
-                      <td className="l"><b>{x.name}</b></td><td>{x.channel}</td><td className="l">{x.reason}</td>
+                      <td className="l"><b>{x.name}</b></td><td>{x.channel}</td><td className="l">{(x.tree||[]).filter((n)=>n.label==="명분"&&n.text).map((n)=>n.text).join(" / ")||x.reason}</td>
                       <td className="l">{[x.target,x.segment].filter(Boolean).join(" / ")}</td><td className="l">{x.comp}</td>
                       <td>{(x.sendAt||"").replace("T"," ")}</td>
                       <td>{fWon(pNum(x.sent))}</td><td>{fWon(pNum(x.read))}</td><td>{fWon(pNum(x.click))}</td>
@@ -5171,10 +5168,8 @@ function Board() {
             <div style={g2}>{F("행사명","name",{autoFocus:true,placeholder:"예) 11월 블랙프라이데이 알림톡"})}{F("채널","channel",{placeholder:"알림톡 / 문자 / 앱푸시 / 자사몰 …",list:"promo-ch"})}</div>
             <datalist id="promo-ch">{["알림톡","친구톡","문자(LMS)","앱푸시","이메일","자사몰 기획전","네이버","쿠팡","올리브영"].map((o)=><option key={o} value={o} />)}</datalist>
             <div style={g2}>{F("시작일","date",{type:"date"})}{F("종료일","endDate",{type:"date"})}</div>
-            <div className="fld"><label>명분 (왜 지금 이 행사를 하는가)</label><textarea value={d.reason||""} onChange={set("reason")} placeholder="예) 재구매 주기 도래 고객 리마인드, 신제품 출시 기념" /></div>
             <div style={g2}>{F("타겟","target",{placeholder:"예) 최근 90일 구매 고객"})}{F("세그먼트","segment",{placeholder:"예) 락토컷 2회 이상 구매 / A그룹"})}</div>
             <div className="fld"><label>구성 (상품·혜택)</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 락토컷 2박스 + 쉐이커, 15% 쿠폰" /></div>
-            {F("목표","goal",{placeholder:"예) 주문 300건 / 매출 1,500만"})}
             <div className="fld"><label>전략 트리 <span style={{fontWeight:500,color:"var(--ink3)"}}>명분 → 목적 → 목표 → 전략 → 전술 순으로 단계별로 내려가며 작성</span></label>
               {(()=>{
                 const up=(id,fn)=>setPromoDraft({...d,tree:tUpd(d.tree||[],id,fn)});
