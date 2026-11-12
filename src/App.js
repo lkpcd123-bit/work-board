@@ -538,6 +538,12 @@ const tForm=()=>tNew("기획양식","",[
   tH("피드백","상사·팀 피드백 기록"),
   tH("주의사항","법적 문구·표시광고·재고·CS 유의점"),
 ]);
+// 구성(상품) 행 계산: 행사가=판매가−쿠폰, 개당=행사가÷수량, 적립금=행사가×적립률, 할인율=(정상가−행사가)÷정상가
+const itemCalc=(it)=>{
+  const has=String(it.sale??"")!=="";
+  const promo=has?pNum(it.sale)-pNum(it.coupon):null,q=pNum(it.qty),l=pNum(it.list);
+  return {promo,per:has&&q>0?promo/q:null,point:has&&String(it.pr??"")!==""?promo*pNum(it.pr)/100:null,disc:has&&l>0?(l-promo)/l:null};
+};
 const fPct=(x)=>x==null?"-":(x*100).toFixed(1)+"%";
 const fWon=(x)=>x==null?"-":Math.round(x).toLocaleString();
 const SLIM_KEYS = ["tasks","routines","checkitems","rItems","memoItems","monthlies","reportItems","mindmaps","refs","promos","inboundPlans","reorderRequests","cafe24_schedules","cafe24_schedules_kualo"];
@@ -809,6 +815,11 @@ const CSS = `
 .hinput{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;font-family:inherit;resize:vertical;min-height:38px;max-height:160px;line-height:1.5;}
 .modal.mly{max-width:760px;}
 .modal.promo{max-width:880px;}
+.itbl{border-collapse:collapse;font-size:13px;width:100%;min-width:760px;}
+.itbl th{background:#F1F2F4;padding:6px 6px;font-size:12px;text-align:center;white-space:nowrap;}
+.itbl td{padding:4px 3px;}
+.itbl input{width:100%;min-width:62px;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:6px 7px;font-size:13px;}
+.itbl td.calc{text-align:right;font-weight:700;background:#F1F2F4;padding:4px 8px;white-space:nowrap;}
 .psec{font-size:13.5px;font-weight:800;margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);}
 .psec:first-child{margin-top:0;padding-top:0;border-top:0;}
 .pres{display:flex;flex-wrap:wrap;gap:6px 16px;background:#F1F2F4;border-radius:8px;padding:12px 14px;font-size:13.5px;}
@@ -3379,7 +3390,7 @@ function Board() {
                     <tr key={x.id} onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>
                       <td>{x.date}{x.endDate&&x.endDate!==x.date?` ~ ${x.endDate.slice(5)}`:""}</td>
                       <td className="l"><b>{x.name}</b></td><td>{x.channel}</td><td className="l">{(x.tree||[]).filter((n)=>n.label==="명분"&&n.text).map((n)=>n.text).join(" / ")||x.reason}</td>
-                      <td className="l">{[x.target,x.segment].filter(Boolean).join(" / ")}</td><td className="l">{x.comp}</td>
+                      <td className="l">{[x.target,x.segment].filter(Boolean).join(" / ")}</td><td className="l">{(x.items||[]).filter((i)=>i.name).map((i)=>`${i.name}${pNum(i.qty)>1?" ×"+pNum(i.qty):""}${itemCalc(i).promo!=null?" "+fWon(itemCalc(i).promo)+"원":""}`).join(", ")||x.comp}</td>
                       <td>{(x.sendAt||"").replace("T"," ")}</td>
                       <td>{fWon(pNum(x.sent))}</td><td>{fWon(pNum(x.read))}</td><td>{fWon(pNum(x.click))}</td>
                       <td>{fPct(c.openRate)}</td><td>{fPct(c.ctr)}</td><td>{fPct(c.ctor)}</td><td>{fPct(c.cvr)}</td>
@@ -5169,7 +5180,26 @@ function Board() {
             <datalist id="promo-ch">{["알림톡","친구톡","문자(LMS)","앱푸시","이메일","자사몰 기획전","네이버","쿠팡","올리브영"].map((o)=><option key={o} value={o} />)}</datalist>
             <div style={g2}>{F("시작일","date",{type:"date"})}{F("종료일","endDate",{type:"date"})}</div>
             <div style={g2}>{F("타겟","target",{placeholder:"예) 최근 90일 구매 고객"})}{F("세그먼트","segment",{placeholder:"예) 락토컷 2회 이상 구매 / A그룹"})}</div>
-            <div className="fld"><label>구성 (상품·혜택)</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 락토컷 2박스 + 쉐이커, 15% 쿠폰" /></div>
+            <div className="fld"><label>구성 <span style={{fontWeight:500,color:"var(--ink3)"}}>행사가 = 판매가 − 쿠폰 · 개당 = 행사가 ÷ 수량 · 적립금 = 행사가 × 적립률 · 할인율 = (정상가 − 행사가) ÷ 정상가</span></label>
+              <div style={{overflowX:"auto"}}>
+                <table className="itbl">
+                  <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립률(%)","적립금","할인율",""].map((h)=><th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {(d.items||[]).map((it)=>{const ic=itemCalc(it);const upd=(k)=>(e)=>setPromoDraft({...d,items:d.items.map((x)=>x.id===it.id?{...x,[k]:e.target.value}:x)});return(
+                      <tr key={it.id}>
+                        <td><input style={{minWidth:130}} value={it.name||""} onChange={upd("name")} placeholder="예) 락토컷 초코" /></td>
+                        {["qty","list","sale","coupon"].map((k)=><td key={k}><input type="number" min="0" value={it[k]??""} onChange={upd(k)} /></td>)}
+                        <td className="calc">{fWon(ic.promo)}</td><td className="calc">{fWon(ic.per)}</td>
+                        <td><input type="number" min="0" step="0.1" value={it.pr??""} onChange={upd("pr")} placeholder="예) 1" /></td>
+                        <td className="calc">{fWon(ic.point)}</td><td className="calc">{fPct(ic.disc)}</td>
+                        <td><button type="button" className="btn ghost" style={{padding:"4px 8px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,items:d.items.filter((x)=>x.id!==it.id)})}>×</button></td>
+                      </tr>);})}
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" className="btn ghost" style={{marginTop:8}} onClick={()=>setPromoDraft({...d,items:[...(d.items||[]),{id:uid(),qty:"1"}]})}>+ 상품 추가</button>
+            </div>
+            <div className="fld"><label>기타 혜택·사은품 메모</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 쉐이커 증정, 7만원 이상 구매 시 사은품" /></div>
             <div className="fld"><label>전략 트리 <span style={{fontWeight:500,color:"var(--ink3)"}}>명분 → 목적 → 목표 → 전략 → 전술 순으로 단계별로 내려가며 작성</span></label>
               {(()=>{
                 const up=(id,fn)=>setPromoDraft({...d,tree:tUpd(d.tree||[],id,fn)});
