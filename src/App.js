@@ -3346,8 +3346,8 @@ function Board() {
       {view==="ref"&&(
         <div>
           <div style={{display:"flex",gap:6,marginBottom:12}}>
-            <button onClick={()=>setRefTab("ref")} style={chipStyle(refTab==="ref")}>📚 래퍼런스</button>
-            <button onClick={()=>setRefTab("promo")} style={chipStyle(refTab==="promo")}>📊 행사 기획·손익</button>
+            {[["ref","📚 래퍼런스"],["promo","📊 행사 기획·손익"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setRefTab(k)} style={{padding:"8px 16px",borderRadius:20,fontSize:13.5,fontWeight:700,cursor:"pointer",border:"1.5px solid #0C66E4",background:refTab===k?"#0C66E4":"#E9F2FF",color:refTab===k?"#fff":"#0C66E4"}}>{l}</button>))}
           </div>
           {refTab==="promo"?(
           <div className="panel" style={{padding:"14px 16px"}}>
