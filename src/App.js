@@ -523,7 +523,7 @@ const promoCalc=(p)=>{
 // 전략 트리: 노드 {id,label,text,children}. fn은 노드를 받아 교체할 노드(배열이면 여러 개)나 null(삭제)을 반환
 const tUpd=(ns,id,fn)=>ns.flatMap((n)=>n.id===id?[].concat(fn(n)||[]):[{...n,children:tUpd(n.children||[],id,fn)}]);
 const tNew=(label,text="",children=[])=>({id:Math.random().toString(36).slice(2,10),label,text,children});
-const tSeg=()=>tNew("고객군","",["명분","목적","목표","전략","전술"].map((l)=>tNew(l)));
+const tSeg=()=>tNew("명분","",["목적","목표","전략","전술"].map((l)=>tNew(l)));
 const tH=(label,hint,children=[])=>({...tNew(label,"",children),hint});
 const tC=(label)=>({...tNew(label),chk:true,done:false});
 // 기획양식 전체 틀 (hint는 입력칸 안내 문구)
@@ -5175,7 +5175,7 @@ function Board() {
             <div style={g2}>{F("타겟","target",{placeholder:"예) 최근 90일 구매 고객"})}{F("세그먼트","segment",{placeholder:"예) 락토컷 2회 이상 구매 / A그룹"})}</div>
             <div className="fld"><label>구성 (상품·혜택)</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 락토컷 2박스 + 쉐이커, 15% 쿠폰" /></div>
             {F("목표","goal",{placeholder:"예) 주문 300건 / 매출 1,500만"})}
-            <div className="fld"><label>전략 트리 <span style={{fontWeight:500,color:"var(--ink3)"}}>고객군 → 목적·목표·전략·전술 …로 단계별로 내려가며 작성</span></label>
+            <div className="fld"><label>전략 트리 <span style={{fontWeight:500,color:"var(--ink3)"}}>명분 → 목적 → 목표 → 전략 → 전술 순으로 단계별로 내려가며 작성</span></label>
               {(()=>{
                 const up=(id,fn)=>setPromoDraft({...d,tree:tUpd(d.tree||[],id,fn)});
                 const R=(ns,depth)=>ns.map((n)=>(
@@ -5186,7 +5186,7 @@ function Board() {
                         <input value={n.label} onChange={(e)=>up(n.id,(x)=>({...x,label:e.target.value}))} style={{flex:1,textDecoration:n.done?"line-through":"none"}} />
                       </>):(<>
                         <input list="promo-lbl" value={n.label} onChange={(e)=>up(n.id,(x)=>({...x,label:e.target.value}))} style={{width:Math.max(depth?84:112,Math.min(240,(n.label||"").length*14+24)),flex:"none",fontWeight:800,color:depth?"#CA3521":"#0055CC"}} />
-                        <textarea rows={1} value={n.text} onChange={(e)=>up(n.id,(x)=>({...x,text:e.target.value}))} placeholder={n.hint||(depth?"내용":"예) 신규고객(가입 후 구매하지 않은 사람)")} style={{flex:1,minHeight:38}} />
+                        <textarea rows={1} value={n.text} onChange={(e)=>up(n.id,(x)=>({...x,text:e.target.value}))} placeholder={n.hint||(depth?"내용":"예) 가입 후 구매하지 않은 신규고객에게 첫 구매 계기 만들기")} style={{flex:1,minHeight:38}} />
                       </>)}
                       <button type="button" title="하위 단계 추가" className="btn ghost" style={{padding:"6px 9px"}} onClick={()=>up(n.id,(x)=>({...x,children:[...(x.children||[]),tNew("")]}))}>↳</button>
                       <button type="button" title="같은 단계에 추가" className="btn ghost" style={{padding:"6px 9px"}} onClick={()=>up(n.id,(x)=>[x,n.chk?tC(""):tNew(x.label)])}>＋</button>
@@ -5195,9 +5195,9 @@ function Board() {
                     {R(n.children||[],depth+1)}
                   </div>));
                 return(<>
-                  <datalist id="promo-lbl">{["고객군","명분","목적","목표","전략","전술","KPI","혜택","메시지","비고"].map((o)=><option key={o} value={o} />)}</datalist>
+                  <datalist id="promo-lbl">{["명분","목적","목표","전략","전술","KPI","혜택","메시지","비고"].map((o)=><option key={o} value={o} />)}</datalist>
                   {R(d.tree||[],0)}
-                  <button type="button" className="btn ghost" style={{marginTop:10}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tSeg()]})}>+ 고객군 추가 (명분·목적·목표·전략·전술)</button>
+                  <button type="button" className="btn ghost" style={{marginTop:10}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tSeg()]})}>+ 명분 추가 (아래에 목적·목표·전략·전술)</button>
                   <button type="button" className="btn ghost" style={{marginTop:10,marginLeft:8}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tForm()]})}>📋 기획양식 전체 틀 불러오기</button>
                 </>);
               })()}
