@@ -1112,7 +1112,7 @@ const ALL_TABS=[
   {id:"checklist",label:"체크리스트"},
   {id:"memo",label:"메모"},
   {id:"mindmap",label:"마인드맵"},
-  {id:"ref",label:"래퍼런스"},
+  {id:"ref",label:"기획실"},
   {id:"schedule",label:"시간표"},
   {id:"issue",label:"이슈"},
   {id:"archive",label:"보관함"},
@@ -3353,8 +3353,8 @@ function Board() {
           <div className="panel" style={{padding:"14px 16px"}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
               <b style={{fontSize:15}}>행사 기획·손익</b>
+              <button className="btn" onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{}})}>+ 행사 추가</button>
               <span style={{fontSize:12,color:"var(--ink3)"}}>{promos.length}건 · 행을 누르면 수정</span>
-              {canEdit&&<button className="btn" style={{marginLeft:"auto"}} onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{}})}>+ 행사 추가</button>}
             </div>
             {promos.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다.</div>:(
             <div style={{overflowX:"auto"}}>
