@@ -530,7 +530,6 @@ const tC=(label)=>({...tNew(label),chk:true,done:false});
 const tForm=()=>tNew("기획양식","",[
   tH("타겟 정의 & 전제 조건","",[tH("현재 상태(고객 문제)","현재 고객이 느끼고 있는 문제점이 무엇인가?"),tH("구매 트리거","상품을 구매 해야 하는 명분")]),
   tH("세부 혜택 구성안","",["혜택01","혜택02","혜택03"].map((l)=>tH(l,"혜택 내용"))),
-  tH("베네핏","\"이 행사에서 제품을 사면 당신의 인생이 어떻게 달라질까(무엇이 좋은가)?\""),
   tH("메인 명분","",[tH("문구","한 눈에 어떤 행사인지 알 수 있으며 직관적으로 후킹성을 가지고 있는 짧은 문장"),tH("이유","왜? 이 메인 명분인지 이유를 설명하시오")]),
   tH("소구 카피","",[tH("카피","메인 명분을 설명하는 문장으로 한 번에 읽을 수 있어야 하며 후킹성 또한 가지고 있어야 하는 카피"),tH("이유","왜? 이 소구 카피인지 이유를 설명하시오")]),
   tH("진행 구성","진행 순서·일정·채널별 구성"),
@@ -827,7 +826,7 @@ const CSS = `
 .ptbl th{background:#F1F2F4;padding:8px 10px;font-size:12px;text-align:right;border-bottom:1px solid var(--line);}
 .ptbl td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;}
 .ptbl td.l{text-align:left;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
-.ptbl th:nth-child(-n+7),.ptbl td:nth-child(-n+7),.ptbl th:last-child{text-align:left;}
+.ptbl th:nth-child(-n+8),.ptbl td:nth-child(-n+8),.ptbl th:last-child{text-align:left;}
 .ptbl tbody tr{cursor:pointer;}
 .ptbl tbody tr:hover{background:#F7F8F9;}
 .ptbl tfoot td{font-weight:800;background:#FAFBFC;}
@@ -3384,13 +3383,14 @@ function Board() {
             {promos.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다.</div>:(
             <div style={{overflowX:"auto"}}>
               <table className="ptbl">
-                <thead><tr>{["날짜","행사명","채널","명분","타겟·세그먼트","구성","발송 시간","발송 수","읽음","클릭","오픈율","CTR","CTOR","CVR","주문고객","주문금액","구매전환율","객단가","비용","공헌이익","ROAS","특이사항"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{["날짜","행사명","채널","명분","타겟·세그먼트","구성","베네핏","발송 시간","발송 수","읽음","클릭","오픈율","CTR","CTOR","CVR","주문고객","주문금액","구매전환율","객단가","비용","공헌이익","ROAS","특이사항"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
                 <tbody>
                   {promos.map((x)=>{const c=promoCalc(x);return(
                     <tr key={x.id} onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>
                       <td>{x.date}{x.endDate&&x.endDate!==x.date?` ~ ${x.endDate.slice(5)}`:""}</td>
                       <td className="l"><b>{x.name}</b></td><td>{x.channel}</td><td className="l">{(x.tree||[]).filter((n)=>n.label==="명분"&&n.text).map((n)=>n.text).join(" / ")||x.reason}</td>
                       <td className="l">{[x.target,x.segment].filter(Boolean).join(" / ")}</td><td className="l">{(x.items||[]).filter((i)=>i.name).map((i)=>`${i.name}${pNum(i.qty)>1?" ×"+pNum(i.qty):""}${itemCalc(i).promo!=null?" "+fWon(itemCalc(i).promo)+"원":""}`).join(", ")||x.comp}</td>
+                      <td className="l">{x.benefit}</td>
                       <td>{(x.sendAt||"").replace("T"," ")}</td>
                       <td>{fWon(pNum(x.sent))}</td><td>{fWon(pNum(x.read))}</td><td>{fWon(pNum(x.click))}</td>
                       <td>{fPct(c.openRate)}</td><td>{fPct(c.ctr)}</td><td>{fPct(c.ctor)}</td><td>{fPct(c.cvr)}</td>
@@ -3402,7 +3402,7 @@ function Board() {
                     </tr>);})}
                 </tbody>
                 <tfoot>{(()=>{const t=promos.reduce((a,x)=>{const c=promoCalc(x);return{sent:a.sent+pNum(x.sent),orders:a.orders+pNum(x.orders),rev:a.rev+pNum(x.revenue),cost:a.cost+c.sendCost+pNum(x.extraCost),profit:a.profit+(c.profit||0)};},{sent:0,orders:0,rev:0,cost:0,profit:0});return(
-                  <tr><td colSpan={7} className="l">합계</td><td>{fWon(t.sent)}</td><td colSpan={6}></td><td>{fWon(t.orders)}</td><td>{fWon(t.rev)}</td><td>{fPct(t.sent>0?t.orders/t.sent:null)}</td><td>{fWon(t.orders>0?t.rev/t.orders:null)}</td><td>{fWon(t.cost)}</td><td>{fWon(t.profit)}</td><td>{t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-"}</td><td></td></tr>);})()}
+                  <tr><td colSpan={8} className="l">합계</td><td>{fWon(t.sent)}</td><td colSpan={6}></td><td>{fWon(t.orders)}</td><td>{fWon(t.rev)}</td><td>{fPct(t.sent>0?t.orders/t.sent:null)}</td><td>{fWon(t.orders>0?t.rev/t.orders:null)}</td><td>{fWon(t.cost)}</td><td>{fWon(t.profit)}</td><td>{t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-"}</td><td></td></tr>);})()}
                 </tfoot>
               </table>
             </div>)}
@@ -5199,6 +5199,7 @@ function Board() {
               </div>
               <button type="button" className="btn ghost" style={{marginTop:8}} onClick={()=>setPromoDraft({...d,items:[...(d.items||[]),{id:uid(),qty:"1"}]})}>+ 상품 추가</button>
             </div>
+            <div className="fld"><label>베네핏 <span style={{fontWeight:500,color:"var(--ink3)"}}>이 행사에서 제품을 사면 고객의 삶이 어떻게 달라질까 (무엇이 좋은가)?</span></label><textarea value={d.benefit||""} onChange={set("benefit")} placeholder="예) 당 걱정 없이 아침 대용으로 간편하게 단백질 23g 섭취" /></div>
             <div className="fld"><label>기타 혜택·사은품 메모</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 쉐이커 증정, 7만원 이상 구매 시 사은품" /></div>
             <div className="fld"><label>전략 트리 <span style={{fontWeight:500,color:"var(--ink3)"}}>명분 → 목적 → 목표 → 전략 → 전술 순으로 단계별로 내려가며 작성</span></label>
               {(()=>{
