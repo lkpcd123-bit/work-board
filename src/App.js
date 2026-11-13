@@ -508,6 +508,7 @@ const emptyData = () => ({ promos:[],promoProducts:[],promoDefaults:null,tasks:[
 const pNum=(v)=>{const n=parseFloat(String(v??"").replace(/,/g,""));return isFinite(n)?n:0;};
 const PROMO_PCT=["openRate","ctr","ctor","cvr","buyRate"];
 const DEF_COSTS=["쿠폰","사은품","바이럴","스튜디오","쇼호스트"];
+ const DEF_CHECKS=["목적이 한 줄로 설명되는가?","이 문구를 고객이 이해할까?","지금 이 정보가 ‘지금’ 필요한가?","상사가 지적했던 포인트가 반영됐는가?","이전 반려 사유를 다시 밟고 있진 않은가?","새로움 또는 기존에서 업그레이드가 되었는가?"];
 const DEF_COLS=["판관비","광고비","찜쿠폰","파우치","보틀","매출VAT"];
 // 상품별 비용 열: 기본 제품가·배송비 + 사용자가 추가한 열 (세트당 금액 × 판매수량)
 const colVal=(it,c)=>pNum(c.id==="cost"?it.cost:c.id==="ship"?it.ship:(it.cv||{})[c.id]);
@@ -531,13 +532,15 @@ const itemCalc=(it,feeRate,cols)=>{
     sold,rev,cost,ship,each,colSum,fee,profit,margin:rev>0&&profit!=null?profit/rev:null,autoRev,autoFee,autoProfit};
 };
 const promoCalc=(p)=>{
-  const sent=pNum(p.sent),read=pNum(p.read),click=pNum(p.click),orders=pNum(p.orders),extra=pNum(p.extraCost);
+  const sent=pNum(p.sent),read=pNum(p.read),click=pNum(p.click),extra=pNum(p.extraCost);
   const cols=promoCols(p);
   const ics=(p.items||[]).map((i)=>itemCalc(i,p.feeRate,cols));
   const itemsRev=ics.reduce((a,i)=>a+(i.rev||0),0);
   const rev=String(p.revenue??"")!==""?pNum(p.revenue):itemsRev;
   const colTot={};cols.forEach((c)=>{colTot[c.id]=ics.reduce((a,i)=>a+(i.each[c.id]||0),0);});
   const colSum=ics.reduce((a,i)=>a+i.colSum,0);
+  const soldQty=ics.reduce((a,i)=>a+i.sold,0);
+  const orders=String(p.orders??"")!==""?pNum(p.orders):soldQty;
   const feeCost=rev*pNum(p.feeRate)/100;
   const lines=(p.costs||[]).reduce((a,c)=>a+pNum(c.amt),0);
   const vat=String(p.vatRate??"")!==""?rev*pNum(p.vatRate)/100:0;
@@ -551,7 +554,7 @@ const promoCalc=(p)=>{
   auto.profit=detail>0?rev-totalCost:(String(p.marginRate??"")===""?null:rev*pNum(p.marginRate)/100-v.sendCost-extra);
   v.profit=has("profit")?pNum(ov.profit):auto.profit;
   v.roas=div(rev,totalCost);
-  return {...v,auto,ics,cols,colTot,colSum,itemsRev,rev,feeCost,lines,vat,extra,totalCost,margin:rev>0&&v.profit!=null?v.profit/rev:null};
+  return {...v,auto,ics,cols,colTot,colSum,soldQty,orders,itemsRev,rev,feeCost,lines,vat,extra,totalCost,margin:rev>0&&v.profit!=null?v.profit/rev:null};
 };
 // 전략 트리: 노드 {id,label,text,children}. fn은 노드를 받아 교체할 노드(배열이면 여러 개)나 null(삭제)을 반환
 const tUpd=(ns,id,fn)=>ns.flatMap((n)=>n.id===id?[].concat(fn(n)||[]):[{...n,children:tUpd(n.children||[],id,fn)}]);
@@ -2456,7 +2459,7 @@ function Board() {
   const promoDefaults=data.promoDefaults||null;
   const newPromo=()=>{const t=promoDefaults;
     return {_new:true,date:todayStr(),name:"",ov:{},tree:t?.tree?JSON.parse(JSON.stringify(t.tree)):tForm(),
-      checks:(t?.checks||[]).map((k)=>({...k,id:uid(),done:false})),costs:(t?.costs||[]).map((k)=>({...k,id:uid()})),
+      checks:(t?.checks?.length?t.checks.map((k)=>({...k,id:uid(),done:false})):DEF_CHECKS.map((x)=>({id:uid(),text:x,done:false}))),costs:(t?.costs||[]).map((k)=>({...k,id:uid()})),
       cat:t?.cat||"",channel:t?.channel||"",feeRate:t?.feeRate||"",vatRate:t?.vatRate||"",unitCost:t?.unitCost||"",marginRate:t?.marginRate||"",
       cols:t?.cols?JSON.parse(JSON.stringify(t.cols)):undefined,
       items:(t?.items||[]).map((i)=>({...i,id:uid(),sold:"",revOv:"",feeOv:"",profitOv:""}))};};
@@ -3539,7 +3542,7 @@ function Board() {
             </div>}
             {promoList.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>{promos.length?"검색/분류 조건에 맞는 행사가 없습니다.":"아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다."}</div>:(<>
             {(()=>{
-              const t=promoList.reduce((a,x)=>{const c=promoCalc(x),sd=x.noSend?0:1;return{sent:a.sent+sd*pNum(x.sent),read:a.read+sd*pNum(x.read),click:a.click+sd*pNum(x.click),sdOrders:a.sdOrders+sd*pNum(x.orders),orders:a.orders+pNum(x.orders),rev:a.rev+c.rev,cost:a.cost+c.totalCost,profit:a.profit+(c.profit||0),done:a.done+((pNum(x.sent)>0||c.rev>0||pNum(x.orders)>0)?1:0)};},{sent:0,read:0,click:0,sdOrders:0,orders:0,rev:0,cost:0,profit:0,done:0});
+              const t=promoList.reduce((a,x)=>{const c=promoCalc(x),sd=x.noSend?0:1;return{sent:a.sent+sd*pNum(x.sent),read:a.read+sd*pNum(x.read),click:a.click+sd*pNum(x.click),sdOrders:a.sdOrders+sd*c.orders,orders:a.orders+c.orders,rev:a.rev+c.rev,cost:a.cost+c.totalCost,profit:a.profit+(c.profit||0),done:a.done+((pNum(x.sent)>0||c.rev>0||pNum(x.orders)>0)?1:0)};},{sent:0,read:0,click:0,sdOrders:0,orders:0,rev:0,cost:0,profit:0,done:0});
               const div=(x,y)=>y>0?x/y:null;
               const tiles=[["행사 수",promoList.length+"건",`진행 완료 ${t.done}건`],["총 주문금액",fWon(t.rev),"원"],["총 주문고객",fWon(t.orders),"명"],["평균 객단가",fWon(div(t.rev,t.orders)),"원"],["총 비용",fWon(t.cost),"원"],["총 공헌이익",fWon(t.profit),"원"],["ROAS",t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-","주문금액÷비용"],["이익률",t.rev>0?(t.profit/t.rev*100).toFixed(1)+"%":"-","공헌이익÷주문금액"]];
               const reach=[["총 발송 수",fWon(t.sent)],["평균 오픈율",fPct(div(t.read,t.sent))],["평균 CTR",fPct(div(t.click,t.sent))],["평균 CTOR",fPct(div(t.click,t.read))],["평균 CVR",fPct(div(t.sdOrders,t.click))],["평균 구매전환율",fPct(div(t.sdOrders,t.sent))],["건당 획득비용",fWon(div(t.cost,t.orders))]];
@@ -3550,7 +3553,7 @@ function Board() {
               const pTot=prods.reduce((a,x)=>a+x.rev,0),qTot=prods.reduce((a,x)=>a+x.qty,0);
               // 채널별
               const cm=new Map();
-              promoList.forEach((x)=>{const c=promoCalc(x),k=(x.channel||"미지정").trim()||"미지정",o=cm.get(k)||{n:0,rev:0,cost:0,profit:0,orders:0};cm.set(k,{n:o.n+1,rev:o.rev+c.rev,cost:o.cost+c.totalCost,profit:o.profit+(c.profit||0),orders:o.orders+pNum(x.orders)});});
+              promoList.forEach((x)=>{const c=promoCalc(x),k=(x.channel||"미지정").trim()||"미지정",o=cm.get(k)||{n:0,rev:0,cost:0,profit:0,orders:0};cm.set(k,{n:o.n+1,rev:o.rev+c.rev,cost:o.cost+c.totalCost,profit:o.profit+(c.profit||0),orders:o.orders+c.orders});});
               const chans=[...cm.entries()].map(([name,v])=>({name,...v})).sort((a,b)=>b.rev-a.rev);
               return(<div className="poverall">
                 <div className="poh" onClick={()=>setPromoOpen({...promoOpen,__sum:!promoOpen.__sum})}>
@@ -3587,7 +3590,7 @@ function Board() {
                     {kids.length>0&&<div className="rt-kids">{RT(kids,depth+1)}</div>}
                   </div>);});
               return promoList.map((x)=>{
-                const c=promoCalc(x),ns=!!x.noSend,done=pNum(x.sent)>0||c.rev>0||pNum(x.orders)>0,open=!!promoOpen[x.id];
+                const c=promoCalc(x),ns=!!x.noSend,done=pNum(x.sent)>0||c.rev>0||c.orders>0,open=!!promoOpen[x.id];
                 const K=(l,v,hi)=><div className="pk"><span>{l}</span><b style={hi}>{v}</b></div>;
                 const items=(x.items||[]).filter((i)=>i.name||i.sale||i.list);
                 const hasTree=(x.tree||[]).some(tHas);
@@ -3626,7 +3629,7 @@ function Board() {
                           {rows.map(([l,v],i)=>(<div key={l+i} className={i===0?"hi":""}><span>{l}</span><b>{fWon(v)}</b><i>{i===0||!(c.rev>0)?"":(v/c.rev*100).toFixed(1)+"%"}</i></div>))}
                           <div className="pf"><span>공헌이익</span><b style={{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"}}>{fWon(c.profit)}</b><i>{fPct(c.margin)}</i></div>
                         </div>);})()}
-                      <div className="pgrp" style={{marginTop:12}}>{K("주문고객",fWon(pNum(x.orders))+"명")}{K("객단가",fWon(c.aov))}{!ns&&K("구매전환율",fPct(c.buyRate))}{!ns&&K("CVR",fPct(c.cvr))}{K("ROAS",c.roas==null?"-":Math.round(c.roas*100)+"%")}</div>
+                      <div className="pgrp" style={{marginTop:12}}>{K("주문고객",fWon(c.orders)+"명")}{K("객단가",fWon(c.aov))}{!ns&&K("구매전환율",fPct(c.buyRate))}{!ns&&K("CVR",fPct(c.cvr))}{K("ROAS",c.roas==null?"-":Math.round(c.roas*100)+"%")}</div>
                       {c.ics.some((i)=>i.sold>0)&&<div style={{overflowX:"auto",marginTop:12}}><table className="rtbl">
                         <thead><tr>{["상품명","판매수량","행사가","매출",...c.cols.map((cl)=>cl.name||"비용"),"수수료","공헌이익","이익률","구매비율"].map((h,n)=><th key={h+n}>{h}</th>)}</tr></thead>
                         <tbody>{(()=>{const qt=c.ics.reduce((a,i)=>a+i.sold,0);return (x.items||[]).map((it,n)=>{const ic=c.ics[n];if(!(ic.sold>0))return null;return(
@@ -5488,15 +5491,17 @@ function Board() {
                 <div style={g4}>{F("발송 시간","sendAt",{type:"datetime-local"})}{N("실제 발송 수","sent")}{N("읽은 고객 수","read")}{N("클릭 고객 수","click")}</div>
                 <div style={g4}>{N("건당 발송비 (원)","unitCost","예) 15")}</div>
               </>}
+            {!d.noSend&&<>
             <div className="psec">③ 자동 계산 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 비워 두면 자동, 값을 넣으면 그 값으로 고정(노란 칸)</span></div>
-            {!d.noSend&&<div style={g4}>{A("오픈율 %","openRate","읽음÷발송")}{A("CTR %","ctr","클릭÷발송")}{A("CTOR %","ctor","클릭÷읽음")}{A("CVR %","cvr","주문÷클릭")}</div>}
-            <div style={g4}>{d.noSend?null:A("구매전환율 %","buyRate","주문÷발송")}{A("객단가","aov","주문금액÷주문고객")}{d.noSend?null:A("발송비","sendCost","발송×건당")}{A("공헌이익","profit","매출×이익률−비용")}</div>
+            <div style={g4}>{A("오픈율 %","openRate","읽음÷발송")}{A("CTR %","ctr","클릭÷발송")}{A("CTOR %","ctor","클릭÷읽음")}{A("CVR %","cvr","주문÷클릭")}</div>
+            <div style={g4}>{A("구매전환율 %","buyRate","주문÷발송")}{A("객단가","aov","주문금액÷주문고객")}{A("발송비","sendCost","발송×건당")}{A("공헌이익","profit","매출×이익률−비용")}</div>
             <div className="pres">
-              {!d.noSend&&<><span>오픈율 <b>{fPct(c.openRate)}</b></span><span>CTR <b>{fPct(c.ctr)}</b></span><span>CTOR <b>{fPct(c.ctor)}</b></span><span>CVR <b>{fPct(c.cvr)}</b></span><span>구매전환율 <b>{fPct(c.buyRate)}</b></span></>}<span>객단가 <b>{fWon(c.aov)}</b></span><span>ROAS <b>{c.roas==null?"-":Math.round(c.roas*100)+"%"}</b></span>
+              <><span>오픈율 <b>{fPct(c.openRate)}</b></span><span>CTR <b>{fPct(c.ctr)}</b></span><span>CTOR <b>{fPct(c.ctor)}</b></span><span>CVR <b>{fPct(c.cvr)}</b></span><span>구매전환율 <b>{fPct(c.buyRate)}</b></span></><span>객단가 <b>{fWon(c.aov)}</b></span><span>ROAS <b>{c.roas==null?"-":Math.round(c.roas*100)+"%"}</b></span>
               <span>공헌이익 <b style={{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"}}>{c.profit==null?"이익률 입력 필요":fWon(c.profit)+"원"}</b></span>
             </div>
+            </>}
             <div className="psec">④ 총 결과 (입력) <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 무엇이 얼마나 팔렸는지 넣으면 매출·공헌이익이 자동 계산됩니다</span></div>
-            <div style={g4}>{N("주문고객 수","orders")}{N("수수료율 (%)","feeRate","예) 3.85")}{N("매출 VAT율 (%)","vatRate","예) 2.7")}{N("기타 비용 (원)","extraCost","위 항목에 없는 비용")}</div>
+            <div style={g4}><div className="fld"><label>주문고객 수 <span style={{fontWeight:500,color:"var(--ink3)"}}>비우면 판매수량 합계</span></label><input type="number" min="0" value={d.orders??""} placeholder={c.soldQty>0?"자동 "+fWon(c.soldQty):"0"} onChange={set("orders")} style={String(d.orders??"")!==""?{background:"#FFF7D6"}:undefined} /></div>{N("수수료율 (%)","feeRate","예) 3.85")}{N("매출 VAT율 (%)","vatRate","예) 2.7")}{N("기타 비용 (원)","extraCost","위 항목에 없는 비용")}</div>
             {(()=>{const cols=promoCols(d),qt=(d.items||[]).reduce((a,y)=>a+pNum(y.sold),0);
               const setCols=(ncols)=>setPromoDraft({...d,cols:ncols});
               const upd=(it,k)=>(e)=>setPromoDraft({...d,items:d.items.map((x)=>x.id===it.id?{...x,[k]:e.target.value}:x)});
@@ -5569,7 +5574,10 @@ function Board() {
                     <input value={k.text} placeholder="예) 목적이 한 줄로 설명되는가?" onChange={(e)=>setPromoDraft({...d,checks:d.checks.map((z)=>z.id===k.id?{...z,text:e.target.value}:z)})} style={{textDecoration:k.done?"line-through":"none"}} />
                     <button type="button" className="btn ghost" style={{padding:"5px 9px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,checks:d.checks.filter((z)=>z.id!==k.id)})}>×</button>
                   </div>))}
-                <button type="button" className="btn ghost" style={{marginTop:6}} onClick={()=>setPromoDraft({...d,checks:[...(d.checks||[]),{id:uid(),text:"",done:false}]})}>+ 체크 항목 추가</button>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
+                  <button type="button" className="btn ghost" onClick={()=>setPromoDraft({...d,checks:[...(d.checks||[]),{id:uid(),text:"",done:false}]})}>+ 체크 항목 추가</button>
+                  {DEF_CHECKS.some((t)=>!(d.checks||[]).some((z)=>z.text===t))&&<button type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>setPromoDraft({...d,checks:[...(d.checks||[]),...DEF_CHECKS.filter((t)=>!(d.checks||[]).some((z)=>z.text===t)).map((t)=>({id:uid(),text:t,done:false}))]})}>+ 기본 체크리스트 불러오기</button>}
+                </div>
               </div>
             </div>
           </div>
