@@ -596,7 +596,7 @@ const tForm=()=>[
 
 // 검색 대상 텍스트(기획 트리 포함)
 const promoText=(x)=>{const t=(n)=>`${n.label||""} ${n.text||""} ${(n.children||[]).map(t).join(" ")}`;
-  return `${x.name||""} ${x.channel||""} ${x.cat||""} ${x.note||""} ${x.feedback||""} ${(x.contents||[]).map((k)=>k.text||"").join(" ")} ${x.comp||""} ${[...(x.items||[]),...(x.sales||[])].map((i)=>i.name||"").join(" ")} ${(x.tree||[]).map(t).join(" ")}`.toLowerCase();};
+  return `${x.name||""} ${x.channel||""} ${x.cat||""} ${x.note||""} ${x.feedback||""} ${x.contentsText||""} ${(x.contents||[]).map((k)=>k.text||"").join(" ")} ${x.comp||""} ${[...(x.items||[]),...(x.sales||[])].map((i)=>i.name||"").join(" ")} ${(x.tree||[]).map(t).join(" ")}`.toLowerCase();};
 const fPct=(x)=>x==null?"-":(x*100).toFixed(1)+"%";
 const fPct0=(x)=>x==null?"-":Math.round(x*100)+"%";
 const fWon=(x)=>x==null?"-":Math.round(x).toLocaleString();
@@ -2568,19 +2568,19 @@ function Board() {
   const copyPromo=(x)=>{const strip=(ns)=>ns.map((n)=>({...n,id:uid(),done:false,children:strip(n.children||[])}));
     setPromoDraft({_new:true,name:(x.name||"")+" (복사)",cat:x.cat,channel:x.channel,date:todayStr(),endDate:"",noSend:x.noSend,
       tree:strip(x.tree||[]),cols:x.cols,feeRate:x.feeRate,vatRate:x.vatRate,costs:(x.costs||[]).map((z)=>({...z,id:uid(),amt:""})),fields:(x.fields||[]).map((f)=>({...f,id:uid(),val:""})),items:(x.items||[]).map((i)=>({...i,id:uid()})),sales:[],comp:x.comp,
-      unitCost:x.unitCost,marginRate:x.marginRate,checks:(x.checks||[]).map((c)=>({...c,id:uid(),done:false})),contents:(x.contents||[]).map((c)=>({...c,id:uid(),done:false})),ov:{}});};
+      unitCost:x.unitCost,marginRate:x.marginRate,checks:(x.checks||[]).map((c)=>({...c,id:uid(),done:false})),contents:(x.contents||[]).map((c)=>({...c,id:uid(),done:false})),contentsText:x.contentsText||"",ov:{}});};
   const promoDefaults=data.promoDefaults||null;
   const newPromo=()=>{const t=promoDefaults;
     return {_new:true,date:todayStr(),name:"",ov:{},tree:t?.tree?JSON.parse(JSON.stringify(t.tree)):tForm(),
       checks:(t?.checks?.length?t.checks.map((k)=>({...k,id:uid(),done:false})):DEF_CHECKS.map((x)=>({id:uid(),text:x,done:false}))),
-      contents:(t?.contents||[]).map((k)=>({...k,id:uid(),done:false})),costs:(t?.costs||[]).map((k)=>({...k,id:uid()})),
+      contents:(t?.contents||[]).map((k)=>({...k,id:uid(),done:false})),contentsText:t?.contentsText||"",costs:(t?.costs||[]).map((k)=>({...k,id:uid()})),
       cat:t?.cat||"",channel:t?.channel||"",feeRate:t?.feeRate||"",vatRate:t?.vatRate||"",unitCost:t?.unitCost||"",marginRate:t?.marginRate||"",
       ...(t?.cols?{cols:JSON.parse(JSON.stringify(t.cols))}:{}),sales:[],fields:(t?.fields||[]).map((f)=>({...f,id:uid(),val:""})),
       items:(t?.items||[]).map((i)=>({...i,id:uid(),sold:"",revOv:"",feeOv:"",profitOv:""}))};};
   const saveDefaults=(x)=>{
     if(!window.confirm("지금 화면의 기획양식·체크리스트·비용 항목·요율·구성 상품을 다음 행사부터 기본으로 사용할까요?\n(이 행사 내용은 그대로 유지됩니다)"))return;
     const strip=(ns)=>(ns||[]).map((n)=>({...n,done:false,children:strip(n.children)}));
-    commit((d)=>({...d,promoDefaults:{tree:strip(x.tree),checks:(x.checks||[]).map((k)=>({...k,done:false})),contents:(x.contents||[]).map((k)=>({...k,done:false})),
+    commit((d)=>({...d,promoDefaults:{tree:strip(x.tree),checks:(x.checks||[]).map((k)=>({...k,done:false})),contents:(x.contents||[]).map((k)=>({...k,done:false})),contentsText:x.contentsText||"",
       costs:(x.costs||[]).map((k)=>({name:k.name,amt:""})),fields:(x.fields||[]).map((f)=>({...f,val:""})),cat:x.cat||"",channel:x.channel||"",
       feeRate:x.feeRate||"",vatRate:x.vatRate||"",unitCost:x.unitCost||"",marginRate:x.marginRate||"",
       cols:promoCols(x),items:(x.items||[]).map((i)=>({name:i.name,qty:i.qty,list:i.list,sale:i.sale,coupon:i.coupon,pr:i.pr,cost:i.cost,ship:i.ship,cv:i.cv})),
@@ -3773,7 +3773,8 @@ function Board() {
                           <td style={{color:ic.profit<0?"#CA3521":"#1F845A",fontWeight:700}}>{fWon(ic.profit)}</td><td>{fPct(ic.margin)}</td><td><b>{qt>0?fPct(ic.sold/qt):"-"}</b></td></tr>);});})()}</tbody>
                       </table></div>}
                     </div>:<div className="psc"><h4>총 결과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 결과가 없어요. [수정] → <b>총 결과</b>에서 상품별 판매수량을 넣으면 매출·공헌이익이 자동 계산돼요.</p></div>}
-                    {(x.contents||[]).length>0&&<div className="psc"><h4>기획안에 들어가야 할 것들 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.contents||[]).filter((k)=>k.done).length}/{(x.contents||[]).length} 완료 · 눌러서 체크</span></h4>
+                    {(x.contentsText||"").trim()&&<div className="psc"><h4>기획안에 들어가야 할 것들</h4><div className="pmemo">{x.contentsText}</div></div>}
+                    {!(x.contentsText||"").trim()&&(x.contents||[]).length>0&&<div className="psc"><h4>기획안에 들어가야 할 것들 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.contents||[]).filter((k)=>k.done).length}/{(x.contents||[]).length} 완료 · 눌러서 체크</span></h4>
                       <div className="pchk">{(x.contents||[]).map((k)=>(
                         <label key={k.id} className={k.done?"on":""}>
                           <input type="checkbox" checked={!!k.done} onChange={()=>commit((dd)=>({...dd,promos:(dd.promos||[]).map((y)=>y.id===x.id?{...y,contents:(y.contents||[]).map((z)=>z.id===k.id?{...z,done:!z.done}:z),updatedAt:Date.now()}:y),updatedAt:Date.now()}),[])} />
@@ -5591,17 +5592,23 @@ function Board() {
                 </>);
               })()}
             </div>
-            <div className="fld"><label>기획안에 들어가야 할 것들 <span style={{fontWeight:500,color:"var(--ink3)"}}>상세페이지·배너·공지 등 실제 산출물에 꼭 넣어야 하는 항목. 챙긴 것은 체크</span></label>
-              <div className="pchk edit">
-                {(d.contents||[]).map((k)=>(
-                  <div key={k.id} className="pchk-row">
-                    <input type="checkbox" checked={!!k.done} onChange={(e)=>setPromoDraft({...d,contents:d.contents.map((z)=>z.id===k.id?{...z,done:e.target.checked}:z)})} />
-                    <input value={k.text} placeholder="예) 할인율 노출 배너 / 증정품 이미지 / 교환·반품 안내 문구" onChange={(e)=>setPromoDraft({...d,contents:d.contents.map((z)=>z.id===k.id?{...z,text:e.target.value}:z)})} style={{textDecoration:k.done?"line-through":"none"}} />
-                    <button type="button" className="btn ghost" style={{padding:"5px 9px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,contents:d.contents.filter((z)=>z.id!==k.id)})}>×</button>
-                  </div>))}
-                <button type="button" className="btn ghost" style={{marginTop:6}} onClick={()=>setPromoDraft({...d,contents:[...(d.contents||[]),{id:uid(),text:"",done:false}]})}>+ 항목 추가</button>
-              </div>
+            <div className="fld"><label>기획안에 들어가야 할 것들 <span style={{fontWeight:500,color:"var(--ink3)"}}>기획양식과 별개로, 실제 기획안 문서에 담아야 할 내용을 자유롭게 적는 칸</span></label>
+              <textarea rows={6} style={{minHeight:130}} placeholder={"예) 행사 개요 한 장\n예) 할인율·혜택 비교표\n예) 증정품 이미지와 재고 수량\n예) 교환·반품 안내 문구\n예) 채널별 노출 일정"}
+                value={d.contentsText??((d.contents||[]).map((k)=>k.text).filter(Boolean).join("\n"))}
+                onChange={(e)=>setPromoDraft({...d,contentsText:e.target.value})} />
             </div>
+            <div className="fld"><label>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)"}}>스스로 점검할 항목을 직접 적어 두세요</span></label>
+              <div className="pchk edit">
+                {(d.checks||[]).map((k)=>(
+                  <div key={k.id} className="pchk-row">
+                    <input type="checkbox" checked={!!k.done} onChange={(e)=>setPromoDraft({...d,checks:d.checks.map((z)=>z.id===k.id?{...z,done:e.target.checked}:z)})} />
+                    <input value={k.text} placeholder="예) 목적이 한 줄로 설명되는가?" onChange={(e)=>setPromoDraft({...d,checks:d.checks.map((z)=>z.id===k.id?{...z,text:e.target.value}:z)})} style={{textDecoration:k.done?"line-through":"none"}} />
+                    <button type="button" className="btn ghost" style={{padding:"5px 9px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,checks:d.checks.filter((z)=>z.id!==k.id)})}>×</button>
+                  </div>))}
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
+                  <button type="button" className="btn ghost" onClick={()=>setPromoDraft({...d,checks:[...(d.checks||[]),{id:uid(),text:"",done:false}]})}>+ 체크 항목 추가</button>
+                  {DEF_CHECKS.some((t)=>!(d.checks||[]).some((z)=>z.text===t))&&<button type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>setPromoDraft({...d,checks:[...(d.checks||[]),...DEF_CHECKS.filter((t)=>!(d.checks||[]).some((z)=>z.text===t)).map((t)=>({id:uid(),text:t,done:false}))]})}>+ 기본 체크리스트 불러오기</button>}
+                </div>
             <div className="fld"><label>구성 <span style={{fontWeight:500,color:"var(--ink3)"}}>행사가 = 판매가 − 쿠폰 · 개당 = 행사가 ÷ 수량 · 적립금 = 행사가 × 적립률 · 할인율 = (정상가 − 행사가) ÷ 정상가</span></label>
               {savedProducts.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
                 <span style={{fontSize:12,color:"var(--ink3)"}}>저장된 상품:</span>
@@ -5763,18 +5770,6 @@ function Board() {
             <div className="psec">⑤ 마무리</div>
             <div className="fld" style={{marginTop:14}}><label>받은 피드백 <span style={{fontWeight:500,color:"var(--ink3)"}}>팀장·동료에게 받은 의견을 그대로 적어 두기</span></label><textarea value={d.feedback||""} onChange={set("feedback")} placeholder="예) 혜택이 한눈에 안 들어온다 — 메인 카피에 할인율 먼저" /></div>
             <div className="fld"><label>특이사항 · 회고</label><textarea value={d.note||""} onChange={set("note")} placeholder="잘된 점, 아쉬운 점, 다음에 바꿀 것" /></div>
-            <div className="fld"><label>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)"}}>스스로 점검할 항목을 직접 적어 두세요</span></label>
-              <div className="pchk edit">
-                {(d.checks||[]).map((k)=>(
-                  <div key={k.id} className="pchk-row">
-                    <input type="checkbox" checked={!!k.done} onChange={(e)=>setPromoDraft({...d,checks:d.checks.map((z)=>z.id===k.id?{...z,done:e.target.checked}:z)})} />
-                    <input value={k.text} placeholder="예) 목적이 한 줄로 설명되는가?" onChange={(e)=>setPromoDraft({...d,checks:d.checks.map((z)=>z.id===k.id?{...z,text:e.target.value}:z)})} style={{textDecoration:k.done?"line-through":"none"}} />
-                    <button type="button" className="btn ghost" style={{padding:"5px 9px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,checks:d.checks.filter((z)=>z.id!==k.id)})}>×</button>
-                  </div>))}
-                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
-                  <button type="button" className="btn ghost" onClick={()=>setPromoDraft({...d,checks:[...(d.checks||[]),{id:uid(),text:"",done:false}]})}>+ 체크 항목 추가</button>
-                  {DEF_CHECKS.some((t)=>!(d.checks||[]).some((z)=>z.text===t))&&<button type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>setPromoDraft({...d,checks:[...(d.checks||[]),...DEF_CHECKS.filter((t)=>!(d.checks||[]).some((z)=>z.text===t)).map((t)=>({id:uid(),text:t,done:false}))]})}>+ 기본 체크리스트 불러오기</button>}
-                </div>
               </div>
             </div>
           </div>
