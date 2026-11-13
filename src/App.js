@@ -522,7 +522,7 @@ const promoCalc=(p)=>{
 };
 // 전략 트리: 노드 {id,label,text,children}. fn은 노드를 받아 교체할 노드(배열이면 여러 개)나 null(삭제)을 반환
 const tUpd=(ns,id,fn)=>ns.flatMap((n)=>n.id===id?[].concat(fn(n)||[]):[{...n,children:tUpd(n.children||[],id,fn)}]);
-const tTxt=(x,label)=>(x.tree||[]).filter((n)=>n.label===label&&n.text).map((n)=>n.text).join(" / ");
+const tTxt=(x,label)=>(x.tree||[]).filter((n)=>!n.skip&&n.label===label&&n.text).map((n)=>n.text).join(" / ");
 const tNew=(label,text="",children=[])=>({id:Math.random().toString(36).slice(2,10),label,text,children});
 const tH=(label,hint,children=[])=>({...tNew(label,"",children),hint});
 const tC=(label)=>({...tNew(label),chk:true,done:false});
@@ -822,6 +822,32 @@ const CSS = `
 .itbl td{padding:4px 3px;}
 .itbl input{width:100%;min-width:62px;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:6px 7px;font-size:13px;}
 .itbl td.calc{text-align:right;font-weight:700;background:#F1F2F4;padding:4px 8px;white-space:nowrap;}
+.psum{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.psum>div{flex:1;min-width:110px;background:#F1F2F4;border-radius:10px;padding:10px 14px;}
+.psum span{display:block;font-size:12px;color:var(--ink3);margin-bottom:2px;}
+.psum b{font-size:17px;font-weight:800;}
+.pcards{display:flex;flex-direction:column;gap:14px;}
+.pcard{border:1px solid var(--line);border-radius:12px;padding:16px 18px;cursor:pointer;background:var(--card);transition:box-shadow .15s;}
+.pcard:hover{box-shadow:0 3px 14px rgba(0,0,0,.1);}
+.phead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;}
+.pname{font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.pch{font-size:12px;font-weight:700;background:#E9F2FF;color:#0C66E4;border-radius:10px;padding:2px 9px;}
+.pst{font-size:12px;font-weight:700;background:#EBECF0;color:var(--ink3);border-radius:10px;padding:2px 9px;}
+.pst.on{background:#DFFCF0;color:#1F845A;}
+.pdate{font-size:13px;color:var(--ink3);margin-top:4px;}
+.pprofit{text-align:right;}
+.pprofit span{display:block;font-size:12px;color:var(--ink3);}
+.pprofit b{font-size:20px;font-weight:800;}
+.pplan{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 20px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
+.pplan span{display:block;font-size:12px;font-weight:700;color:var(--ink3);margin-bottom:3px;}
+.pplan p{margin:0;font-size:14px;line-height:1.55;white-space:pre-line;}
+.pkpis{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px;}
+.pgrp{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;}
+.pgrp em{font-style:normal;font-size:12px;font-weight:800;color:#0C66E4;width:64px;align-self:center;}
+.pk{background:#F7F8F9;border-radius:8px;padding:8px 12px;min-width:92px;}
+.pk span{display:block;font-size:11.5px;color:var(--ink3);}
+.pk b{font-size:15px;font-weight:800;}
+.pnote{margin-top:12px;font-size:13.5px;color:var(--ink2);background:#FFF7D6;border-radius:8px;padding:8px 12px;white-space:pre-line;}
 .psec{font-size:13.5px;font-weight:800;margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);}
 .psec:first-child{margin-top:0;padding-top:0;border-top:0;}
 .pres{display:flex;flex-wrap:wrap;gap:6px 16px;background:#F1F2F4;border-radius:8px;padding:12px 14px;font-size:13.5px;}
@@ -3383,32 +3409,35 @@ function Board() {
               <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{},tree:tForm()})}>+ 행사 추가</button>
               <span style={{fontSize:12,color:"var(--ink3)"}}>{promos.length}건 · 행을 누르면 수정</span>
             </div>
-            {promos.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다.</div>:(
-            <div style={{overflowX:"auto"}}>
-              <table className="ptbl">
-                <thead><tr>{["날짜","행사명","채널","명분","타겟·세그먼트","구성","베네핏","발송 시간","발송 수","읽음","클릭","오픈율","CTR","CTOR","CVR","주문고객","주문금액","구매전환율","객단가","비용","공헌이익","ROAS","특이사항"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {promos.map((x)=>{const c=promoCalc(x);return(
-                    <tr key={x.id} onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>
-                      <td>{x.date}{x.endDate&&x.endDate!==x.date?` ~ ${x.endDate.slice(5)}`:""}</td>
-                      <td className="l"><b>{x.name}</b></td><td>{x.channel}</td><td className="l">{tTxt(x,"명분")||x.reason}</td>
-                      <td className="l">{[tTxt(x,"타겟")||x.target,tTxt(x,"세그먼트")||x.segment].filter(Boolean).join(" / ")}</td><td className="l">{(x.items||[]).filter((i)=>i.name).map((i)=>`${i.name}${pNum(i.qty)>1?" ×"+pNum(i.qty):""}${itemCalc(i).promo!=null?" "+fWon(itemCalc(i).promo)+"원":""}`).join(", ")||x.comp}</td>
-                      <td className="l">{x.benefit}</td>
-                      <td>{(x.sendAt||"").replace("T"," ")}</td>
-                      <td>{fWon(pNum(x.sent))}</td><td>{fWon(pNum(x.read))}</td><td>{fWon(pNum(x.click))}</td>
-                      <td>{fPct(c.openRate)}</td><td>{fPct(c.ctr)}</td><td>{fPct(c.ctor)}</td><td>{fPct(c.cvr)}</td>
-                      <td>{fWon(pNum(x.orders))}</td><td><b>{fWon(pNum(x.revenue))}</b></td><td>{fPct(c.buyRate)}</td><td>{fWon(c.aov)}</td>
-                      <td>{fWon(c.sendCost+pNum(x.extraCost))}</td>
-                      <td style={{fontWeight:800,color:c.profit==null?"var(--ink3)":c.profit<0?"#CA3521":"#1F845A"}}>{fWon(c.profit)}</td>
-                      <td>{c.roas==null?"-":Math.round(c.roas*100)+"%"}</td>
-                      <td className="l">{x.note}</td>
-                    </tr>);})}
-                </tbody>
-                <tfoot>{(()=>{const t=promos.reduce((a,x)=>{const c=promoCalc(x);return{sent:a.sent+pNum(x.sent),orders:a.orders+pNum(x.orders),rev:a.rev+pNum(x.revenue),cost:a.cost+c.sendCost+pNum(x.extraCost),profit:a.profit+(c.profit||0)};},{sent:0,orders:0,rev:0,cost:0,profit:0});return(
-                  <tr><td colSpan={8} className="l">합계</td><td>{fWon(t.sent)}</td><td colSpan={6}></td><td>{fWon(t.orders)}</td><td>{fWon(t.rev)}</td><td>{fPct(t.sent>0?t.orders/t.sent:null)}</td><td>{fWon(t.orders>0?t.rev/t.orders:null)}</td><td>{fWon(t.cost)}</td><td>{fWon(t.profit)}</td><td>{t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-"}</td><td></td></tr>);})()}
-                </tfoot>
-              </table>
-            </div>)}
+            {promos.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다.</div>:(<>
+            {(()=>{const t=promos.reduce((a,x)=>{const c=promoCalc(x);return{sent:a.sent+pNum(x.sent),orders:a.orders+pNum(x.orders),rev:a.rev+pNum(x.revenue),cost:a.cost+c.sendCost+pNum(x.extraCost),profit:a.profit+(c.profit||0)};},{sent:0,orders:0,rev:0,cost:0,profit:0});return(
+              <div className="psum">
+                {[["행사",promos.length+"건"],["발송",fWon(t.sent)],["주문",fWon(t.orders)],["주문금액",fWon(t.rev)],["비용",fWon(t.cost)],["공헌이익",fWon(t.profit)],["ROAS",t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-"]].map(([l,v])=>(
+                  <div key={l}><span>{l}</span><b style={l==="공헌이익"?{color:t.profit<0?"#CA3521":"#1F845A"}:undefined}>{v}</b></div>))}
+              </div>);})()}
+            <div className="pcards">
+              {promos.map((x)=>{
+                const c=promoCalc(x),done=pNum(x.sent)>0||pNum(x.revenue)>0;
+                const plan=[["명분",tTxt(x,"명분")||x.reason],["타겟·세그먼트",[tTxt(x,"타겟")||x.target,tTxt(x,"세그먼트")||x.segment].filter(Boolean).join(" / ")],["구성",(x.items||[]).filter((i)=>i.name).map((i)=>`${i.name}${pNum(i.qty)>1?" ×"+pNum(i.qty):""}${itemCalc(i).promo!=null?" · "+fWon(itemCalc(i).promo)+"원":""}`).join("\n")||x.comp],["베네핏",x.benefit]].filter(([,v])=>v);
+                const K=(l,v,hi)=><div className="pk"><span>{l}</span><b style={hi}>{v}</b></div>;
+                return(
+                <div key={x.id} className="pcard" onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>
+                  <div className="phead">
+                    <div>
+                      <div className="pname">{x.name}{x.channel&&<span className="pch">{x.channel}</span>}<span className={"pst"+(done?" on":"")}>{done?"발송 완료":"발송 전"}</span></div>
+                      <div className="pdate">{x.date}{x.endDate&&x.endDate!==x.date?` ~ ${x.endDate}`:""}{x.sendAt?` · 발송 ${x.sendAt.replace("T"," ")}`:""}</div>
+                    </div>
+                    {done&&<div className="pprofit"><span>공헌이익</span><b style={{color:c.profit==null?"var(--ink3)":c.profit<0?"#CA3521":"#1F845A"}}>{fWon(c.profit)}</b></div>}
+                  </div>
+                  {plan.length>0&&<div className="pplan">{plan.map(([l,v])=><div key={l}><span>{l}</span><p>{v}</p></div>)}</div>}
+                  {done&&<div className="pkpis">
+                    <div className="pgrp"><em>발송·반응</em>{K("발송",fWon(pNum(x.sent)))}{K("읽음",fWon(pNum(x.read)))}{K("클릭",fWon(pNum(x.click)))}{K("오픈율",fPct(c.openRate))}{K("CTR",fPct(c.ctr))}{K("CTOR",fPct(c.ctor))}</div>
+                    <div className="pgrp"><em>구매</em>{K("주문고객",fWon(pNum(x.orders)))}{K("주문금액",fWon(pNum(x.revenue)))}{K("CVR",fPct(c.cvr))}{K("구매전환율",fPct(c.buyRate))}{K("객단가",fWon(c.aov))}</div>
+                    <div className="pgrp"><em>손익</em>{K("비용",fWon(c.sendCost+pNum(x.extraCost)))}{K("공헌이익",fWon(c.profit),{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"})}{K("ROAS",c.roas==null?"-":Math.round(c.roas*100)+"%")}</div>
+                  </div>}
+                  {x.note&&<div className="pnote">📝 {x.note}</div>}
+                </div>);})}
+            </div></>)}
           </div>
           ):(<>
           {/* 툴바 */}
@@ -5187,19 +5216,20 @@ function Board() {
                 const up=(id,fn)=>setPromoDraft({...d,tree:tUpd(d.tree||[],id,fn)});
                 const R=(ns,depth)=>ns.map((n)=>(
                   <div key={n.id} style={{marginLeft:depth?18:0,borderLeft:depth?"2px solid var(--line)":"none",paddingLeft:depth?10:0,marginTop:6}}>
-                    <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
+                    <div style={{display:"flex",gap:6,alignItems:"flex-start",opacity:n.skip?.45:1}}>
                       {n.chk?(<>
                         <input type="checkbox" checked={!!n.done} onChange={(e)=>up(n.id,(x)=>({...x,done:e.target.checked}))} style={{width:18,flex:"none",marginTop:11}} />
                         <input value={n.label} onChange={(e)=>up(n.id,(x)=>({...x,label:e.target.value}))} style={{flex:1,textDecoration:n.done?"line-through":"none"}} />
                       </>):(<>
-                        <input list="promo-lbl" value={n.label} onChange={(e)=>up(n.id,(x)=>({...x,label:e.target.value}))} style={{width:Math.max(depth?84:112,Math.min(240,(n.label||"").length*14+24)),flex:"none",fontWeight:800,color:depth?"#CA3521":"#0055CC"}} />
+                        <input list="promo-lbl" value={n.label} onChange={(e)=>up(n.id,(x)=>({...x,label:e.target.value}))} style={{textDecoration:n.skip?"line-through":"none",width:Math.max(depth?84:112,Math.min(240,(n.label||"").length*14+24)),flex:"none",fontWeight:800,color:depth?"#CA3521":"#0055CC"}} />
                         <textarea rows={1} value={n.text} onChange={(e)=>up(n.id,(x)=>({...x,text:e.target.value}))} placeholder={n.hint||(depth?"내용":"예) 가입 후 구매하지 않은 신규고객에게 첫 구매 계기 만들기")} style={{flex:1,minHeight:38}} />
                       </>)}
+                      <button type="button" title={n.skip?"다시 넣기":"넣지 않음"} className="btn ghost" style={{padding:"6px 9px",fontSize:12,background:n.skip?"#FFE2DE":undefined,color:n.skip?"#CA3521":undefined}} onClick={()=>up(n.id,(x)=>({...x,skip:!x.skip}))}>{n.skip?"넣지 않음 ✓":"∅"}</button>
                       <button type="button" title="하위 단계 추가" className="btn ghost" style={{padding:"6px 9px"}} onClick={()=>up(n.id,(x)=>({...x,children:[...(x.children||[]),tNew("")]}))}>↳</button>
                       <button type="button" title="같은 단계에 추가" className="btn ghost" style={{padding:"6px 9px"}} onClick={()=>up(n.id,(x)=>[x,n.chk?tC(""):tNew(x.label)])}>＋</button>
                       <button type="button" title="삭제" className="btn ghost" style={{padding:"6px 9px",color:"#CA3521"}} onClick={()=>up(n.id,()=>null)}>×</button>
                     </div>
-                    {R(n.children||[],depth+1)}
+                    {!n.skip&&R(n.children||[],depth+1)}
                   </div>));
                 return(<>
                   <datalist id="promo-lbl">{["명분","목적","목표","전략","전술","KPI","혜택","메시지","비고"].map((o)=><option key={o} value={o} />)}</datalist>
