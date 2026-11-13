@@ -512,6 +512,15 @@ const DEF_COSTS=["바이럴","스튜디오","쇼호스트","촬영비","모델�
 const DEF_COLS=["판관비","광고비","찜쿠폰","파우치","보틀","매출VAT"];
 // 상품별 비용 열: 기본 제품가·배송비 + 사용자가 추가한 열 (세트당 금액 × 판매수량)
 const colVal=(it,c)=>pNum(c.id==="cost"?it.cost:c.id==="ship"?it.ship:(it.cv||{})[c.id]);
+// 총 결과 행의 빈 칸은 ① 구성에 연결된 상품 값을 자동으로 따름 (직접 넣으면 그 값 우선)
+const rowSrc=(row,items)=>(items||[]).find((i)=>i.id===row.srcId)||null;
+const resolveRow=(row,src)=>{
+  if(!src)return row;
+  const g=(k)=>String(row[k]??"")!==""?row[k]:src[k];
+  const cv={...(src.cv||{})};
+  Object.entries(row.cv||{}).forEach(([k,v])=>{if(String(v??"")!=="")cv[k]=v;});
+  return {...row,name:row.name||src.name,sale:g("sale"),qty:g("qty"),coupon:g("coupon"),cost:g("cost"),ship:g("ship"),cv};
+};
 const promoSales=(p)=>p.sales||(p.items||[]).filter((i)=>pNum(i.sold)>0);
 const promoCols=(p)=>(p&&p.cols)||[{id:"cost",name:"제품가"},{id:"ship",name:"배송비"},{id:"gift",name:"사은품"},{id:"cpn",name:"쿠폰"}];
 // 상품 한 줄: 매출 = 행사가×판매수량, 비용 = 제품가·배송비(수량분) + 수수료(매출×수수료율)
@@ -537,7 +546,7 @@ const itemCalc=(it,feeRate,cols)=>{
 const promoCalc=(p)=>{
   const sent=pNum(p.sent),read=pNum(p.read),click=pNum(p.click),extra=pNum(p.extraCost);
   const cols=promoCols(p);
-  const sales=promoSales(p);
+  const sales=promoSales(p).map((r)=>resolveRow(r,rowSrc(r,p.items)));
   const ics=sales.map((i)=>itemCalc(i,p.feeRate,cols));
   const itemsRev=ics.reduce((a,i)=>a+(i.rev||0),0);
   const rev=String(p.revenue??"")!==""?pNum(p.revenue):itemsRev;
@@ -3755,10 +3764,11 @@ function Board() {
                         </div>);})()}
                       <div className="pgrp" style={{marginTop:12}}>{K("주문고객",fWon(c.orders)+"명")}{K("객단가",fWon(c.aov))}{!ns&&K("구매전환율",fPct(c.buyRate))}{!ns&&K("CVR",fPct(c.cvr))}{K("ROAS",c.roas==null?"-":Math.round(c.roas*100)+"%")}</div>
                       {c.ics.some((i)=>i.sold>0)&&<div style={{overflowX:"auto",marginTop:12}}><table className="rtbl">
-                        <thead><tr>{["상품명","판매수량","행사가","매출",...c.cols.map((cl)=>cl.name||"비용"),"수수료","공헌이익","이익률","구매비율"].map((h,n)=><th key={h+n}>{h}</th>)}</tr></thead>
+                        <thead><tr>{["상품명","판매수량","행사가",...c.cols.map((cl)=>cl.name||"비용"),"총원가","매출VAT","총매출","수수료","영업이익","이익률","구매비율"].map((h,n)=><th key={h+n}>{h}</th>)}</tr></thead>
                         <tbody>{(()=>{const qt=c.ics.reduce((a,i)=>a+i.sold,0);return c.sales.map((it,n)=>{const ic=c.ics[n];if(!(ic.sold>0))return null;return(
-                          <tr key={it.id}><td className="l">{it.name}</td><td><b>{fWon(ic.sold)}</b></td><td>{fWon(ic.promo)}</td><td>{fWon(ic.rev)}</td>
-                          {c.cols.map((cl)=><td key={cl.id}>{fWon(ic.each[cl.id]||0)}</td>)}<td>{fWon(ic.fee)}</td>
+                          <tr key={it.id}><td className="l">{it.name}</td><td><b>{fWon(ic.sold)}</b></td><td>{fWon(ic.promo)}</td>
+                          {c.cols.map((cl)=><td key={cl.id}>{fWon((ic.each[cl.id]||0)/(ic.sold||1))}</td>)}
+                          <td>{fWon(ic.colSum)}</td><td>{fWon(ic.vat)}</td><td><b>{fWon(ic.rev)}</b></td><td>{fWon(ic.fee)}</td>
                           <td style={{color:ic.profit<0?"#CA3521":"#1F845A",fontWeight:700}}>{fWon(ic.profit)}</td><td>{fPct(ic.margin)}</td><td><b>{qt>0?fPct(ic.sold/qt):"-"}</b></td></tr>);});})()}</tbody>
                       </table></div>}
                     </div>:<div className="psc"><h4>총 결과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 결과가 없어요. [수정] → <b>총 결과</b>에서 상품별 판매수량을 넣으면 매출·공헌이익이 자동 계산돼요.</p></div>}
@@ -5671,22 +5681,29 @@ function Board() {
                         <input value={cl.name} onChange={(e)=>setCols(cols.map((z)=>z.id===cl.id?{...z,name:e.target.value}:z))} style={{width:66,textAlign:"center",fontWeight:700,background:"transparent",border:"none",fontSize:12}} />
                         <button type="button" title="열 삭제" style={{background:"none",border:"none",cursor:"pointer",color:"#8993A4",padding:0}} onClick={()=>setCols(cols.filter((z)=>z.id!==cl.id))}>×</button>
                       </th>))}
-                      {["매출","수수료","공헌이익","이익률","구매비율",""].map((h)=><th key={h}>{h}</th>)}
+                      {["총원가","매출VAT","총매출","수수료","영업이익","이익률","구매비율",""].map((h)=><th key={h}>{h}</th>)}
                     </tr></thead>
                     <tbody>
-                      {rows.map((it)=>{const ic=itemCalc(it,d.feeRate,cols);return(
-                        <tr key={it.id}>
-                          <td><input value={it.name||""} onChange={upd(it,"name")} placeholder="상품명" style={{minWidth:110,fontWeight:700}} /></td>
-                          <td><input type="number" value={it.sale??""} onChange={upd(it,"sale")} placeholder="행사가" /></td>
-                          <td><input type="number" min="0" value={it.sold??""} onChange={upd(it,"sold")} placeholder="0" /></td>
-                          {cols.map((cl)=><td key={cl.id}><input type="number" value={cl.id==="cost"?(it.cost??""):cl.id==="ship"?(it.ship??""):((it.cv||{})[cl.id]??"")} onChange={updCol(it,cl.id)} placeholder="세트당" /></td>)}
+                      {rows.map((raw)=>{const src=rowSrc(raw,d.items),it=resolveRow(raw,src),ic=itemCalc(it,d.feeRate,cols);
+                        const ph=(k)=>src&&String(src[k]??"")!==""?fWon(pNum(src[k])):"행사가";
+                        const cls=(k)=>String(raw[k]??"")!==""?"inp-ov":(src&&String(src[k]??"")!==""?"inp-auto":"");
+                        return(
+                        <tr key={raw.id}>
+                          <td><input value={raw.name??""} onChange={upd(raw,"name")} placeholder={src?.name||"상품명"} style={{minWidth:110,fontWeight:700}} /></td>
+                          <td><input className={cls("sale")} type="number" value={raw.sale??""} onChange={upd(raw,"sale")} placeholder={ph("sale")} /></td>
+                          <td><input type="number" min="0" value={raw.sold??""} onChange={upd(raw,"sold")} placeholder="0" /></td>
+                          {cols.map((cl)=>{const k=cl.id==="cost"?"cost":cl.id==="ship"?"ship":null;
+                            const v=k?(raw[k]??""):((raw.cv||{})[cl.id]??"");
+                            const sv=k?(src?.[k]??""):((src?.cv||{})[cl.id]??"");
+                            return <td key={cl.id}><input className={String(v??"")!==""?"inp-ov":(String(sv??"")!==""?"inp-auto":"")} type="number" value={v} onChange={updCol(raw,cl.id)} placeholder={String(sv??"")!==""?fWon(pNum(sv)):"세트당"} /></td>;})}
+                          <td className="calc">{fWon(ic.colSum)}</td><td className="calc">{fWon(ic.vat||null)}</td>
                           {[["revOv",ic.autoRev],["feeOv",ic.autoFee],["profitOv",ic.autoProfit]].map(([k,a])=>(
-                            <td key={k}><input className={String(it[k]??"")!==""?"inp-ov":"inp-auto"} type="number" value={it[k]??""} placeholder={a==null?"자동":fWon(a)} onChange={upd(it,k)} /></td>))}
+                            <td key={k}><input className={String(raw[k]??"")!==""?"inp-ov":"inp-auto"} type="number" value={raw[k]??""} placeholder={a==null?"자동":fWon(a)} onChange={upd(raw,k)} /></td>))}
                           <td className="calc">{fPct(ic.margin)}</td>
                           <td className="calc">{qt>0&&ic.sold>0?fPct(ic.sold/qt):"-"}</td>
-                          <td><button type="button" className="btn ghost" style={{padding:"4px 8px",color:"#CA3521"}} onClick={()=>setRows(rows.filter((z)=>z.id!==it.id))}>×</button></td>
+                          <td><button type="button" className="btn ghost" style={{padding:"4px 8px",color:"#CA3521"}} onClick={()=>setRows(rows.filter((z)=>z.id!==raw.id))}>×</button></td>
                         </tr>);})}
-                      {rows.length===0&&<tr><td colSpan={9+cols.length} style={{textAlign:"center",color:"var(--ink3)",padding:14,fontSize:13}}>아래에서 ① 기획의 구성 상품을 가져오거나 직접 추가해 주세요.</td></tr>}
+                      {rows.length===0&&<tr><td colSpan={11+cols.length} style={{textAlign:"center",color:"var(--ink3)",padding:14,fontSize:13}}>아래에서 ① 기획의 구성 상품을 가져오거나 직접 추가해 주세요.</td></tr>}
                     </tbody>
                   </table>
                 </div>
