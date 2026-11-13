@@ -522,7 +522,7 @@ const promoCalc=(p)=>{
 };
 // 전략 트리: 노드 {id,label,text,children}. fn은 노드를 받아 교체할 노드(배열이면 여러 개)나 null(삭제)을 반환
 const tUpd=(ns,id,fn)=>ns.flatMap((n)=>n.id===id?[].concat(fn(n)||[]):[{...n,children:tUpd(n.children||[],id,fn)}]);
-const tTxt=(x,label)=>(x.tree||[]).filter((n)=>!n.skip&&n.label===label&&n.text).map((n)=>n.text).join(" / ");
+const tHas=(n)=>!n.skip&&(!!(n.text||"").trim()||(n.children||[]).some(tHas)||(n.chk&&n.done));
 const tNew=(label,text="",children=[])=>({id:Math.random().toString(36).slice(2,10),label,text,children});
 const tH=(label,hint,children=[])=>({...tNew(label,"",children),hint});
 const tC=(label)=>({...tNew(label),chk:true,done:false});
@@ -822,7 +822,29 @@ const CSS = `
 .psum span{display:block;font-size:12px;color:var(--ink3);margin-bottom:2px;}
 .psum b{font-size:17px;font-weight:800;}
 .pcards{display:flex;flex-direction:column;gap:14px;}
-.pcard{border:1px solid var(--line);border-radius:12px;padding:16px 18px;cursor:pointer;background:var(--card);transition:box-shadow .15s;}
+.pcard{border:1px solid var(--line);border-radius:12px;background:var(--card);transition:box-shadow .15s;overflow:hidden;}
+.pcard.open{box-shadow:0 3px 14px rgba(0,0,0,.08);border-color:#B3D4FF;}
+.pcard .phead{padding:14px 18px;cursor:pointer;align-items:center;justify-content:flex-start;}
+.pcard .phead:hover{background:#F7F8F9;}
+.pchev{color:var(--ink3);font-size:14px;width:14px;}
+.pcard .pdate{margin:0 0 0 auto;white-space:nowrap;}
+.pbody{padding:2px 22px 20px;border-top:1px solid var(--line);}
+.pbar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;font-size:13.5px;color:var(--ink2);padding:12px 0;}
+.psc{margin-top:16px;}
+.psc h4{margin:0 0 10px;font-size:13px;font-weight:800;color:#0C66E4;letter-spacing:-.01em;padding-bottom:6px;border-bottom:2px solid #E9F2FF;}
+.rt{margin-bottom:9px;}
+.rt-row{display:flex;gap:12px;align-items:baseline;}
+.rt-l{flex:none;min-width:84px;font-size:12.5px;font-weight:700;color:var(--ink3);}
+.rt-l.grp{font-size:14px;font-weight:800;color:var(--ink);}
+.rt-row p{margin:0;font-size:14.5px;line-height:1.6;white-space:pre-line;}
+.rt-kids{margin:6px 0 0 6px;padding-left:14px;border-left:2px solid var(--line);}
+.rt-chk{font-size:14px;margin:3px 0;}
+.rtbl{border-collapse:collapse;font-size:13.5px;width:100%;min-width:640px;}
+.rtbl th{background:#F1F2F4;padding:7px 10px;font-size:12px;text-align:right;}
+.rtbl td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;}
+.rtbl th:first-child,.rtbl td.l{text-align:left;}
+.pmemo{margin:10px 0 0;font-size:14px;line-height:1.6;white-space:pre-line;background:#F7F8F9;border-radius:8px;padding:9px 12px;}
+
 .pcard:hover{box-shadow:0 3px 14px rgba(0,0,0,.1);}
 .phead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;}
 .pname{font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
@@ -2341,6 +2363,7 @@ function Board() {
   const refSubOf=(cat)=>[...new Set(refs.filter((r)=>r.cat===cat).map((r)=>r.sub).filter(Boolean))].sort();
   const [refTab, setRefTab] = useState("ref");
   const [promoDraft, setPromoDraft] = useState(null);
+  const [promoOpen, setPromoOpen] = useState({});
   const promos=useMemo(()=>(data.promos||[]).filter((x)=>!x.deleted).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0)),[data.promos]);
   const savePromo=()=>{
     const {_new,...item}=promoDraft;
@@ -3410,29 +3433,54 @@ function Board() {
                 {[["행사",promos.length+"건"],["발송",fWon(t.sent)],["주문",fWon(t.orders)],["주문금액",fWon(t.rev)],["비용",fWon(t.cost)],["공헌이익",fWon(t.profit)],["ROAS",t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-"]].map(([l,v])=>(
                   <div key={l}><span>{l}</span><b style={l==="공헌이익"?{color:t.profit<0?"#CA3521":"#1F845A"}:undefined}>{v}</b></div>))}
               </div>);})()}
-            <div className="pcards">
-              {promos.map((x)=>{
-                const c=promoCalc(x),done=pNum(x.sent)>0||pNum(x.revenue)>0;
-                const plan=[["명분",tTxt(x,"명분")||x.reason],["타겟·세그먼트",[tTxt(x,"타겟")||x.target,tTxt(x,"세그먼트")||x.segment].filter(Boolean).join(" / ")],["구성",(x.items||[]).filter((i)=>i.name).map((i)=>`${i.name}${pNum(i.qty)>1?" ×"+pNum(i.qty):""}${itemCalc(i).promo!=null?" · "+fWon(itemCalc(i).promo)+"원":""}`).join("\n")||x.comp],["베네핏",tTxt(x,"베네핏")||x.benefit]].filter(([,v])=>v);
-                const K=(l,v,hi)=><div className="pk"><span>{l}</span><b style={hi}>{v}</b></div>;
+            <div className="pcards">{(()=>{
+              const RT=(ns,depth)=>ns.filter(tHas).map((n)=>{
+                const kids=(n.children||[]).filter(tHas);
+                if(n.chk)return <div key={n.id} className="rt-chk">{n.done?"☑":"☐"} {n.label}</div>;
                 return(
-                <div key={x.id} className="pcard" onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>
-                  <div className="phead">
-                    <div>
-                      <div className="pname">{x.name}{x.channel&&<span className="pch">{x.channel}</span>}<span className={"pst"+(done?" on":"")}>{done?"발송 완료":"발송 전"}</span></div>
-                      <div className="pdate">{x.date}{x.endDate&&x.endDate!==x.date?` ~ ${x.endDate}`:""}{x.sendAt?` · 발송 ${x.sendAt.replace("T"," ")}`:""}</div>
-                    </div>
-                    {done&&<div className="pprofit"><span>공헌이익</span><b style={{color:c.profit==null?"var(--ink3)":c.profit<0?"#CA3521":"#1F845A"}}>{fWon(c.profit)}</b></div>}
+                  <div key={n.id} className={"rt"+(depth?" sub":"")}>
+                    <div className="rt-row"><span className={"rt-l"+(kids.length?" grp":"")}>{n.label}</span>{(n.text||"").trim()&&<p>{n.text}</p>}</div>
+                    {kids.length>0&&<div className="rt-kids">{RT(kids,depth+1)}</div>}
+                  </div>);});
+              return promos.map((x)=>{
+                const c=promoCalc(x),done=pNum(x.sent)>0||pNum(x.revenue)>0,open=!!promoOpen[x.id];
+                const K=(l,v,hi)=><div className="pk"><span>{l}</span><b style={hi}>{v}</b></div>;
+                const items=(x.items||[]).filter((i)=>i.name||i.sale||i.list);
+                const hasTree=(x.tree||[]).some(tHas);
+                const legacy=[["명분",x.reason],["타겟",x.target],["세그먼트",x.segment],["베네핏",x.benefit]].filter(([,v])=>v);
+                return(
+                <div key={x.id} className={"pcard"+(open?" open":"")}>
+                  <div className="phead" onClick={()=>setPromoOpen({...promoOpen,[x.id]:!open})}>
+                    <span className="pchev">{open?"▾":"▸"}</span>
+                    <div className="pname">{x.name}{x.channel&&<span className="pch">{x.channel}</span>}<span className={"pst"+(done?" on":"")}>{done?"발송 완료":"발송 전"}</span></div>
+                    <div className="pdate">{x.date}{x.endDate&&x.endDate!==x.date?` ~ ${x.endDate}`:""}</div>
                   </div>
-                  {plan.length>0&&<div className="pplan">{plan.map(([l,v])=><div key={l}><span>{l}</span><p>{v}</p></div>)}</div>}
-                  {done&&<div className="pkpis">
-                    <div className="pgrp"><em>발송·반응</em>{K("발송",fWon(pNum(x.sent)))}{K("읽음",fWon(pNum(x.read)))}{K("클릭",fWon(pNum(x.click)))}{K("오픈율",fPct(c.openRate))}{K("CTR",fPct(c.ctr))}{K("CTOR",fPct(c.ctor))}</div>
-                    <div className="pgrp"><em>구매</em>{K("주문고객",fWon(pNum(x.orders)))}{K("주문금액",fWon(pNum(x.revenue)))}{K("CVR",fPct(c.cvr))}{K("구매전환율",fPct(c.buyRate))}{K("객단가",fWon(c.aov))}</div>
-                    <div className="pgrp"><em>손익</em>{K("비용",fWon(c.sendCost+pNum(x.extraCost)))}{K("공헌이익",fWon(c.profit),{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"})}{K("ROAS",c.roas==null?"-":Math.round(c.roas*100)+"%")}</div>
+                  {open&&<div className="pbody">
+                    <div className="pbar">
+                      {x.sendAt&&<span>발송 시간 {x.sendAt.replace("T"," ")}</span>}
+                      {done&&<span>공헌이익 <b style={{color:c.profit==null?"var(--ink3)":c.profit<0?"#CA3521":"#1F845A"}}>{fWon(c.profit)}원</b></span>}
+                      <button type="button" className="btn ghost" style={{marginLeft:"auto",padding:"6px 14px"}} onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>✏️ 수정</button>
+                    </div>
+                    {(hasTree||legacy.length>0)&&<div className="psc"><h4>기획</h4>
+                      {hasTree?RT(x.tree,0):legacy.map(([l,v])=><div key={l} className="rt"><div className="rt-row"><span className="rt-l">{l}</span><p>{v}</p></div></div>)}
+                    </div>}
+                    {items.length>0&&<div className="psc"><h4>구성</h4>
+                      <div style={{overflowX:"auto"}}><table className="rtbl">
+                        <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립금","할인율"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
+                        <tbody>{items.map((it)=>{const ic=itemCalc(it);return(<tr key={it.id}><td className="l">{it.name}</td><td>{fWon(pNum(it.qty))}</td><td>{fWon(pNum(it.list))}</td><td>{fWon(pNum(it.sale))}</td><td>{fWon(pNum(it.coupon))}</td><td><b>{fWon(ic.promo)}</b></td><td>{fWon(ic.per)}</td><td>{fWon(ic.point)}</td><td>{fPct(ic.disc)}</td></tr>);})}</tbody>
+                      </table></div>
+                      {x.comp&&<p className="pmemo">{x.comp}</p>}
+                    </div>}
+                    {!items.length&&x.comp&&<div className="psc"><h4>구성</h4><p className="pmemo">{x.comp}</p></div>}
+                    {done?<div className="psc"><h4>성과</h4><div className="pkpis">
+                      <div className="pgrp"><em>발송·반응</em>{K("발송",fWon(pNum(x.sent)))}{K("읽음",fWon(pNum(x.read)))}{K("클릭",fWon(pNum(x.click)))}{K("오픈율",fPct(c.openRate))}{K("CTR",fPct(c.ctr))}{K("CTOR",fPct(c.ctor))}</div>
+                      <div className="pgrp"><em>구매</em>{K("주문고객",fWon(pNum(x.orders)))}{K("주문금액",fWon(pNum(x.revenue)))}{K("CVR",fPct(c.cvr))}{K("구매전환율",fPct(c.buyRate))}{K("객단가",fWon(c.aov))}</div>
+                      <div className="pgrp"><em>손익</em>{K("비용",fWon(c.sendCost+pNum(x.extraCost)))}{K("공헌이익",fWon(c.profit),{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"})}{K("ROAS",c.roas==null?"-":Math.round(c.roas*100)+"%")}</div>
+                    </div></div>:<div className="psc"><h4>성과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 발송 전이에요. 발송 후 [수정]에서 성과를 입력하면 손익이 자동 계산돼요.</p></div>}
+                    {x.note&&<div className="psc"><h4>특이사항·회고</h4><div className="pnote">{x.note}</div></div>}
                   </div>}
-                  {x.note&&<div className="pnote">📝 {x.note}</div>}
-                </div>);})}
-            </div></>)}
+                </div>);});
+            })()}</div></>)}
           </div>
           ):(<>
           {/* 툴바 */}
