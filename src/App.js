@@ -585,6 +585,7 @@ const tForm=()=>[
 const promoText=(x)=>{const t=(n)=>`${n.label||""} ${n.text||""} ${(n.children||[]).map(t).join(" ")}`;
   return `${x.name||""} ${x.channel||""} ${x.cat||""} ${x.note||""} ${x.feedback||""} ${x.comp||""} ${[...(x.items||[]),...(x.sales||[])].map((i)=>i.name||"").join(" ")} ${(x.tree||[]).map(t).join(" ")}`.toLowerCase();};
 const fPct=(x)=>x==null?"-":(x*100).toFixed(1)+"%";
+const fPct0=(x)=>x==null?"-":Math.round(x*100)+"%";
 const fWon=(x)=>x==null?"-":Math.round(x).toLocaleString();
 const SLIM_KEYS = ["tasks","routines","checkitems","rItems","memoItems","monthlies","reportItems","mindmaps","refs","promos","promoProducts","inboundPlans","reorderRequests","cafe24_schedules","cafe24_schedules_kualo"];
 const TOMB_KEYS = ["id","deleted","updatedAt","createdAt"];
@@ -3664,7 +3665,7 @@ function Board() {
                     {items.length>0&&<div className="psc"><h4>구성</h4>
                       <div style={{overflowX:"auto"}}><table className="rtbl">
                         <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립금","할인율"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
-                        <tbody>{items.map((it)=>{const ic=itemCalc(it,x.feeRate,promoCols(x));return(<tr key={it.id}><td className="l">{it.name}</td><td>{fWon(pNum(it.qty))}</td><td>{fWon(pNum(it.list))}</td><td>{fWon(pNum(it.sale))}</td><td>{fWon(pNum(it.coupon))}</td><td><b>{fWon(ic.promo)}</b></td><td>{fWon(ic.per)}</td><td>{fWon(ic.point)}</td><td>{fPct(ic.disc)}</td></tr>);})}</tbody>
+                        <tbody>{items.map((it)=>{const ic=itemCalc(it,x.feeRate,promoCols(x));return(<tr key={it.id}><td className="l">{it.name}</td><td>{fWon(pNum(it.qty))}</td><td>{fWon(pNum(it.list))}</td><td>{fWon(pNum(it.sale))}</td><td>{fWon(pNum(it.coupon))}</td><td><b>{fWon(ic.promo)}</b></td><td>{fWon(ic.per)}</td><td>{fWon(ic.point)}</td><td>{fPct0(ic.disc)}</td></tr>);})}</tbody>
                       </table></div>
                       {x.comp&&<p className="pmemo">{x.comp}</p>}
                     </div>}
@@ -5528,7 +5529,7 @@ function Board() {
                         {["qty","list","sale","coupon"].map((k)=><td key={k}><input type="number" min="0" value={it[k]??""} onChange={upd(k)} /></td>)}
                         <td className="calc">{fWon(ic.promo)}</td><td className="calc">{fWon(ic.per)}</td>
                         <td><input type="number" min="0" step="0.1" value={it.pr??""} onChange={upd("pr")} placeholder="예) 1" /></td>
-                        <td className="calc">{fWon(ic.point)}</td><td className="calc">{fPct(ic.disc)}</td>
+                        <td className="calc">{fWon(ic.point)}</td><td className="calc">{fPct0(ic.disc)}</td>
                         <td style={{whiteSpace:"nowrap"}}><button type="button" title="상품 저장 (다음 행사에서 바로 불러오기)" className="btn ghost" style={{padding:"4px 7px"}} onClick={()=>saveProduct(it)}>💾</button>
                           <button type="button" className="btn ghost" style={{padding:"4px 8px",color:"#CA3521",marginLeft:4}} onClick={()=>setPromoDraft({...d,items:d.items.filter((x)=>x.id!==it.id)})}>×</button></td>
                       </tr>);})}
