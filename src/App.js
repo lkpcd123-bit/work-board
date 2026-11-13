@@ -1538,7 +1538,8 @@ function Board() {
       merged.updatedAt=Date.now();
       // 안전망: remote에 있지만 merged에 없는 필드는 보존 (구버전 코드가 알 수 없는 필드를 지우는 것 방지)
       if(remote){Object.keys(remote).forEach((k)=>{if(!(k in merged))merged[k]=remote[k];});}
-      const out=await externalizeImages(slimDeleted(merged)); // 삭제 항목 비우기 + 큰 이미지는 드라이브로 (1MiB 한도)
+      // JSON 왕복으로 undefined 필드 제거 (Firestore가 undefined를 거부함) + 삭제 항목 비우기 + 큰 이미지는 드라이브로
+      const out=JSON.parse(JSON.stringify(await externalizeImages(slimDeleted(merged))));
       await setDoc(BOARD_REF(),out);
       // 뒤따르는 저장이 남아 있으면 화면을 덮어쓰지 않는다 (마지막 저장이 최신 상태로 반영)
       if(pendingRef.current===1){errShownRef.current=false;dataRef.current=out;setData(out);setSaveState("saved");setTimeout(()=>setSaveState("idle"),1500);}
@@ -2494,7 +2495,7 @@ function Board() {
     return {_new:true,date:todayStr(),name:"",ov:{},tree:t?.tree?JSON.parse(JSON.stringify(t.tree)):tForm(),
       checks:(t?.checks?.length?t.checks.map((k)=>({...k,id:uid(),done:false})):DEF_CHECKS.map((x)=>({id:uid(),text:x,done:false}))),costs:(t?.costs||[]).map((k)=>({...k,id:uid()})),
       cat:t?.cat||"",channel:t?.channel||"",feeRate:t?.feeRate||"",vatRate:t?.vatRate||"",unitCost:t?.unitCost||"",marginRate:t?.marginRate||"",
-      cols:t?.cols?JSON.parse(JSON.stringify(t.cols)):undefined,sales:[],
+      ...(t?.cols?{cols:JSON.parse(JSON.stringify(t.cols))}:{}),sales:[],
       items:(t?.items||[]).map((i)=>({...i,id:uid(),sold:"",revOv:"",feeOv:"",profitOv:""}))};};
   const saveDefaults=(x)=>{
     if(!window.confirm("지금 화면의 기획양식·체크리스트·비용 항목·요율·구성 상품을 다음 행사부터 기본으로 사용할까요?\n(이 행사 내용은 그대로 유지됩니다)"))return;
@@ -5498,7 +5499,7 @@ function Board() {
                 <span style={{fontSize:12,color:"var(--ink3)"}}>저장된 상품:</span>
                 {savedProducts.map((sp)=>(
                   <span key={sp.id} style={{display:"inline-flex",alignItems:"center",gap:4,background:"#E9F2FF",borderRadius:14,padding:"3px 4px 3px 11px",fontSize:12.5,fontWeight:700,color:"#0C66E4"}}>
-                    <button type="button" style={{background:"none",border:"none",cursor:"pointer",color:"inherit",font:"inherit",padding:0}} onClick={()=>setPromoDraft({...d,items:[...(d.items||[]),{...sp,id:uid(),sold:"",deleted:undefined,updatedAt:undefined}]})}>+ {sp.name}</button>
+                    <button type="button" style={{background:"none",border:"none",cursor:"pointer",color:"inherit",font:"inherit",padding:0}} onClick={()=>setPromoDraft({...d,items:[...(d.items||[]),{...sp,id:uid(),sold:"",deleted:false,updatedAt:Date.now()}]})}>+ {sp.name}</button>
                     <button type="button" title="저장 목록에서 삭제" style={{background:"none",border:"none",cursor:"pointer",color:"#8993A4",padding:"0 4px"}} onClick={()=>deleteProduct(sp.id)}>×</button>
                   </span>))}
               </div>}
@@ -5600,7 +5601,7 @@ function Board() {
                 </div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12,alignItems:"center"}}>
                   <button type="button" className="btn ghost" onClick={()=>setRows([...rows,{id:uid(),qty:"1"}])}>+ 직접 추가</button>
-                  {savedProducts.map((sp)=><button key={sp.id} type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>setRows([...rows,{...sp,id:uid(),sold:"",deleted:undefined,updatedAt:undefined}])}>+ {sp.name}</button>)}
+                  {savedProducts.map((sp)=><button key={sp.id} type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>setRows([...rows,{...sp,id:uid(),sold:"",deleted:false,updatedAt:Date.now()}])}>+ {sp.name}</button>)}
                   <span style={{fontSize:12,color:"var(--ink3)",marginLeft:8}}>비용 열 추가:</span>
                   <button type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>setCols([...cols,{id:uid(),name:""}])}>+ 직접</button>
                   {DEF_COLS.filter((n)=>!cols.some((z)=>z.name===n)).map((n)=><button key={n} type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>setCols([...cols,{id:uid(),name:n}])}>+ {n}</button>)}
