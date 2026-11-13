@@ -3480,10 +3480,10 @@ function Board() {
             </div>}
             {promoList.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>{promos.length?"검색/분류 조건에 맞는 행사가 없습니다.":"아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다."}</div>:(<>
             {(()=>{
-              const t=promoList.reduce((a,x)=>{const c=promoCalc(x);return{sent:a.sent+pNum(x.sent),read:a.read+pNum(x.read),click:a.click+pNum(x.click),orders:a.orders+pNum(x.orders),rev:a.rev+pNum(x.revenue),cost:a.cost+c.sendCost+pNum(x.extraCost),profit:a.profit+(c.profit||0),done:a.done+((pNum(x.sent)>0||pNum(x.revenue)>0||pNum(x.orders)>0)?1:0)};},{sent:0,read:0,click:0,orders:0,rev:0,cost:0,profit:0,done:0});
+              const t=promoList.reduce((a,x)=>{const c=promoCalc(x),sd=x.noSend?0:1;return{sent:a.sent+sd*pNum(x.sent),read:a.read+sd*pNum(x.read),click:a.click+sd*pNum(x.click),sdOrders:a.sdOrders+sd*pNum(x.orders),orders:a.orders+pNum(x.orders),rev:a.rev+pNum(x.revenue),cost:a.cost+c.sendCost+pNum(x.extraCost),profit:a.profit+(c.profit||0),done:a.done+((pNum(x.sent)>0||pNum(x.revenue)>0||pNum(x.orders)>0)?1:0)};},{sent:0,read:0,click:0,sdOrders:0,orders:0,rev:0,cost:0,profit:0,done:0});
               const div=(x,y)=>y>0?x/y:null;
               const tiles=[["행사 수",promoList.length+"건",`진행 완료 ${t.done}건`],["총 주문금액",fWon(t.rev),"원"],["총 주문고객",fWon(t.orders),"명"],["평균 객단가",fWon(div(t.rev,t.orders)),"원"],["총 비용",fWon(t.cost),"원"],["총 공헌이익",fWon(t.profit),"원"],["ROAS",t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-","주문금액÷비용"],["이익률",t.rev>0?(t.profit/t.rev*100).toFixed(1)+"%":"-","공헌이익÷주문금액"]];
-              const reach=[["총 발송 수",fWon(t.sent)],["평균 오픈율",fPct(div(t.read,t.sent))],["평균 CTR",fPct(div(t.click,t.sent))],["평균 CTOR",fPct(div(t.click,t.read))],["평균 CVR",fPct(div(t.orders,t.click))],["평균 구매전환율",fPct(div(t.orders,t.sent))],["건당 획득비용",fWon(div(t.cost,t.orders))]];
+              const reach=[["총 발송 수",fWon(t.sent)],["평균 오픈율",fPct(div(t.read,t.sent))],["평균 CTR",fPct(div(t.click,t.sent))],["평균 CTOR",fPct(div(t.click,t.read))],["평균 CVR",fPct(div(t.sdOrders,t.click))],["평균 구매전환율",fPct(div(t.sdOrders,t.sent))],["건당 획득비용",fWon(div(t.cost,t.orders))]];
               // 상품별 구매 비중 (전체 행사 합산)
               const pm=new Map();
               promoList.forEach((x)=>(x.items||[]).forEach((it)=>{const ic=itemCalc(it),nm=(it.name||"").trim();if(!nm||!(ic.sold>0))return;const o=pm.get(nm)||{qty:0,rev:0,n:0};pm.set(nm,{qty:o.qty+ic.sold,rev:o.rev+(ic.rev||0),n:o.n+1});}));
@@ -3501,7 +3501,7 @@ function Board() {
                 <div className="psum">{tiles.map(([l,v,sub])=>(
                   <div key={l}><span>{l}</span><b style={l==="총 공헌이익"?{color:t.profit<0?"#CA3521":"#1F845A"}:undefined}>{v}</b><i>{sub}</i></div>))}</div>
                 {promoOpen.__sum&&<>
-                  <div className="psc"><h4>발송·반응 평균</h4>
+                  <div className="psc"><h4>발송·반응 평균 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 보내지 않음 행사는 제외</span></h4>
                     <div className="pgrp">{reach.map(([l,v])=><div key={l} className="pk"><span>{l}</span><b>{v}</b></div>)}</div></div>
                   <div className="psc"><h4>상품별 구매 비중</h4>
                     {prods.length===0?<p className="pmemo">구성 표의 <b>판매 수량</b>을 입력하면 상품별 비중이 집계됩니다.</p>:
@@ -3558,11 +3558,13 @@ function Board() {
                       {x.comp&&<p className="pmemo">{x.comp}</p>}
                     </div>}
                     {!items.length&&x.comp&&<div className="psc"><h4>구성</h4><p className="pmemo">{x.comp}</p></div>}
-                    {done?<div className="psc"><h4>성과</h4><div className="pkpis">
-                      {!ns&&<div className="pgrp"><em>발송·반응</em>{K("발송",fWon(pNum(x.sent)))}{K("읽음",fWon(pNum(x.read)))}{K("클릭",fWon(pNum(x.click)))}{K("오픈율",fPct(c.openRate))}{K("CTR",fPct(c.ctr))}{K("CTOR",fPct(c.ctor))}</div>}
-                      <div className="pgrp"><em>구매</em>{K("주문고객",fWon(pNum(x.orders)))}{K("주문금액",fWon(pNum(x.revenue)))}{!ns&&K("CVR",fPct(c.cvr))}{!ns&&K("구매전환율",fPct(c.buyRate))}{K("객단가",fWon(c.aov))}</div>
+                    {!ns&&(pNum(x.sent)>0||x.sendAt)&&<div className="psc"><h4>발송</h4><div className="pgrp" style={{paddingLeft:0}}>
+                      {K("발송",fWon(pNum(x.sent)))}{K("읽음",fWon(pNum(x.read)))}{K("클릭",fWon(pNum(x.click)))}{K("오픈율",fPct(c.openRate))}{K("CTR",fPct(c.ctr))}{K("CTOR",fPct(c.ctor))}
+                    </div></div>}
+                    {done?<div className="psc"><h4>총 결과</h4><div className="pkpis">
+                      <div className="pgrp"><em>주문</em>{K("주문고객",fWon(pNum(x.orders)))}{K("주문금액",fWon(pNum(x.revenue)))}{K("객단가",fWon(c.aov))}{!ns&&K("CVR",fPct(c.cvr))}{!ns&&K("구매전환율",fPct(c.buyRate))}</div>
                       <div className="pgrp"><em>손익</em>{K("비용",fWon(c.sendCost+pNum(x.extraCost)))}{K("공헌이익",fWon(c.profit),{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"})}{K("ROAS",c.roas==null?"-":Math.round(c.roas*100)+"%")}</div>
-                    </div></div>:<div className="psc"><h4>성과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 결과가 없어요. [수정]에서 주문·매출을 입력하면 손익이 자동 계산돼요.</p></div>}
+                    </div></div>:<div className="psc"><h4>총 결과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 결과가 없어요. [수정] → <b>총 결과</b>에 주문·매출을 입력하면 손익이 자동 계산돼요.</p></div>}
                     {x.feedback&&<div className="psc"><h4>받은 피드백</h4><div className="pnote" style={{background:"#E9F2FF"}}>{x.feedback}</div></div>}
                     {x.note&&<div className="psc"><h4>특이사항·회고</h4><div className="pnote">{x.note}</div></div>}
                     {(x.checks||[]).length>0&&<div className="psc"><h4>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.checks||[]).filter((k)=>k.done).length}/{(x.checks||[]).length} 완료 · 눌러서 체크</span></h4>
@@ -5407,15 +5409,21 @@ function Board() {
               <button type="button" className="btn ghost" style={{marginTop:8}} onClick={()=>setPromoDraft({...d,items:[...(d.items||[]),{id:uid(),qty:"1"}]})}>+ 상품 추가</button>
             </div>
             <div className="fld"><label>기타 혜택·사은품 메모</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 쉐이커 증정, 7만원 이상 구매 시 사은품" /></div>
-            <div className="psec">② 발송·성과 (입력)</div>
-            <label style={{display:"flex",gap:8,alignItems:"center",fontSize:14,fontWeight:700,marginBottom:14,cursor:"pointer"}}>
-              <input type="checkbox" checked={!!d.noSend} onChange={(e)=>setPromoDraft({...d,noSend:e.target.checked})} style={{width:17,height:17}} />
-              보내지 않음 <span style={{fontWeight:500,color:"var(--ink3)"}}>— 알림톡·문자 발송 없이 진행하는 기획전 (발송 관련 항목 숨김)</span>
-            </label>
-            {!d.noSend&&<div style={g4}>{F("발송 시간","sendAt",{type:"datetime-local"})}{N("실제 발송 수","sent")}{N("읽은 고객 수","read")}{N("클릭 고객 수","click")}</div>}
-            <div style={g4}>{N("주문고객 수","orders")}{N("주문금액 (원)","revenue")}{d.noSend?null:N("건당 발송비 (원)","unitCost","예) 15")}{N("기타 비용 (원)","extraCost","사은품·쿠폰 등")}</div>
-            <div style={g4}>{N("공헌이익률 (%)","marginRate","예) 35")}</div>
-            <div className="psec">③ 자동 계산 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 비워 두면 자동, 값을 넣으면 그 값으로 고정(노란 칸)</span></div>
+            <div className="psec" style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>② 발송 (입력)
+              <label style={{display:"flex",gap:7,alignItems:"center",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                <input type="checkbox" checked={!!d.noSend} onChange={(e)=>setPromoDraft({...d,noSend:e.target.checked})} style={{width:16,height:16}} />
+                보내지 않음 <span style={{fontWeight:500,color:"var(--ink3)"}}>— 발송 없이 진행하는 행사</span>
+              </label>
+            </div>
+            {d.noSend
+              ? <p className="pmemo" style={{margin:0}}>발송하지 않는 행사예요. 발송 수·오픈율·CTR 같은 발송 지표는 기록·집계에서 빠지고, 아래 <b>총 결과</b>만 반영돼요.</p>
+              : <>
+                <div style={g4}>{F("발송 시간","sendAt",{type:"datetime-local"})}{N("실제 발송 수","sent")}{N("읽은 고객 수","read")}{N("클릭 고객 수","click")}</div>
+                <div style={g4}>{N("건당 발송비 (원)","unitCost","예) 15")}</div>
+              </>}
+            <div className="psec">③ 총 결과 (입력) <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 이 행사로 발생한 전체 주문·매출</span></div>
+            <div style={g4}>{N("주문고객 수","orders")}{N("주문금액 (원)","revenue")}{N("기타 비용 (원)","extraCost","사은품·쿠폰 등")}{N("공헌이익률 (%)","marginRate","예) 35")}</div>
+            <div className="psec">④ 자동 계산 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 비워 두면 자동, 값을 넣으면 그 값으로 고정(노란 칸)</span></div>
             {!d.noSend&&<div style={g4}>{A("오픈율 %","openRate","읽음÷발송")}{A("CTR %","ctr","클릭÷발송")}{A("CTOR %","ctor","클릭÷읽음")}{A("CVR %","cvr","주문÷클릭")}</div>}
             <div style={g4}>{d.noSend?null:A("구매전환율 %","buyRate","주문÷발송")}{A("객단가","aov","주문금액÷주문고객")}{d.noSend?null:A("발송비","sendCost","발송×건당")}{A("공헌이익","profit","매출×이익률−비용")}</div>
             <div className="pres">
