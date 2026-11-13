@@ -545,7 +545,8 @@ const promoCalc=(p)=>{
   const orders=String(p.orders??"")!==""?pNum(p.orders):soldQty;
   const feeCost=rev*pNum(p.feeRate)/100;
   const lines=(p.costs||[]).reduce((a,c)=>a+pNum(c.amt),0);
-  const vat=String(p.vatRate??"")!==""?rev*pNum(p.vatRate)/100:0;
+  const autoVat=String(p.vatRate??"")!==""?rev*pNum(p.vatRate)/100:0;
+  const vat=String(p.vatAmt??"")!==""?pNum(p.vatAmt):autoVat;
   const div=(a,b)=>b>0?a/b:null;
   const ov=p.ov||{},has=(k)=>ov[k]!==undefined&&ov[k]!=="";
   const auto={openRate:div(read,sent),ctr:div(click,sent),ctor:div(click,read),cvr:div(orders,click),buyRate:div(orders,sent),aov:div(rev,orders),sendCost:p.noSend?0:sent*pNum(p.unitCost)};
@@ -556,7 +557,7 @@ const promoCalc=(p)=>{
   auto.profit=detail>0?rev-totalCost:(String(p.marginRate??"")===""?null:rev*pNum(p.marginRate)/100-v.sendCost-extra);
   v.profit=has("profit")?pNum(ov.profit):auto.profit;
   v.roas=div(rev,totalCost);
-  return {...v,auto,ics,sales,cols,colTot,colSum,soldQty,orders,itemsRev,rev,feeCost,lines,vat,extra,totalCost,margin:rev>0&&v.profit!=null?v.profit/rev:null};
+  return {...v,auto,autoVat,ics,sales,cols,colTot,colSum,soldQty,orders,itemsRev,rev,feeCost,lines,vat,extra,totalCost,margin:rev>0&&v.profit!=null?v.profit/rev:null};
 };
 // 전략 트리: 노드 {id,label,text,children}. fn은 노드를 받아 교체할 노드(배열이면 여러 개)나 null(삭제)을 반환
 const tUpd=(ns,id,fn)=>ns.flatMap((n)=>n.id===id?[].concat(fn(n)||[]):[{...n,children:tUpd(n.children||[],id,fn)}]);
@@ -858,6 +859,24 @@ const CSS = `
 .modal.promo .itbl{min-width:0;}
 .modal.promo .itbl input{min-width:56px;}
 @media(min-width:1100px){.modal.promo .fld textarea{min-height:60px;}}
+.inp-auto{background:#E9F2FF!important;border-color:#B3D4FF!important;color:#0055CC;font-weight:700;}
+.inp-auto::placeholder{color:#0C66E4;opacity:.85;font-weight:700;}
+.inp-ov{background:#FFF7D6!important;border-color:#F0B429!important;font-weight:800;color:#7A4100;}
+.plegend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink3);margin:0 0 12px;}
+.plegend i{width:13px;height:13px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-2px;}
+.lg-in{background:#F7F8F9;border:1px solid var(--line2);}
+.lg-au{background:#E9F2FF;border:1px solid #B3D4FF;}
+.lg-ov{background:#FFF7D6;border:1px solid #F0B429;}
+.modal.promo .psec{font-size:15px;font-weight:800;margin:26px 0 14px;padding:9px 0 9px 12px;border-top:0;border-left:4px solid #0C66E4;background:linear-gradient(90deg,#F4F8FF,transparent);border-radius:0 6px 6px 0;}
+.modal.promo .psec:first-child{margin-top:0;}
+.modal.promo .fld{margin-bottom:12px;}
+.modal.promo .fld label{font-size:12px;}
+.itbl tbody tr:nth-child(even){background:#FAFBFC;}
+.itbl tbody tr:hover{background:#F4F8FF;}
+.itbl th{position:sticky;top:0;z-index:2;border-bottom:2px solid var(--line);}
+.itbl td:first-child,.itbl th:first-child{position:sticky;left:0;background:#fff;z-index:1;box-shadow:1px 0 0 var(--line);}
+.itbl th:first-child{z-index:3;background:#F1F2F4;}
+.itbl tbody tr:nth-child(even) td:first-child{background:#FAFBFC;}
 .pfull{margin-left:auto;background:#EBECF0;border:none;border-radius:6px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--ink2);cursor:pointer;}
 .pfull:hover{background:#DFE1E6;}
 .itbl{border-collapse:collapse;font-size:13px;width:100%;min-width:760px;}
@@ -2485,6 +2504,16 @@ function Board() {
     alert("저장했어요. 다음 [+ 행사 추가]부터 이 양식으로 시작합니다.");};
   const clearDefaults=()=>{if(!window.confirm("저장된 기본 양식을 지울까요? 다음 행사부터 처음 양식으로 돌아갑니다."))return;
     commit((d)=>({...d,promoDefaults:null,updatedAt:Date.now()}),[]);};
+  const [promoSaved, setPromoSaved] = useState(0);
+  const savePromoKeep=()=>{
+    const {_new,...item}=promoDraft;
+    if(!(item.name||"").trim()){alert("행사명을 입력해 주세요.");return;}
+    const id=item.id||uid();
+    if(_new)commit((dd)=>({...dd,promos:[{...item,id,createdAt:Date.now(),createdBy:me||"익명"},...(dd.promos||[])],updatedAt:Date.now()}),[]);
+    else commit((dd)=>({...dd,promos:(dd.promos||[]).map((x)=>x.id===item.id?{...item,updatedAt:Date.now()}:x),updatedAt:Date.now()}),[]);
+    setPromoDraft({...item,id,_new:false});
+    setPromoSaved(Date.now());setTimeout(()=>setPromoSaved(0),2200);
+  };
   const savePromo=()=>{
     const {_new,...item}=promoDraft;
     if(!(item.name||"").trim()){alert("행사명을 입력해 주세요.");return;}
@@ -5421,9 +5450,9 @@ function Board() {
         const F=(label,k,props)=><div className="fld"><label>{label}</label><input value={d[k]||""} onChange={set(k)} {...props} /></div>;
         const N=(label,k,ph)=>F(label,k,{type:"number",min:0,placeholder:ph||"0"});
         // 자동 계산 칸: 비워 두면 자동값(placeholder), 직접 입력하면 그 값으로 고정
-        const A=(label,k,how)=>{const pct=PROMO_PCT.includes(k),a=c.auto[k];return(
+        const A=(label,k,how)=>{const pct=PROMO_PCT.includes(k),a=c.auto[k],on=String(d.ov?.[k]??"")!=="";return(
           <div className="fld"><label>{label} <span style={{fontWeight:500,color:"var(--ink3)"}}>{how}</span></label>
-            <input type="number" value={d.ov?.[k]??""} placeholder={a==null?"자동":`자동 ${pct?(a*100).toFixed(1)+"%":fWon(a)}`} onChange={(e)=>setPromoDraft({...d,ov:{...(d.ov||{}),[k]:e.target.value}})} style={d.ov?.[k]?{background:"#FFF7D6"}:undefined} /></div>);};
+            <input className={on?"inp-ov":"inp-auto"} type="number" value={d.ov?.[k]??""} placeholder={a==null?"자동":`${pct?(a*100).toFixed(1)+"%":fWon(a)}`} onChange={(e)=>setPromoDraft({...d,ov:{...(d.ov||{}),[k]:e.target.value}})} /></div>);};
         return(
         <div className="mask" style={promoFull?{padding:0}:undefined} onClick={(e)=>e.target===e.currentTarget&&setPromoDraft(null)}><div className={"modal promo"+(promoFull?" full":"")}>
           <h2>{d._new?"새 행사":"행사 상세"}<button type="button" className="pfull" onClick={()=>setPromoFull(!promoFull)}>{promoFull?"⤡ 창 모드":"⤢ 전체 화면"}</button></h2>
@@ -5512,7 +5541,8 @@ function Board() {
             </div>
             </>}
             <div className="psec">④ 총 결과 (입력) <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 무엇이 얼마나 팔렸는지 넣으면 매출·공헌이익이 자동 계산됩니다</span></div>
-            <div style={g4}><div className="fld"><label>주문고객 수 <span style={{fontWeight:500,color:"var(--ink3)"}}>비우면 판매수량 합계</span></label><input type="number" min="0" value={d.orders??""} placeholder={c.soldQty>0?"자동 "+fWon(c.soldQty):"0"} onChange={set("orders")} style={String(d.orders??"")!==""?{background:"#FFF7D6"}:undefined} /></div>{N("수수료율 (%)","feeRate","예) 3.85")}{N("매출 VAT율 (%)","vatRate","예) 2.7")}{N("기타 비용 (원)","extraCost","위 항목에 없는 비용")}</div>
+            <div className="plegend"><span><i className="lg-in" />직접 입력</span><span><i className="lg-au" />자동 계산</span><span><i className="lg-ov" />자동값을 내가 고침</span></div>
+            <div style={g4}><div className="fld"><label>주문고객 수 <span style={{fontWeight:500,color:"var(--ink3)"}}>비우면 판매수량 합계</span></label><input className={String(d.orders??"")!==""?"inp-ov":"inp-auto"} type="number" min="0" value={d.orders??""} placeholder={c.soldQty>0?fWon(c.soldQty):"0"} onChange={set("orders")} /></div>{N("수수료율 (%)","feeRate","예) 3.85")}<div className="fld"><label>매출 VAT</label><div style={{display:"flex",gap:6}}><input style={{width:"42%"}} type="number" value={d.vatRate??""} placeholder="율 %" onChange={set("vatRate")} /><input className={String(d.vatAmt??"")!==""?"inp-ov":"inp-auto"} type="number" value={d.vatAmt??""} placeholder={fWon(c.autoVat)} onChange={set("vatAmt")} /></div></div>{N("기타 비용 (원)","extraCost","위 항목에 없는 비용")}</div>
             {(()=>{const cols=promoCols(d),rows=d.sales||[],qt=rows.reduce((a,y)=>a+pNum(y.sold),0);
               const setRows=(r)=>setPromoDraft({...d,sales:r});
               const setCols=(ncols)=>setPromoDraft({...d,cols:ncols});
@@ -5539,7 +5569,7 @@ function Board() {
                           <td><input type="number" min="0" value={it.sold??""} onChange={upd(it,"sold")} placeholder="0" /></td>
                           {cols.map((cl)=><td key={cl.id}><input type="number" value={cl.id==="cost"?(it.cost??""):cl.id==="ship"?(it.ship??""):((it.cv||{})[cl.id]??"")} onChange={updCol(it,cl.id)} placeholder="세트당" /></td>)}
                           {[["revOv",ic.autoRev],["feeOv",ic.autoFee],["profitOv",ic.autoProfit]].map(([k,a])=>(
-                            <td key={k}><input type="number" value={it[k]??""} placeholder={a==null?"자동":"자동 "+fWon(a)} onChange={upd(it,k)} style={String(it[k]??"")!==""?{background:"#FFF7D6"}:undefined} /></td>))}
+                            <td key={k}><input className={String(it[k]??"")!==""?"inp-ov":"inp-auto"} type="number" value={it[k]??""} placeholder={a==null?"자동":fWon(a)} onChange={upd(it,k)} /></td>))}
                           <td className="calc">{fPct(ic.margin)}</td>
                           <td className="calc">{qt>0&&ic.sold>0?fPct(ic.sold/qt):"-"}</td>
                           <td><button type="button" className="btn ghost" style={{padding:"4px 8px",color:"#CA3521"}} onClick={()=>setRows(rows.filter((z)=>z.id!==it.id))}>×</button></td>
@@ -5563,7 +5593,7 @@ function Board() {
                   {DEF_COLS.filter((n)=>!cols.some((z)=>z.name===n)).map((n)=><button key={n} type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>setCols([...cols,{id:uid(),name:n}])}>+ {n}</button>)}
                 </div>
               </>);})()}
-            <div style={g4}><div className="fld"><label>전체 매출 (원) <span style={{fontWeight:500,color:"var(--ink3)"}}>비우면 상품별 합계</span></label><input type="number" min="0" value={d.revenue??""} placeholder={c.itemsRev>0?"자동 "+fWon(c.itemsRev):"0"} onChange={set("revenue")} style={String(d.revenue??"")!==""?{background:"#FFF7D6"}:undefined} /></div></div>
+            <div style={g4}><div className="fld"><label>전체 매출 (원) <span style={{fontWeight:500,color:"var(--ink3)"}}>비우면 상품별 합계</span></label><input className={String(d.revenue??"")!==""?"inp-ov":"inp-auto"} type="number" min="0" value={d.revenue??""} placeholder={c.itemsRev>0?fWon(c.itemsRev):"0"} onChange={set("revenue")} /></div></div>
             <div className="fld"><label>프로모션·기타 비용</label>
               <div className="pcost">
                 {(d.costs||[]).map((cl)=>(
@@ -5605,6 +5635,8 @@ function Board() {
           <div className="modal-foot">
             {!d._new&&canEdit&&<button className="btn ghost" style={{color:"#CA3521"}} onClick={()=>deletePromo(d.id)}>삭제</button>}
             <button className="btn ghost" title="지금 양식을 다음 행사부터 기본으로 사용" onClick={()=>saveDefaults(d)}>🔖 다음 행사부터 적용</button>
+            <button className="btn ghost" style={{fontWeight:800,color:"#0C66E4"}} onClick={savePromoKeep}>💾 중간 저장</button>
+            {promoSaved>0&&<span style={{fontSize:13,fontWeight:700,color:"#1F845A"}}>✓ 저장됨</span>}
             {promoDefaults&&<button className="btn ghost" style={{fontSize:12.5}} onClick={clearDefaults}>기본 양식 초기화</button>}
             <button className="btn ghost" style={{marginLeft:"auto"}} onClick={()=>setPromoDraft(null)}>닫기</button>
             <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={savePromo}>저장</button>
