@@ -507,18 +507,37 @@ const emptyData = () => ({ promos:[],promoProducts:[],tasks:[],routines:[],check
 // 행사 손익 자동 계산. ov[k]에 값이 있으면 그 값을 우선(직접 수정), 없으면 자동값
 const pNum=(v)=>{const n=parseFloat(String(v??"").replace(/,/g,""));return isFinite(n)?n:0;};
 const PROMO_PCT=["openRate","ctr","ctor","cvr","buyRate"];
+const DEF_COSTS=["쿠폰","사은품","바이럴","스튜디오","쇼호스트"];
+// 상품 한 줄: 매출 = 행사가×판매수량, 비용 = 제품가·배송비(수량분) + 수수료(매출×수수료율)
+const itemCalc=(it,feeRate)=>{
+  const has=String(it.sale??"")!=="";
+  const promo=has?pNum(it.sale)-pNum(it.coupon):null,q=pNum(it.qty),l=pNum(it.list),sold=pNum(it.sold);
+  const rev=has&&sold>0?promo*sold:null;
+  const cost=sold*pNum(it.cost),ship=sold*pNum(it.ship),fee=rev!=null?rev*pNum(feeRate)/100:0;
+  const profit=rev!=null?rev-cost-ship-fee:null;
+  return {promo,per:has&&q>0?promo/q:null,point:has&&String(it.pr??"")!==""?promo*pNum(it.pr)/100:null,disc:has&&l>0?(l-promo)/l:null,
+    sold,rev,cost,ship,fee,profit,margin:rev>0&&profit!=null?profit/rev:null};
+};
 const promoCalc=(p)=>{
-  const sent=pNum(p.sent),read=pNum(p.read),click=pNum(p.click),orders=pNum(p.orders),rev=pNum(p.revenue),extra=pNum(p.extraCost);
+  const sent=pNum(p.sent),read=pNum(p.read),click=pNum(p.click),orders=pNum(p.orders),extra=pNum(p.extraCost);
+  const ics=(p.items||[]).map((i)=>itemCalc(i,p.feeRate));
+  const itemsRev=ics.reduce((a,i)=>a+(i.rev||0),0);
+  const rev=itemsRev>0?itemsRev:pNum(p.revenue);
+  const prodCost=ics.reduce((a,i)=>a+i.cost,0),shipCost=ics.reduce((a,i)=>a+i.ship,0);
+  const feeCost=rev*pNum(p.feeRate)/100;
+  const lines=(p.costs||[]).reduce((a,c)=>a+pNum(c.amt),0);
+  const vat=String(p.vatRate??"")!==""?rev*pNum(p.vatRate)/100:0;
   const div=(a,b)=>b>0?a/b:null;
-  const ov=p.ov||{};
-  const has=(k)=>ov[k]!==undefined&&ov[k]!=="";
+  const ov=p.ov||{},has=(k)=>ov[k]!==undefined&&ov[k]!=="";
   const auto={openRate:div(read,sent),ctr:div(click,sent),ctor:div(click,read),cvr:div(orders,click),buyRate:div(orders,sent),aov:div(rev,orders),sendCost:p.noSend?0:sent*pNum(p.unitCost)};
   const v={};
   Object.keys(auto).forEach((k)=>{v[k]=has(k)?pNum(ov[k])/(PROMO_PCT.includes(k)?100:1):auto[k];});
-  auto.profit=String(p.marginRate??"")===""?null:rev*pNum(p.marginRate)/100-v.sendCost-extra;
+  const detail=prodCost+shipCost+feeCost+lines+vat;
+  const totalCost=v.sendCost+extra+detail;
+  auto.profit=detail>0?rev-totalCost:(String(p.marginRate??"")===""?null:rev*pNum(p.marginRate)/100-v.sendCost-extra);
   v.profit=has("profit")?pNum(ov.profit):auto.profit;
-  v.roas=div(rev,v.sendCost+extra);
-  return {...v,auto};
+  v.roas=div(rev,totalCost);
+  return {...v,auto,ics,rev,prodCost,shipCost,feeCost,lines,vat,extra,totalCost,margin:rev>0&&v.profit!=null?v.profit/rev:null};
 };
 // 전략 트리: 노드 {id,label,text,children}. fn은 노드를 받아 교체할 노드(배열이면 여러 개)나 null(삭제)을 반환
 const tUpd=(ns,id,fn)=>ns.flatMap((n)=>n.id===id?[].concat(fn(n)||[]):[{...n,children:tUpd(n.children||[],id,fn)}]);
@@ -536,12 +555,7 @@ const tForm=()=>[
   tH("세부 혜택 구성안","",["혜택01","혜택02","혜택03"].map((l)=>tH(l,"혜택 내용"))),
 ];
 // 구성(상품) 행 계산: 행사가=판매가−쿠폰, 개당=행사가÷수량, 적립금=행사가×적립률, 할인율=(정상가−행사가)÷정상가
-const itemCalc=(it)=>{
-  const has=String(it.sale??"")!=="";
-  const promo=has?pNum(it.sale)-pNum(it.coupon):null,q=pNum(it.qty),l=pNum(it.list);
-  const sold=pNum(it.sold);
-  return {promo,per:has&&q>0?promo/q:null,point:has&&String(it.pr??"")!==""?promo*pNum(it.pr)/100:null,disc:has&&l>0?(l-promo)/l:null,sold,rev:has&&sold>0?promo*sold:null};
-};
+
 // 검색 대상 텍스트(기획 트리 포함)
 const promoText=(x)=>{const t=(n)=>`${n.label||""} ${n.text||""} ${(n.children||[]).map(t).join(" ")}`;
   return `${x.name||""} ${x.channel||""} ${x.cat||""} ${x.note||""} ${x.feedback||""} ${x.comp||""} ${(x.items||[]).map((i)=>i.name||"").join(" ")} ${(x.tree||[]).map(t).join(" ")}`.toLowerCase();};
@@ -829,6 +843,18 @@ const CSS = `
 .pohs{margin-left:auto;font-size:13px;color:var(--ink3);}
 .psum{display:flex;flex-wrap:wrap;gap:8px;}
 .psum i{display:block;font-style:normal;font-size:11px;color:var(--ink3);margin-top:2px;}
+.pbreak{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;}
+.pbreak>div{flex:1;min-width:92px;background:#F7F8F9;border-radius:8px;padding:8px 11px;}
+.pbreak>div.hi{background:#FFF7D6;}
+.pbreak>div.pf{background:#E3FCEF;min-width:120px;}
+.pbreak span{display:block;font-size:11.5px;color:var(--ink3);}
+.pbreak b{font-size:15px;font-weight:800;}
+.pbreak i{display:block;font-style:normal;font-size:11px;color:var(--ink3);}
+.pcost{display:flex;flex-direction:column;gap:6px;}
+.pcost-row{display:flex;gap:8px;align-items:center;}
+.pcost-row input{background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:7px 10px;font-size:14px;}
+.pcost-row input:first-child{flex:1;}
+.pcost-row input:nth-child(2){width:150px;text-align:right;}
 .pchk{display:flex;flex-direction:column;gap:6px;}
 .pchk label{display:flex;gap:9px;align-items:flex-start;font-size:14.5px;cursor:pointer;line-height:1.5;}
 .pchk label input{width:17px;height:17px;flex:none;margin-top:2px;}
@@ -3480,18 +3506,18 @@ function Board() {
             </div>}
             {promoList.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>{promos.length?"검색/분류 조건에 맞는 행사가 없습니다.":"아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다."}</div>:(<>
             {(()=>{
-              const t=promoList.reduce((a,x)=>{const c=promoCalc(x),sd=x.noSend?0:1;return{sent:a.sent+sd*pNum(x.sent),read:a.read+sd*pNum(x.read),click:a.click+sd*pNum(x.click),sdOrders:a.sdOrders+sd*pNum(x.orders),orders:a.orders+pNum(x.orders),rev:a.rev+pNum(x.revenue),cost:a.cost+c.sendCost+pNum(x.extraCost),profit:a.profit+(c.profit||0),done:a.done+((pNum(x.sent)>0||pNum(x.revenue)>0||pNum(x.orders)>0)?1:0)};},{sent:0,read:0,click:0,sdOrders:0,orders:0,rev:0,cost:0,profit:0,done:0});
+              const t=promoList.reduce((a,x)=>{const c=promoCalc(x),sd=x.noSend?0:1;return{sent:a.sent+sd*pNum(x.sent),read:a.read+sd*pNum(x.read),click:a.click+sd*pNum(x.click),sdOrders:a.sdOrders+sd*pNum(x.orders),orders:a.orders+pNum(x.orders),rev:a.rev+c.rev,cost:a.cost+c.totalCost,profit:a.profit+(c.profit||0),done:a.done+((pNum(x.sent)>0||c.rev>0||pNum(x.orders)>0)?1:0)};},{sent:0,read:0,click:0,sdOrders:0,orders:0,rev:0,cost:0,profit:0,done:0});
               const div=(x,y)=>y>0?x/y:null;
               const tiles=[["행사 수",promoList.length+"건",`진행 완료 ${t.done}건`],["총 주문금액",fWon(t.rev),"원"],["총 주문고객",fWon(t.orders),"명"],["평균 객단가",fWon(div(t.rev,t.orders)),"원"],["총 비용",fWon(t.cost),"원"],["총 공헌이익",fWon(t.profit),"원"],["ROAS",t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-","주문금액÷비용"],["이익률",t.rev>0?(t.profit/t.rev*100).toFixed(1)+"%":"-","공헌이익÷주문금액"]];
               const reach=[["총 발송 수",fWon(t.sent)],["평균 오픈율",fPct(div(t.read,t.sent))],["평균 CTR",fPct(div(t.click,t.sent))],["평균 CTOR",fPct(div(t.click,t.read))],["평균 CVR",fPct(div(t.sdOrders,t.click))],["평균 구매전환율",fPct(div(t.sdOrders,t.sent))],["건당 획득비용",fWon(div(t.cost,t.orders))]];
               // 상품별 구매 비중 (전체 행사 합산)
               const pm=new Map();
-              promoList.forEach((x)=>(x.items||[]).forEach((it)=>{const ic=itemCalc(it),nm=(it.name||"").trim();if(!nm||!(ic.sold>0))return;const o=pm.get(nm)||{qty:0,rev:0,n:0};pm.set(nm,{qty:o.qty+ic.sold,rev:o.rev+(ic.rev||0),n:o.n+1});}));
+              promoList.forEach((x)=>(x.items||[]).forEach((it)=>{const ic=itemCalc(it,x.feeRate),nm=(it.name||"").trim();if(!nm||!(ic.sold>0))return;const o=pm.get(nm)||{qty:0,rev:0,n:0};pm.set(nm,{qty:o.qty+ic.sold,rev:o.rev+(ic.rev||0),n:o.n+1});}));
               const prods=[...pm.entries()].map(([name,v])=>({name,...v})).sort((a,b)=>b.rev-a.rev||b.qty-a.qty);
               const pTot=prods.reduce((a,x)=>a+x.rev,0),qTot=prods.reduce((a,x)=>a+x.qty,0);
               // 채널별
               const cm=new Map();
-              promoList.forEach((x)=>{const c=promoCalc(x),k=(x.channel||"미지정").trim()||"미지정",o=cm.get(k)||{n:0,rev:0,cost:0,profit:0,orders:0};cm.set(k,{n:o.n+1,rev:o.rev+pNum(x.revenue),cost:o.cost+c.sendCost+pNum(x.extraCost),profit:o.profit+(c.profit||0),orders:o.orders+pNum(x.orders)});});
+              promoList.forEach((x)=>{const c=promoCalc(x),k=(x.channel||"미지정").trim()||"미지정",o=cm.get(k)||{n:0,rev:0,cost:0,profit:0,orders:0};cm.set(k,{n:o.n+1,rev:o.rev+c.rev,cost:o.cost+c.totalCost,profit:o.profit+(c.profit||0),orders:o.orders+pNum(x.orders)});});
               const chans=[...cm.entries()].map(([name,v])=>({name,...v})).sort((a,b)=>b.rev-a.rev);
               return(<div className="poverall">
                 <div className="poh" onClick={()=>setPromoOpen({...promoOpen,__sum:!promoOpen.__sum})}>
@@ -3528,7 +3554,7 @@ function Board() {
                     {kids.length>0&&<div className="rt-kids">{RT(kids,depth+1)}</div>}
                   </div>);});
               return promoList.map((x)=>{
-                const c=promoCalc(x),ns=!!x.noSend,done=pNum(x.sent)>0||pNum(x.revenue)>0||(ns&&pNum(x.orders)>0),open=!!promoOpen[x.id];
+                const c=promoCalc(x),ns=!!x.noSend,done=pNum(x.sent)>0||c.rev>0||pNum(x.orders)>0,open=!!promoOpen[x.id];
                 const K=(l,v,hi)=><div className="pk"><span>{l}</span><b style={hi}>{v}</b></div>;
                 const items=(x.items||[]).filter((i)=>i.name||i.sale||i.list);
                 const hasTree=(x.tree||[]).some(tHas);
@@ -3552,8 +3578,8 @@ function Board() {
                     </div>}
                     {items.length>0&&<div className="psc"><h4>구성</h4>
                       <div style={{overflowX:"auto"}}><table className="rtbl">
-                        <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립금","할인율","판매 수량","판매금액","비중"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
-                        <tbody>{items.map((it)=>{const ic=itemCalc(it);return(<tr key={it.id}><td className="l">{it.name}</td><td>{fWon(pNum(it.qty))}</td><td>{fWon(pNum(it.list))}</td><td>{fWon(pNum(it.sale))}</td><td>{fWon(pNum(it.coupon))}</td><td><b>{fWon(ic.promo)}</b></td><td>{fWon(ic.per)}</td><td>{fWon(ic.point)}</td><td>{fPct(ic.disc)}</td><td>{ic.sold>0?fWon(ic.sold):"-"}</td><td>{fWon(ic.rev)}</td><td>{(()=>{const tot=items.reduce((a,y)=>a+(itemCalc(y).rev||0),0);return tot>0&&ic.rev!=null?<b>{fPct(ic.rev/tot)}</b>:"-";})()}</td></tr>);})}</tbody>
+                        <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립금","할인율"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
+                        <tbody>{items.map((it)=>{const ic=itemCalc(it,x.feeRate);return(<tr key={it.id}><td className="l">{it.name}</td><td>{fWon(pNum(it.qty))}</td><td>{fWon(pNum(it.list))}</td><td>{fWon(pNum(it.sale))}</td><td>{fWon(pNum(it.coupon))}</td><td><b>{fWon(ic.promo)}</b></td><td>{fWon(ic.per)}</td><td>{fWon(ic.point)}</td><td>{fPct(ic.disc)}</td></tr>);})}</tbody>
                       </table></div>
                       {x.comp&&<p className="pmemo">{x.comp}</p>}
                     </div>}
@@ -3561,10 +3587,20 @@ function Board() {
                     {!ns&&(pNum(x.sent)>0||x.sendAt)&&<div className="psc"><h4>발송</h4><div className="pgrp" style={{paddingLeft:0}}>
                       {K("발송",fWon(pNum(x.sent)))}{K("읽음",fWon(pNum(x.read)))}{K("클릭",fWon(pNum(x.click)))}{K("오픈율",fPct(c.openRate))}{K("CTR",fPct(c.ctr))}{K("CTOR",fPct(c.ctor))}
                     </div></div>}
-                    {done?<div className="psc"><h4>총 결과</h4><div className="pkpis">
-                      <div className="pgrp"><em>주문</em>{K("주문고객",fWon(pNum(x.orders)))}{K("주문금액",fWon(pNum(x.revenue)))}{K("객단가",fWon(c.aov))}{!ns&&K("CVR",fPct(c.cvr))}{!ns&&K("구매전환율",fPct(c.buyRate))}</div>
-                      <div className="pgrp"><em>손익</em>{K("비용",fWon(c.sendCost+pNum(x.extraCost)))}{K("공헌이익",fWon(c.profit),{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"})}{K("ROAS",c.roas==null?"-":Math.round(c.roas*100)+"%")}</div>
-                    </div></div>:<div className="psc"><h4>총 결과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 결과가 없어요. [수정] → <b>총 결과</b>에 주문·매출을 입력하면 손익이 자동 계산돼요.</p></div>}
+                    {done?<div className="psc"><h4>총 결과</h4>
+                      {(()=>{const rows=[["전체 매출",c.rev,1],["제품가",c.prodCost],["배송비",c.shipCost],["수수료",c.feeCost],...(x.costs||[]).filter((z)=>pNum(z.amt)>0).map((z)=>[z.name||"기타",pNum(z.amt)]),["매출 VAT",c.vat],["발송비",c.sendCost],["기타 비용",c.extra]].filter(([,v],i)=>i===0||v>0);
+                        return(<div className="pbreak">
+                          {rows.map(([l,v],i)=>(<div key={l+i} className={i===0?"hi":""}><span>{l}</span><b>{fWon(v)}</b><i>{i===0||!(c.rev>0)?"":(v/c.rev*100).toFixed(1)+"%"}</i></div>))}
+                          <div className="pf"><span>공헌이익</span><b style={{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"}}>{fWon(c.profit)}</b><i>{fPct(c.margin)}</i></div>
+                        </div>);})()}
+                      <div className="pgrp" style={{marginTop:12}}>{K("주문고객",fWon(pNum(x.orders))+"명")}{K("객단가",fWon(c.aov))}{!ns&&K("구매전환율",fPct(c.buyRate))}{!ns&&K("CVR",fPct(c.cvr))}{K("ROAS",c.roas==null?"-":Math.round(c.roas*100)+"%")}</div>
+                      {c.ics.some((i)=>i.sold>0)&&<div style={{overflowX:"auto",marginTop:12}}><table className="rtbl">
+                        <thead><tr>{["상품명","판매수량","행사가","매출","제품가","배송비","수수료","공헌이익","이익률","구매비율"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
+                        <tbody>{(()=>{const qt=c.ics.reduce((a,i)=>a+i.sold,0);return (x.items||[]).map((it,n)=>{const ic=c.ics[n];if(!(ic.sold>0))return null;return(
+                          <tr key={it.id}><td className="l">{it.name}</td><td><b>{fWon(ic.sold)}</b></td><td>{fWon(ic.promo)}</td><td>{fWon(ic.rev)}</td><td>{fWon(ic.cost)}</td><td>{fWon(ic.ship)}</td><td>{fWon(ic.fee)}</td>
+                          <td style={{color:ic.profit<0?"#CA3521":"#1F845A",fontWeight:700}}>{fWon(ic.profit)}</td><td>{fPct(ic.margin)}</td><td><b>{qt>0?fPct(ic.sold/qt):"-"}</b></td></tr>);});})()}</tbody>
+                      </table></div>}
+                    </div>:<div className="psc"><h4>총 결과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 결과가 없어요. [수정] → <b>총 결과</b>에서 상품별 판매수량을 넣으면 매출·공헌이익이 자동 계산돼요.</p></div>}
                     {x.feedback&&<div className="psc"><h4>받은 피드백</h4><div className="pnote" style={{background:"#E9F2FF"}}>{x.feedback}</div></div>}
                     {x.note&&<div className="psc"><h4>특이사항·회고</h4><div className="pnote">{x.note}</div></div>}
                     {(x.checks||[]).length>0&&<div className="psc"><h4>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.checks||[]).filter((k)=>k.done).length}/{(x.checks||[]).length} 완료 · 눌러서 체크</span></h4>
@@ -5388,18 +5424,15 @@ function Board() {
               </div>}
               <div style={{overflowX:"auto"}}>
                 <table className="itbl">
-                  <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립률(%)","적립금","할인율","판매 수량","판매금액","비중",""].map((h)=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립률(%)","적립금","할인율",""].map((h)=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {(d.items||[]).map((it)=>{const ic=itemCalc(it);const upd=(k)=>(e)=>setPromoDraft({...d,items:d.items.map((x)=>x.id===it.id?{...x,[k]:e.target.value}:x)});return(
+                    {(d.items||[]).map((it)=>{const ic=itemCalc(it,d.feeRate);const upd=(k)=>(e)=>setPromoDraft({...d,items:d.items.map((x)=>x.id===it.id?{...x,[k]:e.target.value}:x)});return(
                       <tr key={it.id}>
                         <td><input style={{minWidth:130}} value={it.name||""} onChange={upd("name")} placeholder="예) 락토컷 초코" /></td>
                         {["qty","list","sale","coupon"].map((k)=><td key={k}><input type="number" min="0" value={it[k]??""} onChange={upd(k)} /></td>)}
                         <td className="calc">{fWon(ic.promo)}</td><td className="calc">{fWon(ic.per)}</td>
                         <td><input type="number" min="0" step="0.1" value={it.pr??""} onChange={upd("pr")} placeholder="예) 1" /></td>
                         <td className="calc">{fWon(ic.point)}</td><td className="calc">{fPct(ic.disc)}</td>
-                        <td><input type="number" min="0" value={it.sold??""} onChange={upd("sold")} placeholder="판매 수" /></td>
-                        <td className="calc">{fWon(ic.rev)}</td>
-                        <td className="calc">{(()=>{const tot=(d.items||[]).reduce((a,y)=>a+(itemCalc(y).rev||0),0);return tot>0&&ic.rev!=null?fPct(ic.rev/tot):"-";})()}</td>
                         <td style={{whiteSpace:"nowrap"}}><button type="button" title="상품 저장 (다음 행사에서 바로 불러오기)" className="btn ghost" style={{padding:"4px 7px"}} onClick={()=>saveProduct(it)}>💾</button>
                           <button type="button" className="btn ghost" style={{padding:"4px 8px",color:"#CA3521",marginLeft:4}} onClick={()=>setPromoDraft({...d,items:d.items.filter((x)=>x.id!==it.id)})}>×</button></td>
                       </tr>);})}
@@ -5421,15 +5454,59 @@ function Board() {
                 <div style={g4}>{F("발송 시간","sendAt",{type:"datetime-local"})}{N("실제 발송 수","sent")}{N("읽은 고객 수","read")}{N("클릭 고객 수","click")}</div>
                 <div style={g4}>{N("건당 발송비 (원)","unitCost","예) 15")}</div>
               </>}
-            <div className="psec">③ 총 결과 (입력) <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 이 행사로 발생한 전체 주문·매출</span></div>
-            <div style={g4}>{N("주문고객 수","orders")}{N("주문금액 (원)","revenue")}{N("기타 비용 (원)","extraCost","사은품·쿠폰 등")}{N("공헌이익률 (%)","marginRate","예) 35")}</div>
-            <div className="psec">④ 자동 계산 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 비워 두면 자동, 값을 넣으면 그 값으로 고정(노란 칸)</span></div>
+            <div className="psec">③ 자동 계산 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 비워 두면 자동, 값을 넣으면 그 값으로 고정(노란 칸)</span></div>
             {!d.noSend&&<div style={g4}>{A("오픈율 %","openRate","읽음÷발송")}{A("CTR %","ctr","클릭÷발송")}{A("CTOR %","ctor","클릭÷읽음")}{A("CVR %","cvr","주문÷클릭")}</div>}
             <div style={g4}>{d.noSend?null:A("구매전환율 %","buyRate","주문÷발송")}{A("객단가","aov","주문금액÷주문고객")}{d.noSend?null:A("발송비","sendCost","발송×건당")}{A("공헌이익","profit","매출×이익률−비용")}</div>
             <div className="pres">
               {!d.noSend&&<><span>오픈율 <b>{fPct(c.openRate)}</b></span><span>CTR <b>{fPct(c.ctr)}</b></span><span>CTOR <b>{fPct(c.ctor)}</b></span><span>CVR <b>{fPct(c.cvr)}</b></span><span>구매전환율 <b>{fPct(c.buyRate)}</b></span></>}<span>객단가 <b>{fWon(c.aov)}</b></span><span>ROAS <b>{c.roas==null?"-":Math.round(c.roas*100)+"%"}</b></span>
               <span>공헌이익 <b style={{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"}}>{c.profit==null?"이익률 입력 필요":fWon(c.profit)+"원"}</b></span>
             </div>
+            <div className="psec">④ 총 결과 (입력) <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 무엇이 얼마나 팔렸는지 넣으면 매출·공헌이익이 자동 계산됩니다</span></div>
+            <div style={g4}>{N("주문고객 수","orders")}{N("수수료율 (%)","feeRate","예) 3.85")}{N("매출 VAT율 (%)","vatRate","예) 2.7")}{N("기타 비용 (원)","extraCost","위 항목에 없는 비용")}</div>
+            {(d.items||[]).length===0
+              ? <p className="pmemo">① 기획의 <b>구성</b>에 상품을 먼저 추가하면 여기에서 상품별 판매 수량을 입력할 수 있어요.</p>
+              : <div style={{overflowX:"auto",marginBottom:10}}>
+                  <table className="itbl">
+                    <thead><tr>{["상품명","행사가","판매수량","제품가(세트)","배송비(건)","매출","수수료","공헌이익","이익률","구매비율"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {(()=>{const qt=(d.items||[]).reduce((a,y)=>a+pNum(y.sold),0);
+                        return (d.items||[]).map((it)=>{const ic=itemCalc(it,d.feeRate);const upd=(k)=>(e)=>setPromoDraft({...d,items:d.items.map((x)=>x.id===it.id?{...x,[k]:e.target.value}:x)});return(
+                        <tr key={it.id}>
+                          <td style={{fontWeight:700,whiteSpace:"nowrap",padding:"4px 8px"}}>{it.name||<span style={{color:"var(--ink3)"}}>이름 없음</span>}</td>
+                          <td className="calc">{fWon(ic.promo)}</td>
+                          <td><input type="number" min="0" value={it.sold??""} onChange={upd("sold")} placeholder="0" /></td>
+                          <td><input type="number" min="0" value={it.cost??""} onChange={upd("cost")} placeholder="원가" /></td>
+                          <td><input type="number" min="0" value={it.ship??""} onChange={upd("ship")} placeholder="배송" /></td>
+                          <td className="calc">{fWon(ic.rev)}</td><td className="calc">{fWon(ic.fee||null)}</td>
+                          <td className="calc" style={{color:ic.profit==null?undefined:ic.profit<0?"#CA3521":"#1F845A"}}>{fWon(ic.profit)}</td>
+                          <td className="calc">{fPct(ic.margin)}</td>
+                          <td className="calc">{qt>0&&ic.sold>0?fPct(ic.sold/qt):"-"}</td>
+                        </tr>);});})()}
+                    </tbody>
+                  </table>
+                </div>}
+            {!(d.items||[]).some((i)=>pNum(i.sold)>0)&&<div style={g4}>{N("주문금액 (원)","revenue","상품별 판매수량을 넣으면 자동")}</div>}
+            <div className="fld"><label>프로모션·기타 비용</label>
+              <div className="pcost">
+                {(d.costs||[]).map((cl)=>(
+                  <div key={cl.id} className="pcost-row">
+                    <input value={cl.name} placeholder="항목명" onChange={(e)=>setPromoDraft({...d,costs:d.costs.map((z)=>z.id===cl.id?{...z,name:e.target.value}:z)})} />
+                    <input type="number" min="0" value={cl.amt??""} placeholder="금액" onChange={(e)=>setPromoDraft({...d,costs:d.costs.map((z)=>z.id===cl.id?{...z,amt:e.target.value}:z)})} />
+                    <button type="button" className="btn ghost" style={{padding:"5px 9px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,costs:d.costs.filter((z)=>z.id!==cl.id)})}>×</button>
+                  </div>))}
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
+                  <button type="button" className="btn ghost" onClick={()=>setPromoDraft({...d,costs:[...(d.costs||[]),{id:uid(),name:"",amt:""}]})}>+ 비용 항목</button>
+                  {DEF_COSTS.filter((n)=>!(d.costs||[]).some((z)=>z.name===n)).map((n)=>(
+                    <button key={n} type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>setPromoDraft({...d,costs:[...(d.costs||[]),{id:uid(),name:n,amt:""}]})}>+ {n}</button>))}
+                </div>
+              </div>
+            </div>
+            {(()=>{const rows=[["전체 매출",c.rev,"rev"],["제품가",c.prodCost],["배송비",c.shipCost],["수수료",c.feeCost],...(d.costs||[]).filter((z)=>pNum(z.amt)>0).map((z)=>[z.name||"기타",pNum(z.amt)]),["매출 VAT",c.vat],["발송비",c.sendCost],["기타 비용",c.extra]].filter(([,v],i)=>i===0||v>0);
+              return(<div className="pbreak">
+                {rows.map(([l,v],i)=>(<div key={l+i} className={i===0?"hi":""}><span>{l}</span><b>{fWon(v)}</b><i>{i===0||!(c.rev>0)?"":(v/c.rev*100).toFixed(1)+"%"}</i></div>))}
+                <div className="pf"><span>공헌이익</span><b style={{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"}}>{fWon(c.profit)}</b><i>{fPct(c.margin)}</i></div>
+              </div>);})()}
+            <div className="psec">⑤ 마무리</div>
             <div className="fld" style={{marginTop:14}}><label>받은 피드백 <span style={{fontWeight:500,color:"var(--ink3)"}}>팀장·동료에게 받은 의견을 그대로 적어 두기</span></label><textarea value={d.feedback||""} onChange={set("feedback")} placeholder="예) 혜택이 한눈에 안 들어온다 — 메인 카피에 할인율 먼저" /></div>
             <div className="fld"><label>특이사항 · 회고</label><textarea value={d.note||""} onChange={set("note")} placeholder="잘된 점, 아쉬운 점, 다음에 바꿀 것" /></div>
             <div className="fld"><label>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)"}}>스스로 점검할 항목을 직접 적어 두세요</span></label>
