@@ -528,17 +528,12 @@ const tH=(label,hint,children=[])=>({...tNew(label,"",children),hint});
 const tC=(label)=>({...tNew(label),chk:true,done:false});
 // 기획양식 전체 틀 (hint는 입력칸 안내 문구)
 const tForm=()=>[
-  tH("타겟","어떤 고객이 구매했으면 좋겠는가? 예) 최근 90일 구매 고객"),
   tH("세그먼트","예) 락토컷 2회 이상 구매 / A그룹"),
+  tH("타겟","어떤 고객이 구매했으면 좋겠는가? 예) 최근 90일 구매 고객"),
+  tH("현재 고객 문제","현재 고객이 느끼고 있는 문제점이 무엇인가?"),
+  tH("베네핏","이 행사에서 제품을 사면 고객의 삶이 어떻게 달라질까 (무엇이 좋은가)?"),
   tH("명분","행사를 진행하기 위한 이유",[tH("목적","이 기획을 왜 하고 있는지"),tH("목표","이 기획을 통해서 무엇을 얻고 싶은지"),tH("전략","전쟁에서 어느 전장을 택할지"),tH("전술","그 전장에서 어떤 부대로 어떻게 싸울지")]),
-  tH("전제 조건","",[tH("현재 상태(고객 문제)","현재 고객이 느끼고 있는 문제점이 무엇인가?"),tH("구매 트리거","상품을 구매 해야 하는 명분")]),
   tH("세부 혜택 구성안","",["혜택01","혜택02","혜택03"].map((l)=>tH(l,"혜택 내용"))),
-  tH("메인 명분","",[tH("문구","한 눈에 어떤 행사인지 알 수 있으며 직관적으로 후킹성을 가지고 있는 짧은 문장"),tH("이유","왜? 이 메인 명분인지 이유를 설명하시오")]),
-  tH("소구 카피","",[tH("카피","메인 명분을 설명하는 문장으로 한 번에 읽을 수 있어야 하며 후킹성 또한 가지고 있어야 하는 카피"),tH("이유","왜? 이 소구 카피인지 이유를 설명하시오")]),
-  tH("진행 구성","진행 순서·일정·채널별 구성"),
-  tH("체크리스트","",["목적이 한 줄로 설명되는가?","이 문구를 고객이 이해할까?","지금 이 정보가 ‘지금’ 필요한가?","상사가 지적했던 포인트가 반영됐는가?","이전 반려 사유를 다시 밟고 있진 않은가?"].map(tC)),
-  tH("피드백","상사·팀 피드백 기록"),
-  tH("주의사항","법적 문구·표시광고·재고·CS 유의점"),
 ];
 // 구성(상품) 행 계산: 행사가=판매가−쿠폰, 개당=행사가÷수량, 적립금=행사가×적립률, 할인율=(정상가−행사가)÷정상가
 const itemCalc=(it)=>{
@@ -3418,7 +3413,7 @@ function Board() {
             <div className="pcards">
               {promos.map((x)=>{
                 const c=promoCalc(x),done=pNum(x.sent)>0||pNum(x.revenue)>0;
-                const plan=[["명분",tTxt(x,"명분")||x.reason],["타겟·세그먼트",[tTxt(x,"타겟")||x.target,tTxt(x,"세그먼트")||x.segment].filter(Boolean).join(" / ")],["구성",(x.items||[]).filter((i)=>i.name).map((i)=>`${i.name}${pNum(i.qty)>1?" ×"+pNum(i.qty):""}${itemCalc(i).promo!=null?" · "+fWon(itemCalc(i).promo)+"원":""}`).join("\n")||x.comp],["베네핏",x.benefit]].filter(([,v])=>v);
+                const plan=[["명분",tTxt(x,"명분")||x.reason],["타겟·세그먼트",[tTxt(x,"타겟")||x.target,tTxt(x,"세그먼트")||x.segment].filter(Boolean).join(" / ")],["구성",(x.items||[]).filter((i)=>i.name).map((i)=>`${i.name}${pNum(i.qty)>1?" ×"+pNum(i.qty):""}${itemCalc(i).promo!=null?" · "+fWon(itemCalc(i).promo)+"원":""}`).join("\n")||x.comp],["베네핏",tTxt(x,"베네핏")||x.benefit]].filter(([,v])=>v);
                 const K=(l,v,hi)=><div className="pk"><span>{l}</span><b style={hi}>{v}</b></div>;
                 return(
                 <div key={x.id} className="pcard" onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>
@@ -5257,7 +5252,6 @@ function Board() {
               </div>
               <button type="button" className="btn ghost" style={{marginTop:8}} onClick={()=>setPromoDraft({...d,items:[...(d.items||[]),{id:uid(),qty:"1"}]})}>+ 상품 추가</button>
             </div>
-            <div className="fld"><label>베네핏 <span style={{fontWeight:500,color:"var(--ink3)"}}>이 행사에서 제품을 사면 고객의 삶이 어떻게 달라질까 (무엇이 좋은가)?</span></label><textarea value={d.benefit||""} onChange={set("benefit")} placeholder="예) 당 걱정 없이 아침 대용으로 간편하게 단백질 23g 섭취" /></div>
             <div className="fld"><label>기타 혜택·사은품 메모</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 쉐이커 증정, 7만원 이상 구매 시 사은품" /></div>
             <div className="psec">② 발송·성과 (입력)</div>
             <div style={g4}>{F("발송 시간","sendAt",{type:"datetime-local"})}{N("실제 발송 수","sent")}{N("읽은 고객 수","read")}{N("클릭 고객 수","click")}</div>
