@@ -596,7 +596,7 @@ const tForm=()=>[
 
 // 검색 대상 텍스트(기획 트리 포함)
 const promoText=(x)=>{const t=(n)=>`${n.label||""} ${n.text||""} ${(n.children||[]).map(t).join(" ")}`;
-  return `${x.name||""} ${x.channel||""} ${x.cat||""} ${x.note||""} ${x.feedback||""} ${x.comp||""} ${[...(x.items||[]),...(x.sales||[])].map((i)=>i.name||"").join(" ")} ${(x.tree||[]).map(t).join(" ")}`.toLowerCase();};
+  return `${x.name||""} ${x.channel||""} ${x.cat||""} ${x.note||""} ${x.feedback||""} ${(x.contents||[]).map((k)=>k.text||"").join(" ")} ${x.comp||""} ${[...(x.items||[]),...(x.sales||[])].map((i)=>i.name||"").join(" ")} ${(x.tree||[]).map(t).join(" ")}`.toLowerCase();};
 const fPct=(x)=>x==null?"-":(x*100).toFixed(1)+"%";
 const fPct0=(x)=>x==null?"-":Math.round(x*100)+"%";
 const fWon=(x)=>x==null?"-":Math.round(x).toLocaleString();
@@ -2568,18 +2568,19 @@ function Board() {
   const copyPromo=(x)=>{const strip=(ns)=>ns.map((n)=>({...n,id:uid(),done:false,children:strip(n.children||[])}));
     setPromoDraft({_new:true,name:(x.name||"")+" (복사)",cat:x.cat,channel:x.channel,date:todayStr(),endDate:"",noSend:x.noSend,
       tree:strip(x.tree||[]),cols:x.cols,feeRate:x.feeRate,vatRate:x.vatRate,costs:(x.costs||[]).map((z)=>({...z,id:uid(),amt:""})),fields:(x.fields||[]).map((f)=>({...f,id:uid(),val:""})),items:(x.items||[]).map((i)=>({...i,id:uid()})),sales:[],comp:x.comp,
-      unitCost:x.unitCost,marginRate:x.marginRate,checks:(x.checks||[]).map((c)=>({...c,id:uid(),done:false})),ov:{}});};
+      unitCost:x.unitCost,marginRate:x.marginRate,checks:(x.checks||[]).map((c)=>({...c,id:uid(),done:false})),contents:(x.contents||[]).map((c)=>({...c,id:uid(),done:false})),ov:{}});};
   const promoDefaults=data.promoDefaults||null;
   const newPromo=()=>{const t=promoDefaults;
     return {_new:true,date:todayStr(),name:"",ov:{},tree:t?.tree?JSON.parse(JSON.stringify(t.tree)):tForm(),
-      checks:(t?.checks?.length?t.checks.map((k)=>({...k,id:uid(),done:false})):DEF_CHECKS.map((x)=>({id:uid(),text:x,done:false}))),costs:(t?.costs||[]).map((k)=>({...k,id:uid()})),
+      checks:(t?.checks?.length?t.checks.map((k)=>({...k,id:uid(),done:false})):DEF_CHECKS.map((x)=>({id:uid(),text:x,done:false}))),
+      contents:(t?.contents||[]).map((k)=>({...k,id:uid(),done:false})),costs:(t?.costs||[]).map((k)=>({...k,id:uid()})),
       cat:t?.cat||"",channel:t?.channel||"",feeRate:t?.feeRate||"",vatRate:t?.vatRate||"",unitCost:t?.unitCost||"",marginRate:t?.marginRate||"",
       ...(t?.cols?{cols:JSON.parse(JSON.stringify(t.cols))}:{}),sales:[],fields:(t?.fields||[]).map((f)=>({...f,id:uid(),val:""})),
       items:(t?.items||[]).map((i)=>({...i,id:uid(),sold:"",revOv:"",feeOv:"",profitOv:""}))};};
   const saveDefaults=(x)=>{
     if(!window.confirm("지금 화면의 기획양식·체크리스트·비용 항목·요율·구성 상품을 다음 행사부터 기본으로 사용할까요?\n(이 행사 내용은 그대로 유지됩니다)"))return;
     const strip=(ns)=>(ns||[]).map((n)=>({...n,done:false,children:strip(n.children)}));
-    commit((d)=>({...d,promoDefaults:{tree:strip(x.tree),checks:(x.checks||[]).map((k)=>({...k,done:false})),
+    commit((d)=>({...d,promoDefaults:{tree:strip(x.tree),checks:(x.checks||[]).map((k)=>({...k,done:false})),contents:(x.contents||[]).map((k)=>({...k,done:false})),
       costs:(x.costs||[]).map((k)=>({name:k.name,amt:""})),fields:(x.fields||[]).map((f)=>({...f,val:""})),cat:x.cat||"",channel:x.channel||"",
       feeRate:x.feeRate||"",vatRate:x.vatRate||"",unitCost:x.unitCost||"",marginRate:x.marginRate||"",
       cols:promoCols(x),items:(x.items||[]).map((i)=>({name:i.name,qty:i.qty,list:i.list,sale:i.sale,coupon:i.coupon,pr:i.pr,cost:i.cost,ship:i.ship,cv:i.cv})),
@@ -3772,6 +3773,11 @@ function Board() {
                           <td style={{color:ic.profit<0?"#CA3521":"#1F845A",fontWeight:700}}>{fWon(ic.profit)}</td><td>{fPct(ic.margin)}</td><td><b>{qt>0?fPct(ic.sold/qt):"-"}</b></td></tr>);});})()}</tbody>
                       </table></div>}
                     </div>:<div className="psc"><h4>총 결과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 결과가 없어요. [수정] → <b>총 결과</b>에서 상품별 판매수량을 넣으면 매출·공헌이익이 자동 계산돼요.</p></div>}
+                    {(x.contents||[]).length>0&&<div className="psc"><h4>기획안에 들어가야 할 것들 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.contents||[]).filter((k)=>k.done).length}/{(x.contents||[]).length} 완료 · 눌러서 체크</span></h4>
+                      <div className="pchk">{(x.contents||[]).map((k)=>(
+                        <label key={k.id} className={k.done?"on":""}>
+                          <input type="checkbox" checked={!!k.done} onChange={()=>commit((dd)=>({...dd,promos:(dd.promos||[]).map((y)=>y.id===x.id?{...y,contents:(y.contents||[]).map((z)=>z.id===k.id?{...z,done:!z.done}:z),updatedAt:Date.now()}:y),updatedAt:Date.now()}),[])} />
+                          <span>{k.text}</span></label>))}</div></div>}
                     {x.feedback&&<div className="psc"><h4>받은 피드백</h4><div className="pnote" style={{background:"#E9F2FF"}}>{x.feedback}</div></div>}
                     {x.note&&<div className="psc"><h4>특이사항·회고</h4><div className="pnote">{x.note}</div></div>}
                     {(x.checks||[]).length>0&&<div className="psc"><h4>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.checks||[]).filter((k)=>k.done).length}/{(x.checks||[]).length} 완료 · 눌러서 체크</span></h4>
@@ -5584,6 +5590,17 @@ function Board() {
                   <button type="button" className="btn ghost" style={{marginTop:10}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tNew("")]})}>+ 항목 추가</button>
                 </>);
               })()}
+            </div>
+            <div className="fld"><label>기획안에 들어가야 할 것들 <span style={{fontWeight:500,color:"var(--ink3)"}}>상세페이지·배너·공지 등 실제 산출물에 꼭 넣어야 하는 항목. 챙긴 것은 체크</span></label>
+              <div className="pchk edit">
+                {(d.contents||[]).map((k)=>(
+                  <div key={k.id} className="pchk-row">
+                    <input type="checkbox" checked={!!k.done} onChange={(e)=>setPromoDraft({...d,contents:d.contents.map((z)=>z.id===k.id?{...z,done:e.target.checked}:z)})} />
+                    <input value={k.text} placeholder="예) 할인율 노출 배너 / 증정품 이미지 / 교환·반품 안내 문구" onChange={(e)=>setPromoDraft({...d,contents:d.contents.map((z)=>z.id===k.id?{...z,text:e.target.value}:z)})} style={{textDecoration:k.done?"line-through":"none"}} />
+                    <button type="button" className="btn ghost" style={{padding:"5px 9px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,contents:d.contents.filter((z)=>z.id!==k.id)})}>×</button>
+                  </div>))}
+                <button type="button" className="btn ghost" style={{marginTop:6}} onClick={()=>setPromoDraft({...d,contents:[...(d.contents||[]),{id:uid(),text:"",done:false}]})}>+ 항목 추가</button>
+              </div>
             </div>
             <div className="fld"><label>구성 <span style={{fontWeight:500,color:"var(--ink3)"}}>행사가 = 판매가 − 쿠폰 · 개당 = 행사가 ÷ 수량 · 적립금 = 행사가 × 적립률 · 할인율 = (정상가 − 행사가) ÷ 정상가</span></label>
               {savedProducts.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
