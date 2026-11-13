@@ -3773,6 +3773,18 @@ function Board() {
                     {(hasTree||legacy.length>0)&&<div className="psc"><h4>기획</h4>
                       {hasTree?RT(x.tree,0):legacy.map(([l,v])=><div key={l} className="rt"><div className="rt-row"><span className="rt-l">{l}</span><p>{v}</p></div></div>)}
                     </div>}
+                    {(x.contentsText||"").trim()&&<div className="psc"><h4>기획안에 들어가야 할 것들</h4><div className="pmemo">{x.contentsText}</div></div>}
+                    {!(x.contentsText||"").trim()&&(x.contents||[]).length>0&&<div className="psc"><h4>기획안에 들어가야 할 것들 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.contents||[]).filter((k)=>k.done).length}/{(x.contents||[]).length} 완료 · 눌러서 체크</span></h4>
+                      <div className="pchk">{(x.contents||[]).map((k)=>(
+                        <label key={k.id} className={k.done?"on":""}>
+                          <input type="checkbox" checked={!!k.done} onChange={()=>commit((dd)=>({...dd,promos:(dd.promos||[]).map((y)=>y.id===x.id?{...y,contents:(y.contents||[]).map((z)=>z.id===k.id?{...z,done:!z.done}:z),updatedAt:Date.now()}:y),updatedAt:Date.now()}),[])} />
+                          <span>{k.text}</span></label>))}</div></div>}
+                    {(x.checks||[]).length>0&&<div className="psc"><h4>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.checks||[]).filter((k)=>k.done).length}/{(x.checks||[]).length} 완료 · 눌러서 체크</span></h4>
+                      <div className="pchk">{(x.checks||[]).map((k)=>(
+                        <label key={k.id} className={k.done?"on":""}>
+                          <input type="checkbox" checked={!!k.done} onChange={()=>commit((dd)=>({...dd,promos:(dd.promos||[]).map((y)=>y.id===x.id?{...y,checks:(y.checks||[]).map((z)=>z.id===k.id?{...z,done:!z.done}:z),updatedAt:Date.now()}:y),updatedAt:Date.now()}),[])} />
+                          <span>{k.text}</span></label>))}</div></div>}
+                  </div>}
                     {items.length>0&&<div className="psc"><h4>구성</h4>
                       <div style={{overflowX:"auto"}}><table className="rtbl">
                         <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립금","할인율"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
@@ -3800,20 +3812,8 @@ function Board() {
                           <td style={{color:ic.profit<0?"#CA3521":"#1F845A",fontWeight:700}}>{fWon(ic.profit)}</td><td>{fPct(ic.margin)}</td><td><b>{qt>0?fPct(ic.sold/qt):"-"}</b></td></tr>);});})()}</tbody>
                       </table></div>}
                     </div>:<div className="psc"><h4>총 결과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 결과가 없어요. [수정] → <b>총 결과</b>에서 상품별 판매수량을 넣으면 매출·공헌이익이 자동 계산돼요.</p></div>}
-                    {(x.contentsText||"").trim()&&<div className="psc"><h4>기획안에 들어가야 할 것들</h4><div className="pmemo">{x.contentsText}</div></div>}
-                    {!(x.contentsText||"").trim()&&(x.contents||[]).length>0&&<div className="psc"><h4>기획안에 들어가야 할 것들 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.contents||[]).filter((k)=>k.done).length}/{(x.contents||[]).length} 완료 · 눌러서 체크</span></h4>
-                      <div className="pchk">{(x.contents||[]).map((k)=>(
-                        <label key={k.id} className={k.done?"on":""}>
-                          <input type="checkbox" checked={!!k.done} onChange={()=>commit((dd)=>({...dd,promos:(dd.promos||[]).map((y)=>y.id===x.id?{...y,contents:(y.contents||[]).map((z)=>z.id===k.id?{...z,done:!z.done}:z),updatedAt:Date.now()}:y),updatedAt:Date.now()}),[])} />
-                          <span>{k.text}</span></label>))}</div></div>}
                     {x.feedback&&<div className="psc"><h4>받은 피드백</h4><div className="pnote" style={{background:"#E9F2FF"}}>{x.feedback}</div></div>}
                     {x.note&&<div className="psc"><h4>특이사항·회고</h4><div className="pnote">{x.note}</div></div>}
-                    {(x.checks||[]).length>0&&<div className="psc"><h4>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.checks||[]).filter((k)=>k.done).length}/{(x.checks||[]).length} 완료 · 눌러서 체크</span></h4>
-                      <div className="pchk">{(x.checks||[]).map((k)=>(
-                        <label key={k.id} className={k.done?"on":""}>
-                          <input type="checkbox" checked={!!k.done} onChange={()=>commit((dd)=>({...dd,promos:(dd.promos||[]).map((y)=>y.id===x.id?{...y,checks:(y.checks||[]).map((z)=>z.id===k.id?{...z,done:!z.done}:z),updatedAt:Date.now()}:y),updatedAt:Date.now()}),[])} />
-                          <span>{k.text}</span></label>))}</div></div>}
-                  </div>}
                 </div>);});
             })()}</div></>)}
           </div>
