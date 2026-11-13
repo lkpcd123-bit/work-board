@@ -5504,10 +5504,20 @@ function Board() {
               </div>}
               <div style={{overflowX:"auto"}}>
                 <table className="itbl">
-                  <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립률(%)","적립금","할인율",""].map((h)=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr><th title="체크한 상품만 ④ 총 결과로 들어갑니다">결과</th>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립률(%)","적립금","할인율",""].map((h)=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {(d.items||[]).map((it)=>{const ic=itemCalc(it,d.feeRate,promoCols(d));const upd=(k)=>(e)=>setPromoDraft({...d,items:d.items.map((x)=>x.id===it.id?{...x,[k]:e.target.value}:x)});return(
+                    {(d.items||[]).map((it)=>{const ic=itemCalc(it,d.feeRate,promoCols(d));const upd=(k)=>(e)=>setPromoDraft({...d,items:d.items.map((x)=>x.id===it.id?{...x,[k]:e.target.value}:x),sales:(d.sales||[]).map((r)=>r.srcId===it.id&&(k==="name"||k==="sale")?{...r,[k]:e.target.value}:r)});return(
                       <tr key={it.id}>
+                        <td style={{textAlign:"center"}}><input type="checkbox" checked={!!it.pick} style={{width:17,height:17,minWidth:0}} title="총 결과로 가져오기"
+                          onChange={(e)=>{const on=e.target.checked;
+                            const its=d.items.map((x)=>x.id===it.id?{...x,pick:on}:x);
+                            const nm=(it.name||"").trim(),cur=d.sales||[];
+                            let sales=cur;
+                            if(on){ if(!cur.some((r)=>r.srcId===it.id||(nm&&(r.name||"")===nm))) sales=[...cur,{id:uid(),srcId:it.id,name:it.name,sale:it.sale,qty:it.qty,cost:it.cost,ship:it.ship,cv:it.cv,sold:""}]; }
+                            else { const t=cur.find((r)=>r.srcId===it.id||(nm&&(r.name||"")===nm));
+                              if(t&&(pNum(t.sold)>0||String(t.revOv??"")!=="")&&!window.confirm("총 결과에 입력한 값이 있어요. 그래도 뺄까요?")){return;}
+                              sales=cur.filter((r)=>r!==t); }
+                            setPromoDraft({...d,items:its,sales});}} /></td>
                         <td><input style={{minWidth:130}} value={it.name||""} onChange={upd("name")} placeholder="예) 락토컷 초코" /></td>
                         {["qty","list","sale","coupon"].map((k)=><td key={k}><input type="number" min="0" value={it[k]??""} onChange={upd(k)} /></td>)}
                         <td className="calc">{fWon(ic.promo)}</td><td className="calc">{fWon(ic.per)}</td>
@@ -5551,8 +5561,8 @@ function Board() {
               const setCols=(ncols)=>setPromoDraft({...d,cols:ncols});
               const upd=(it,k)=>(e)=>setRows(rows.map((x)=>x.id===it.id?{...x,[k]:e.target.value}:x));
               const updCol=(it,cid)=>(e)=>setRows(rows.map((x)=>x.id===it.id?(cid==="cost"?{...x,cost:e.target.value}:cid==="ship"?{...x,ship:e.target.value}:{...x,cv:{...(x.cv||{}),[cid]:e.target.value}}):x));
-              const pull=(src)=>setRows([...rows,{id:uid(),name:src.name,sale:src.sale,qty:src.qty,cost:src.cost,ship:src.ship,cv:src.cv,sold:""}]);
-              const notYet=(d.items||[]).filter((i)=>(i.name||"").trim()&&!rows.some((r)=>(r.name||"")===i.name));
+              const pull=(src)=>setRows([...rows,{id:uid(),srcId:src.id,name:src.name,sale:src.sale,qty:src.qty,cost:src.cost,ship:src.ship,cv:src.cv,sold:""}]);
+              const notYet=(d.items||[]).filter((i)=>i.pick&&!rows.some((r)=>r.srcId===i.id||((i.name||"").trim()&&(r.name||"")===i.name)));
               return(<>
                 <div style={{overflowX:"auto",marginBottom:8}}>
                   <table className="itbl">
@@ -5582,11 +5592,11 @@ function Board() {
                   </table>
                 </div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
-                  <span style={{fontSize:12,color:"var(--ink3)"}}>① 구성에서 가져오기:</span>
-                  {notYet.length===0
-                    ? <span style={{fontSize:12,color:"var(--ink3)"}}>{(d.items||[]).length?"모두 가져왔어요":"① 기획의 구성에 상품을 먼저 넣어 주세요"}</span>
-                    : <>{notYet.map((i)=><button key={i.id} type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>pull(i)}>+ {i.name}</button>)}
-                        {notYet.length>1&&<button type="button" className="btn ghost" style={{fontSize:12.5,fontWeight:800}} onClick={()=>setRows([...rows,...notYet.map((i)=>({id:uid(),name:i.name,sale:i.sale,qty:i.qty,cost:i.cost,ship:i.ship,cv:i.cv,sold:""}))])}>+ 전체</button>}</>}
+                  <span style={{fontSize:12,color:"var(--ink3)"}}>① 구성에서 <b>결과</b> 칸을 체크한 상품이 여기로 들어옵니다.</span>
+                  {notYet.length>0&&<>
+                    {notYet.map((i)=><button key={i.id} type="button" className="btn ghost" style={{fontSize:12.5}} onClick={()=>pull(i)}>+ {i.name||"이름 없음"}</button>)}
+                    <button type="button" className="btn ghost" style={{fontSize:12.5,fontWeight:800}} onClick={()=>setRows([...rows,...notYet.map((i)=>({id:uid(),srcId:i.id,name:i.name,sale:i.sale,qty:i.qty,cost:i.cost,ship:i.ship,cv:i.cv,sold:""}))])}>+ 체크한 상품 모두</button>
+                  </>}
                 </div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12,alignItems:"center"}}>
                   <button type="button" className="btn ghost" onClick={()=>setRows([...rows,{id:uid(),qty:"1"}])}>+ 직접 추가</button>
