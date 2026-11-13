@@ -522,13 +522,16 @@ const promoCalc=(p)=>{
 };
 // 전략 트리: 노드 {id,label,text,children}. fn은 노드를 받아 교체할 노드(배열이면 여러 개)나 null(삭제)을 반환
 const tUpd=(ns,id,fn)=>ns.flatMap((n)=>n.id===id?[].concat(fn(n)||[]):[{...n,children:tUpd(n.children||[],id,fn)}]);
+const tTxt=(x,label)=>(x.tree||[]).filter((n)=>n.label===label&&n.text).map((n)=>n.text).join(" / ");
 const tNew=(label,text="",children=[])=>({id:Math.random().toString(36).slice(2,10),label,text,children});
-const tSeg=()=>tNew("명분","",["목적","목표","전략","전술"].map((l)=>tNew(l)));
 const tH=(label,hint,children=[])=>({...tNew(label,"",children),hint});
 const tC=(label)=>({...tNew(label),chk:true,done:false});
 // 기획양식 전체 틀 (hint는 입력칸 안내 문구)
-const tForm=()=>tNew("기획양식","",[
-  tH("타겟 정의 & 전제 조건","",[tH("현재 상태(고객 문제)","현재 고객이 느끼고 있는 문제점이 무엇인가?"),tH("구매 트리거","상품을 구매 해야 하는 명분")]),
+const tForm=()=>[
+  tH("타겟","어떤 고객이 구매했으면 좋겠는가? 예) 최근 90일 구매 고객"),
+  tH("세그먼트","예) 락토컷 2회 이상 구매 / A그룹"),
+  tH("명분","행사를 진행하기 위한 이유",[tH("목적","이 기획을 왜 하고 있는지"),tH("목표","이 기획을 통해서 무엇을 얻고 싶은지"),tH("전략","전쟁에서 어느 전장을 택할지"),tH("전술","그 전장에서 어떤 부대로 어떻게 싸울지")]),
+  tH("전제 조건","",[tH("현재 상태(고객 문제)","현재 고객이 느끼고 있는 문제점이 무엇인가?"),tH("구매 트리거","상품을 구매 해야 하는 명분")]),
   tH("세부 혜택 구성안","",["혜택01","혜택02","혜택03"].map((l)=>tH(l,"혜택 내용"))),
   tH("메인 명분","",[tH("문구","한 눈에 어떤 행사인지 알 수 있으며 직관적으로 후킹성을 가지고 있는 짧은 문장"),tH("이유","왜? 이 메인 명분인지 이유를 설명하시오")]),
   tH("소구 카피","",[tH("카피","메인 명분을 설명하는 문장으로 한 번에 읽을 수 있어야 하며 후킹성 또한 가지고 있어야 하는 카피"),tH("이유","왜? 이 소구 카피인지 이유를 설명하시오")]),
@@ -536,7 +539,7 @@ const tForm=()=>tNew("기획양식","",[
   tH("체크리스트","",["목적이 한 줄로 설명되는가?","이 문구를 고객이 이해할까?","지금 이 정보가 ‘지금’ 필요한가?","상사가 지적했던 포인트가 반영됐는가?","이전 반려 사유를 다시 밟고 있진 않은가?"].map(tC)),
   tH("피드백","상사·팀 피드백 기록"),
   tH("주의사항","법적 문구·표시광고·재고·CS 유의점"),
-]);
+];
 // 구성(상품) 행 계산: 행사가=판매가−쿠폰, 개당=행사가÷수량, 적립금=행사가×적립률, 할인율=(정상가−행사가)÷정상가
 const itemCalc=(it)=>{
   const has=String(it.sale??"")!=="";
@@ -3377,7 +3380,7 @@ function Board() {
           <div className="panel" style={{padding:"14px 16px"}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
               <b style={{fontSize:15}}>행사 기획·손익</b>
-              <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{},tree:[tSeg()]})}>+ 행사 추가</button>
+              <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{},tree:tForm()})}>+ 행사 추가</button>
               <span style={{fontSize:12,color:"var(--ink3)"}}>{promos.length}건 · 행을 누르면 수정</span>
             </div>
             {promos.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다.</div>:(
@@ -3388,8 +3391,8 @@ function Board() {
                   {promos.map((x)=>{const c=promoCalc(x);return(
                     <tr key={x.id} onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>
                       <td>{x.date}{x.endDate&&x.endDate!==x.date?` ~ ${x.endDate.slice(5)}`:""}</td>
-                      <td className="l"><b>{x.name}</b></td><td>{x.channel}</td><td className="l">{(x.tree||[]).filter((n)=>n.label==="명분"&&n.text).map((n)=>n.text).join(" / ")||x.reason}</td>
-                      <td className="l">{[x.target,x.segment].filter(Boolean).join(" / ")}</td><td className="l">{(x.items||[]).filter((i)=>i.name).map((i)=>`${i.name}${pNum(i.qty)>1?" ×"+pNum(i.qty):""}${itemCalc(i).promo!=null?" "+fWon(itemCalc(i).promo)+"원":""}`).join(", ")||x.comp}</td>
+                      <td className="l"><b>{x.name}</b></td><td>{x.channel}</td><td className="l">{tTxt(x,"명분")||x.reason}</td>
+                      <td className="l">{[tTxt(x,"타겟")||x.target,tTxt(x,"세그먼트")||x.segment].filter(Boolean).join(" / ")}</td><td className="l">{(x.items||[]).filter((i)=>i.name).map((i)=>`${i.name}${pNum(i.qty)>1?" ×"+pNum(i.qty):""}${itemCalc(i).promo!=null?" "+fWon(itemCalc(i).promo)+"원":""}`).join(", ")||x.comp}</td>
                       <td className="l">{x.benefit}</td>
                       <td>{(x.sendAt||"").replace("T"," ")}</td>
                       <td>{fWon(pNum(x.sent))}</td><td>{fWon(pNum(x.read))}</td><td>{fWon(pNum(x.click))}</td>
@@ -5179,29 +5182,7 @@ function Board() {
             <div style={g2}>{F("행사명","name",{autoFocus:true,placeholder:"예) 11월 블랙프라이데이 알림톡"})}{F("채널","channel",{placeholder:"알림톡 / 문자 / 앱푸시 / 자사몰 …",list:"promo-ch"})}</div>
             <datalist id="promo-ch">{["알림톡","친구톡","문자(LMS)","앱푸시","이메일","자사몰 기획전","네이버","쿠팡","올리브영"].map((o)=><option key={o} value={o} />)}</datalist>
             <div style={g2}>{F("시작일","date",{type:"date"})}{F("종료일","endDate",{type:"date"})}</div>
-            <div style={g2}>{F("타겟","target",{placeholder:"예) 최근 90일 구매 고객"})}{F("세그먼트","segment",{placeholder:"예) 락토컷 2회 이상 구매 / A그룹"})}</div>
-            <div className="fld"><label>구성 <span style={{fontWeight:500,color:"var(--ink3)"}}>행사가 = 판매가 − 쿠폰 · 개당 = 행사가 ÷ 수량 · 적립금 = 행사가 × 적립률 · 할인율 = (정상가 − 행사가) ÷ 정상가</span></label>
-              <div style={{overflowX:"auto"}}>
-                <table className="itbl">
-                  <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립률(%)","적립금","할인율",""].map((h)=><th key={h}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {(d.items||[]).map((it)=>{const ic=itemCalc(it);const upd=(k)=>(e)=>setPromoDraft({...d,items:d.items.map((x)=>x.id===it.id?{...x,[k]:e.target.value}:x)});return(
-                      <tr key={it.id}>
-                        <td><input style={{minWidth:130}} value={it.name||""} onChange={upd("name")} placeholder="예) 락토컷 초코" /></td>
-                        {["qty","list","sale","coupon"].map((k)=><td key={k}><input type="number" min="0" value={it[k]??""} onChange={upd(k)} /></td>)}
-                        <td className="calc">{fWon(ic.promo)}</td><td className="calc">{fWon(ic.per)}</td>
-                        <td><input type="number" min="0" step="0.1" value={it.pr??""} onChange={upd("pr")} placeholder="예) 1" /></td>
-                        <td className="calc">{fWon(ic.point)}</td><td className="calc">{fPct(ic.disc)}</td>
-                        <td><button type="button" className="btn ghost" style={{padding:"4px 8px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,items:d.items.filter((x)=>x.id!==it.id)})}>×</button></td>
-                      </tr>);})}
-                  </tbody>
-                </table>
-              </div>
-              <button type="button" className="btn ghost" style={{marginTop:8}} onClick={()=>setPromoDraft({...d,items:[...(d.items||[]),{id:uid(),qty:"1"}]})}>+ 상품 추가</button>
-            </div>
-            <div className="fld"><label>베네핏 <span style={{fontWeight:500,color:"var(--ink3)"}}>이 행사에서 제품을 사면 고객의 삶이 어떻게 달라질까 (무엇이 좋은가)?</span></label><textarea value={d.benefit||""} onChange={set("benefit")} placeholder="예) 당 걱정 없이 아침 대용으로 간편하게 단백질 23g 섭취" /></div>
-            <div className="fld"><label>기타 혜택·사은품 메모</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 쉐이커 증정, 7만원 이상 구매 시 사은품" /></div>
-            <div className="fld"><label>전략 트리 <span style={{fontWeight:500,color:"var(--ink3)"}}>명분 → 목적 → 목표 → 전략 → 전술 순으로 단계별로 내려가며 작성</span></label>
+            <div className="fld"><label>기획양식 <span style={{fontWeight:500,color:"var(--ink3)"}}>↳ 하위 단계 · ＋ 같은 단계 추가 · × 삭제</span></label>
               {(()=>{
                 const up=(id,fn)=>setPromoDraft({...d,tree:tUpd(d.tree||[],id,fn)});
                 const R=(ns,depth)=>ns.map((n)=>(
@@ -5223,11 +5204,31 @@ function Board() {
                 return(<>
                   <datalist id="promo-lbl">{["명분","목적","목표","전략","전술","KPI","혜택","메시지","비고"].map((o)=><option key={o} value={o} />)}</datalist>
                   {R(d.tree||[],0)}
-                  <button type="button" className="btn ghost" style={{marginTop:10}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tSeg()]})}>+ 명분 추가 (아래에 목적·목표·전략·전술)</button>
-                  <button type="button" className="btn ghost" style={{marginTop:10,marginLeft:8}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tForm()]})}>📋 기획양식 전체 틀 불러오기</button>
+                  <button type="button" className="btn ghost" style={{marginTop:10}} onClick={()=>setPromoDraft({...d,tree:[...(d.tree||[]),tNew("")]})}>+ 항목 추가</button>
                 </>);
               })()}
             </div>
+            <div className="fld"><label>구성 <span style={{fontWeight:500,color:"var(--ink3)"}}>행사가 = 판매가 − 쿠폰 · 개당 = 행사가 ÷ 수량 · 적립금 = 행사가 × 적립률 · 할인율 = (정상가 − 행사가) ÷ 정상가</span></label>
+              <div style={{overflowX:"auto"}}>
+                <table className="itbl">
+                  <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립률(%)","적립금","할인율",""].map((h)=><th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {(d.items||[]).map((it)=>{const ic=itemCalc(it);const upd=(k)=>(e)=>setPromoDraft({...d,items:d.items.map((x)=>x.id===it.id?{...x,[k]:e.target.value}:x)});return(
+                      <tr key={it.id}>
+                        <td><input style={{minWidth:130}} value={it.name||""} onChange={upd("name")} placeholder="예) 락토컷 초코" /></td>
+                        {["qty","list","sale","coupon"].map((k)=><td key={k}><input type="number" min="0" value={it[k]??""} onChange={upd(k)} /></td>)}
+                        <td className="calc">{fWon(ic.promo)}</td><td className="calc">{fWon(ic.per)}</td>
+                        <td><input type="number" min="0" step="0.1" value={it.pr??""} onChange={upd("pr")} placeholder="예) 1" /></td>
+                        <td className="calc">{fWon(ic.point)}</td><td className="calc">{fPct(ic.disc)}</td>
+                        <td><button type="button" className="btn ghost" style={{padding:"4px 8px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,items:d.items.filter((x)=>x.id!==it.id)})}>×</button></td>
+                      </tr>);})}
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" className="btn ghost" style={{marginTop:8}} onClick={()=>setPromoDraft({...d,items:[...(d.items||[]),{id:uid(),qty:"1"}]})}>+ 상품 추가</button>
+            </div>
+            <div className="fld"><label>베네핏 <span style={{fontWeight:500,color:"var(--ink3)"}}>이 행사에서 제품을 사면 고객의 삶이 어떻게 달라질까 (무엇이 좋은가)?</span></label><textarea value={d.benefit||""} onChange={set("benefit")} placeholder="예) 당 걱정 없이 아침 대용으로 간편하게 단백질 23g 섭취" /></div>
+            <div className="fld"><label>기타 혜택·사은품 메모</label><textarea value={d.comp||""} onChange={set("comp")} placeholder="예) 쉐이커 증정, 7만원 이상 구매 시 사은품" /></div>
             <div className="psec">② 발송·성과 (입력)</div>
             <div style={g4}>{F("발송 시간","sendAt",{type:"datetime-local"})}{N("실제 발송 수","sent")}{N("읽은 고객 수","read")}{N("클릭 고객 수","click")}</div>
             <div style={g4}>{N("주문고객 수","orders")}{N("주문금액 (원)","revenue")}{N("건당 발송비 (원)","unitCost","예) 15")}{N("기타 비용 (원)","extraCost","사은품·쿠폰 등")}</div>
