@@ -851,7 +851,15 @@ const CSS = `
 .addrow input{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;}
 .hinput{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;font-family:inherit;resize:vertical;min-height:38px;max-height:160px;line-height:1.5;}
 .modal.mly{max-width:760px;}
-.modal.promo{max-width:880px;}
+.modal.promo{max-width:1440px;width:96vw;max-height:94vh;}
+.modal.promo.full{max-width:100vw;width:100vw;max-height:100vh;height:100vh;border-radius:0;}
+.modal.promo .modal-body{padding:22px 28px 28px;}
+.modal.promo h2{display:flex;align-items:center;gap:10px;padding:18px 28px 16px;}
+.modal.promo .itbl{min-width:0;}
+.modal.promo .itbl input{min-width:56px;}
+@media(min-width:1100px){.modal.promo .fld textarea{min-height:60px;}}
+.pfull{margin-left:auto;background:#EBECF0;border:none;border-radius:6px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--ink2);cursor:pointer;}
+.pfull:hover{background:#DFE1E6;}
 .itbl{border-collapse:collapse;font-size:13px;width:100%;min-width:760px;}
 .itbl th{background:#F1F2F4;padding:6px 6px;font-size:12px;text-align:center;white-space:nowrap;}
 .itbl td{padding:4px 3px;}
@@ -2434,6 +2442,7 @@ function Board() {
   const refSubOf=(cat)=>[...new Set(refs.filter((r)=>r.cat===cat).map((r)=>r.sub).filter(Boolean))].sort();
   const [refTab, setRefTab] = useState("ref");
   const [promoDraft, setPromoDraft] = useState(null);
+  const [promoFull, setPromoFull] = useState(false);
   const [promoOpen, setPromoOpen] = useState({});
   const [promoQ, setPromoQ] = useState("");
   const [promoCat, setPromoCat] = useState("전체");
@@ -5416,8 +5425,8 @@ function Board() {
           <div className="fld"><label>{label} <span style={{fontWeight:500,color:"var(--ink3)"}}>{how}</span></label>
             <input type="number" value={d.ov?.[k]??""} placeholder={a==null?"자동":`자동 ${pct?(a*100).toFixed(1)+"%":fWon(a)}`} onChange={(e)=>setPromoDraft({...d,ov:{...(d.ov||{}),[k]:e.target.value}})} style={d.ov?.[k]?{background:"#FFF7D6"}:undefined} /></div>);};
         return(
-        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setPromoDraft(null)}><div className="modal promo">
-          <h2>{d._new?"새 행사":"행사 상세"}</h2>
+        <div className="mask" style={promoFull?{padding:0}:undefined} onClick={(e)=>e.target===e.currentTarget&&setPromoDraft(null)}><div className={"modal promo"+(promoFull?" full":"")}>
+          <h2>{d._new?"새 행사":"행사 상세"}<button type="button" className="pfull" onClick={()=>setPromoFull(!promoFull)}>{promoFull?"⤡ 창 모드":"⤢ 전체 화면"}</button></h2>
           <div className="modal-body">
             <div className="psec">① 기획</div>
             <div style={g2}>{F("행사명","name",{autoFocus:true,placeholder:"예) 11월 블랙프라이데이 알림톡"})}{F("채널","channel",{placeholder:"알림톡 / 문자 / 앱푸시 / 자사몰 …",list:"promo-ch"})}</div>
