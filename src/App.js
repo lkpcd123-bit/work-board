@@ -814,6 +814,7 @@ const CSS = `
 
 /* ── 모달 ── */
 .mask{position:fixed;inset:0;background:rgba(9,30,66,.54);display:flex;align-items:center;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:50;}
+.mask:has(>.modal.promo){padding:10px;}
 .modal{background:var(--card);border-radius:12px;box-shadow:var(--sh2);width:100%;max-width:580px;padding:0;display:flex;flex-direction:column;max-height:90vh;}
 .modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;border-bottom:1px solid var(--line);}
 .modal-head h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.02em;}
@@ -852,9 +853,11 @@ const CSS = `
 .addrow input{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;}
 .hinput{flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:14px;font-family:inherit;resize:vertical;min-height:38px;max-height:160px;line-height:1.5;}
 .modal.mly{max-width:760px;}
-.modal.promo{max-width:1440px;width:96vw;max-height:94vh;}
+.modal.promo{max-width:none;width:99vw;max-height:97vh;}
 .modal.promo.full{max-width:100vw;width:100vw;max-height:100vh;height:100vh;border-radius:0;}
-.modal.promo .modal-body{padding:22px 28px 28px;}
+.modal.promo .modal-body{padding:22px 32px 28px;}
+.modal.promo.full .modal-body{padding:22px 40px 28px;}
+.modal.promo .pres,.modal.promo .pbreak{font-size:14px;}
 .modal.promo h2{display:flex;align-items:center;gap:10px;padding:18px 28px 16px;}
 .modal.promo .itbl{min-width:0;}
 .modal.promo .itbl input{min-width:56px;}
@@ -2461,7 +2464,7 @@ function Board() {
   const refSubOf=(cat)=>[...new Set(refs.filter((r)=>r.cat===cat).map((r)=>r.sub).filter(Boolean))].sort();
   const [refTab, setRefTab] = useState("ref");
   const [promoDraft, setPromoDraft] = useState(null);
-  const [promoFull, setPromoFull] = useState(false);
+  const [promoFull, setPromoFull] = useState(true);
   const [promoOpen, setPromoOpen] = useState({});
   const [promoQ, setPromoQ] = useState("");
   const [promoCat, setPromoCat] = useState("전체");
