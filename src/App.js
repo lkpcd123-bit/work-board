@@ -589,6 +589,23 @@ const promoText=(x)=>{const t=(n)=>`${n.label||""} ${n.text||""} ${(n.children||
 const fPct=(x)=>x==null?"-":(x*100).toFixed(1)+"%";
 const fPct0=(x)=>x==null?"-":Math.round(x*100)+"%";
 const fWon=(x)=>x==null?"-":Math.round(x).toLocaleString();
+const UNSAVED_KEY="wb_unsaved";
+// 저장 실패분을 브라우저에 보관 (이미지 base64는 제외해 용량 초과 방지)
+const stashUnsaved=(data)=>{
+  try{
+    const t=JSON.stringify(data).replace(/"data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+"/g,'"[img]"');
+    localStorage.setItem(UNSAVED_KEY,JSON.stringify({ts:Date.now(),json:t}));
+    return JSON.parse(t);
+  }catch(e){return null;}
+};
+const downloadJson=(obj,name)=>{
+  try{
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:"application/json"}));
+    a.download=name;document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);
+  }catch(e){}
+};
 const SLIM_KEYS = ["tasks","routines","checkitems","rItems","memoItems","monthlies","reportItems","mindmaps","refs","promos","promoProducts","inboundPlans","reorderRequests","cafe24_schedules","cafe24_schedules_kualo"];
 const TOMB_KEYS = ["id","deleted","updatedAt","createdAt"];
 const slimDeleted = (d) => {
@@ -1550,13 +1567,16 @@ function Board() {
       const out=JSON.parse(JSON.stringify(await externalizeImages(slimDeleted(merged))));
       await setDoc(BOARD_REF(),out);
       // 뒤따르는 저장이 남아 있으면 화면을 덮어쓰지 않는다 (마지막 저장이 최신 상태로 반영)
-      if(pendingRef.current===1){errShownRef.current=false;dataRef.current=out;setData(out);setSaveState("saved");setTimeout(()=>setSaveState("idle"),1500);}
+      try{localStorage.removeItem(UNSAVED_KEY);}catch(_){}
+      if(pendingRef.current===1){errShownRef.current=false;setUnsaved(null);dataRef.current=out;setData(out);setSaveState("saved");setTimeout(()=>setSaveState("idle"),1500);}
     } catch(e){
       setSaveState("error");
+      const snap=stashUnsaved(dataRef.current);   // 새로고침해도 남도록 브라우저에 보관
       if(!errShownRef.current){
         errShownRef.current=true;
+        if(snap)downloadJson(snap,`work-board-미저장-${new Date().toISOString().slice(0,16).replace(/[:T]/g,"")}.json`);
         let kb="?";try{kb=Math.round(new Blob([JSON.stringify(dataRef.current)]).size/1024);}catch(_){}
-        alert(`⚠ 저장에 실패했습니다. 이 화면의 변경 내용은 서버에 저장되지 않았고, 새로고침하면 사라집니다.\n\n원인: ${e?.code||""} ${e?.message||e}\n현재 데이터 크기: 약 ${kb}KB (Firestore 문서 한도 1,024KB)\n\n새로고침하지 말고 [JSON 내려받기]로 먼저 백업해 주세요.`);
+        alert(`⚠ 저장에 실패했습니다. 이 화면의 변경 내용은 서버에 저장되지 않았고, 새로고침하면 사라집니다.\n\n원인: ${e?.code||""} ${e?.message||e}\n현재 데이터 크기: 약 ${kb}KB (Firestore 문서 한도 1,024KB)\n\n변경 내용을 이 브라우저에 자동 보관했고 백업 파일도 내려받았습니다.\n새로고침해도 상단에 [복구하기] 버튼이 나옵니다.`);
       }
     } finally{pendingRef.current=Math.max(0,pendingRef.current-1);if(pendingRef.current===0)busyRef.current=false;}
     };
@@ -2474,6 +2494,13 @@ function Board() {
   const [refTab, setRefTab] = useState("ref");
   const [promoDraft, setPromoDraft] = useState(null);
   const [promoFull, setPromoFull] = useState(true);
+  const [unsaved, setUnsaved] = useState(()=>{try{const v=localStorage.getItem(UNSAVED_KEY);return v?JSON.parse(v):null;}catch(e){return null;}});
+  const restoreUnsaved=()=>{
+    if(!unsaved)return;
+    let snap=null;try{snap=JSON.parse(unsaved.json);}catch(e){alert("보관된 내용을 읽지 못했습니다.");return;}
+    if(!window.confirm(`${new Date(unsaved.ts).toLocaleString()} 에 저장되지 못한 변경 내용을 지금 서버에 반영할까요?\n(현재 서버 내용과 합쳐지며, 지워지는 항목은 없습니다)`))return;
+    commit((d)=>mergeData(d,snap),[mkLog("미저장 변경 복구",null,new Date(unsaved.ts).toLocaleString())]);
+  };
   const [promoOpen, setPromoOpen] = useState({});
   const [promoQ, setPromoQ] = useState("");
   const [promoCat, setPromoCat] = useState("전체");
@@ -2944,6 +2971,16 @@ function Board() {
         <button title="탭 관리" onClick={()=>setTabMgr(true)} style={{background:"none",border:"none",cursor:"pointer",fontSize:16,color:"var(--ink3)",padding:"0 6px",flexShrink:0}}>⚙</button>
       </div>
       <div className="page">
+
+      {unsaved&&(
+        <div style={{background:"#FFF7D6",border:"1.5px solid #F0B429",borderRadius:10,padding:"12px 16px",marginBottom:14,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+          <b style={{fontSize:14}}>⚠ 저장되지 못한 변경 내용이 있습니다</b>
+          <span style={{fontSize:13,color:"var(--ink2)"}}>{new Date(unsaved.ts).toLocaleString()}</span>
+          <button className="btn" style={{marginLeft:"auto"}} onClick={restoreUnsaved}>복구하기</button>
+          <button className="btn ghost" onClick={()=>{try{downloadJson(JSON.parse(unsaved.json),"work-board-미저장.json");}catch(e){}}}>파일로 내려받기</button>
+          <button className="btn ghost" onClick={()=>{if(window.confirm("보관된 미저장 내용을 지울까요? 되돌릴 수 없습니다."))
+            {try{localStorage.removeItem(UNSAVED_KEY);}catch(e){}setUnsaved(null);}}}>지우기</button>
+        </div>)}
 
       {view==="board"&&(<>
         <div className="metrics">
