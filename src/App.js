@@ -930,7 +930,20 @@ const CSS = `
 .lg-in{background:#F7F8F9;border:1px solid var(--line2);}
 .lg-au{background:#E9F2FF;border:1px solid #B3D4FF;}
 .lg-ov{background:#FFF7D6;border:1px solid #F0B429;}
-.modal.promo .psec{font-size:15px;font-weight:800;margin:26px 0 14px;padding:9px 0 9px 12px;border-top:0;border-left:4px solid #0C66E4;background:linear-gradient(90deg,#F4F8FF,transparent);border-radius:0 6px 6px 0;}
+.modal.promo .modal-body{background:#F4F5F7;}
+.modal.promo .psec{font-size:15.5px;font-weight:800;margin:24px 0 14px;padding:11px 16px;border-top:0;border-left:5px solid #0C66E4;background:#fff;border-radius:8px;box-shadow:0 1px 2px rgba(9,30,66,.08);letter-spacing:-.02em;}
+.modal.promo .psec:first-child{margin-top:0;}
+.modal.promo>.modal-body>.fld,.modal.promo .plegend{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 2px rgba(9,30,66,.08);}
+.modal.promo>.modal-body>div[style*="grid"]{background:#fff;border-radius:10px;padding:14px 16px 2px;box-shadow:0 1px 2px rgba(9,30,66,.08);margin-bottom:12px;}
+.modal.promo .plegend{padding:9px 16px;}
+.pbox>label{font-size:14px!important;font-weight:800!important;color:var(--ink)!important;display:flex!important;align-items:center;gap:7px;flex-wrap:wrap;padding-bottom:9px;margin-bottom:12px;border-bottom:1px solid var(--line);}
+.pb-ic{font-size:15px;}
+.pbox .pchk-row input[type=text],.pbox .pchk-row input:not([type]){background:#fff;border:1px solid var(--line2);}
+.pbox .pchk-row{padding:3px 0;border-radius:6px;}
+.pbox .pchk-row:hover{background:#F7F8F9;}
+.rt-row input[list]{background:#E9F2FF!important;border:1px solid #B3D4FF!important;border-radius:14px!important;text-align:center;padding:7px 8px!important;}
+.rt.sub .rt-row input[list]{background:#FFF4E5!important;border-color:#FFD9A6!important;}
+.rt-row textarea{background:#fff!important;}
 .modal.promo .psec:first-child{margin-top:0;}
 .modal.promo .fld{margin-bottom:12px;}
 .modal.promo .fld label{font-size:12px;}
@@ -5565,7 +5578,7 @@ function Board() {
             <div style={g2}>{F("시작일","date",{type:"date"})}{F("종료일","endDate",{type:"date"})}</div>
             <div style={g2}>{F("카테고리","cat",{placeholder:"예) 정기행사 / 신제품 / 시즌 / 리타겟팅",list:"promo-cat"})}</div>
             <datalist id="promo-cat">{promoCats.map((o)=><option key={o} value={o} />)}</datalist>
-            <div className="fld"><label>기획양식 <span style={{fontWeight:500,color:"var(--ink3)"}}>↳ 하위 단계 · ＋ 같은 단계 추가 · × 삭제</span></label>
+            <div className="fld pbox"><label><span className="pb-ic">🧭</span>기획양식 <span style={{fontWeight:500,color:"var(--ink3)"}}>↳ 하위 단계 · ＋ 같은 단계 추가 · × 삭제</span></label>
               {(()=>{
                 const up=(id,fn)=>setPromoDraft({...d,tree:tUpd(d.tree||[],id,fn)});
                 const R=(ns,depth)=>ns.map((n)=>(
@@ -5592,12 +5605,12 @@ function Board() {
                 </>);
               })()}
             </div>
-            <div className="fld"><label>기획안에 들어가야 할 것들 <span style={{fontWeight:500,color:"var(--ink3)"}}>기획양식과 별개로, 실제 기획안 문서에 담아야 할 내용을 자유롭게 적는 칸</span></label>
+            <div className="fld pbox"><label><span className="pb-ic">📄</span>기획안에 들어가야 할 것들 <span style={{fontWeight:500,color:"var(--ink3)"}}>기획양식과 별개로, 실제 기획안 문서에 담아야 할 내용을 자유롭게 적는 칸</span></label>
               <textarea rows={6} style={{minHeight:130}} placeholder={"예) 행사 개요 한 장\n예) 할인율·혜택 비교표\n예) 증정품 이미지와 재고 수량\n예) 교환·반품 안내 문구\n예) 채널별 노출 일정"}
                 value={d.contentsText??((d.contents||[]).map((k)=>k.text).filter(Boolean).join("\n"))}
                 onChange={(e)=>setPromoDraft({...d,contentsText:e.target.value})} />
             </div>
-            <div className="fld"><label>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)"}}>스스로 점검할 항목을 직접 적어 두세요</span></label>
+            <div className="fld pbox"><label><span className="pb-ic">✅</span>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)"}}>기획하면서 스스로 점검</span></label>
               <div className="pchk edit">
                 {(d.checks||[]).map((k)=>(
                   <div key={k.id} className="pchk-row">
