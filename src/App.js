@@ -501,7 +501,7 @@ const noteKeyDown = (e, val, set) => {
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ promos:[],tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockOrderTs:{naver:0,coupang:0},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
+const emptyData = () => ({ promos:[],promoProducts:[],tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockOrderTs:{naver:0,coupang:0},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
 // Firestore 문서 1MiB 한도 대응: 삭제된 항목은 내용을 비우고 id/deleted/시각만 남긴다.
 // (묘비는 유지 → 다른 기기의 오래된 사본이 병합 때 되살아나지 않음. 원본 내용은 일일 백업에 남아 있음)
 // 행사 손익 자동 계산. ov[k]에 값이 있으면 그 값을 우선(직접 수정), 없으면 자동값
@@ -542,9 +542,12 @@ const itemCalc=(it)=>{
   const sold=pNum(it.sold);
   return {promo,per:has&&q>0?promo/q:null,point:has&&String(it.pr??"")!==""?promo*pNum(it.pr)/100:null,disc:has&&l>0?(l-promo)/l:null,sold,rev:has&&sold>0?promo*sold:null};
 };
+// 검색 대상 텍스트(기획 트리 포함)
+const promoText=(x)=>{const t=(n)=>`${n.label||""} ${n.text||""} ${(n.children||[]).map(t).join(" ")}`;
+  return `${x.name||""} ${x.channel||""} ${x.cat||""} ${x.note||""} ${x.feedback||""} ${x.comp||""} ${(x.items||[]).map((i)=>i.name||"").join(" ")} ${(x.tree||[]).map(t).join(" ")}`.toLowerCase();};
 const fPct=(x)=>x==null?"-":(x*100).toFixed(1)+"%";
 const fWon=(x)=>x==null?"-":Math.round(x).toLocaleString();
-const SLIM_KEYS = ["tasks","routines","checkitems","rItems","memoItems","monthlies","reportItems","mindmaps","refs","promos","inboundPlans","reorderRequests","cafe24_schedules","cafe24_schedules_kualo"];
+const SLIM_KEYS = ["tasks","routines","checkitems","rItems","memoItems","monthlies","reportItems","mindmaps","refs","promos","promoProducts","inboundPlans","reorderRequests","cafe24_schedules","cafe24_schedules_kualo"];
 const TOMB_KEYS = ["id","deleted","updatedAt","createdAt"];
 const slimDeleted = (d) => {
   let n = d;
@@ -573,6 +576,7 @@ function mergeData(r,l) {
   const roMap=new Map(); [...(r.reorderRequests||[]),...(l.reorderRequests||[])].forEach(t=>{const p=roMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))roMap.set(t.id,t);});
   const refMap=new Map(); [...(r.refs||[]),...(l.refs||[])].forEach(t=>{const p=refMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))refMap.set(t.id,t);});
   const promoMap=new Map(); [...(r.promos||[]),...(l.promos||[])].forEach(t=>{const p=promoMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))promoMap.set(t.id,t);});
+  const ppMap=new Map(); [...(r.promoProducts||[]),...(l.promoProducts||[])].forEach(t=>{const p=ppMap.get(t.id);if(!p||(t.updatedAt||0)>=(p.updatedAt||0))ppMap.set(t.id,t);});
   const c24kMap=new Map(); [...(r.cafe24_schedules_kualo||[]),...(l.cafe24_schedules_kualo||[])].forEach(t=>{const p=c24kMap.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))c24kMap.set(t.id,t);});
   const c24Map=new Map(); [...(r.cafe24_schedules||[]),...(l.cafe24_schedules||[])].forEach(t=>{const p=c24Map.get(t.id);if(!p||(t.updatedAt||t.createdAt||0)>=(p.updatedAt||p.createdAt||0))c24Map.set(t.id,t);});
   const notifMap=new Map(); [...(r.notifications||[]),...(l.notifications||[])].forEach(t=>{const p=notifMap.get(t.id);if(!p||(t.updatedAt||t.ts||0)>=(p.updatedAt||p.ts||0))notifMap.set(t.id,t);});
@@ -587,6 +591,7 @@ function mergeData(r,l) {
     tabConfigUpdatedAt:Math.max(l.tabConfigUpdatedAt||0,r.tabConfigUpdatedAt||0),
     refs:[...refMap.values()],
     promos:[...promoMap.values()],
+    promoProducts:[...ppMap.values()],
     refCats:((l.updatedAt||0)>=(r.updatedAt||0)?l.refCats:r.refCats)||["디자인","마케팅","경쟁사","콘텐츠"],
     stockData:(()=>{
       const mergeStockArr=(rArr,lArr,rOrderTs,lOrderTs)=>{
@@ -824,6 +829,13 @@ const CSS = `
 .pohs{margin-left:auto;font-size:13px;color:var(--ink3);}
 .psum{display:flex;flex-wrap:wrap;gap:8px;}
 .psum i{display:block;font-style:normal;font-size:11px;color:var(--ink3);margin-top:2px;}
+.pchk{display:flex;flex-direction:column;gap:6px;}
+.pchk label{display:flex;gap:9px;align-items:flex-start;font-size:14.5px;cursor:pointer;line-height:1.5;}
+.pchk label input{width:17px;height:17px;flex:none;margin-top:2px;}
+.pchk label.on span{text-decoration:line-through;color:var(--ink3);}
+.pchk-row{display:flex;gap:8px;align-items:center;}
+.pchk-row input[type=checkbox]{width:17px;height:17px;flex:none;}
+.pchk-row input[type=text],.pchk-row input:not([type]){flex:1;background:#F7F8F9;border:1px solid var(--line2);border-radius:6px;padding:7px 10px;font-size:14px;}
 .pbars{display:flex;flex-direction:column;gap:7px;}
 .pbar-row{display:flex;align-items:center;gap:10px;font-size:13px;}
 .pbn{flex:none;width:150px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -2377,7 +2389,29 @@ function Board() {
   const [refTab, setRefTab] = useState("ref");
   const [promoDraft, setPromoDraft] = useState(null);
   const [promoOpen, setPromoOpen] = useState({});
+  const [promoQ, setPromoQ] = useState("");
+  const [promoCat, setPromoCat] = useState("전체");
   const promos=useMemo(()=>(data.promos||[]).filter((x)=>!x.deleted).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0)),[data.promos]);
+  const promoCats=useMemo(()=>[...new Set(promos.map((x)=>(x.cat||"").trim()).filter(Boolean))].sort(),[promos]);
+  const promoList=useMemo(()=>{
+    let l=promos;
+    if(promoCat!=="전체")l=l.filter((x)=>(x.cat||"").trim()===promoCat);
+    const q=promoQ.trim().toLowerCase();
+    if(q){
+      l=l.filter((x)=>promoText(x).includes(q));
+    }
+    return l;
+  },[promos,promoCat,promoQ]);
+  const savedProducts=useMemo(()=>(data.promoProducts||[]).filter((x)=>!x.deleted),[data.promoProducts]);
+  const saveProduct=(it)=>{const nm=(it.name||"").trim();if(!nm){alert("상품명을 먼저 입력해 주세요.");return;}
+    commit((d)=>{const ex=(d.promoProducts||[]).filter((x)=>!x.deleted&&x.name===nm);
+      const row={id:ex[0]?.id||uid(),name:nm,qty:it.qty,list:it.list,sale:it.sale,coupon:it.coupon,pr:it.pr,updatedAt:Date.now()};
+      return {...d,promoProducts:ex.length?(d.promoProducts||[]).map((x)=>x.id===row.id?row:x):[...(d.promoProducts||[]),row],updatedAt:Date.now()};},[]);};
+  const deleteProduct=(id)=>{if(!window.confirm("저장된 상품을 삭제할까요?"))return;commit((d)=>({...d,promoProducts:(d.promoProducts||[]).map((x)=>x.id===id?{...x,deleted:true,updatedAt:Date.now()}:x),updatedAt:Date.now()}),[]);};
+  const copyPromo=(x)=>{const strip=(ns)=>ns.map((n)=>({...n,id:uid(),done:false,children:strip(n.children||[])}));
+    setPromoDraft({_new:true,name:(x.name||"")+" (복사)",cat:x.cat,channel:x.channel,date:todayStr(),endDate:"",noSend:x.noSend,
+      tree:strip(x.tree||[]),items:(x.items||[]).map((i)=>({...i,id:uid(),sold:""})),comp:x.comp,
+      unitCost:x.unitCost,marginRate:x.marginRate,checks:(x.checks||[]).map((c)=>({...c,id:uid(),done:false})),ov:{}});};
   const savePromo=()=>{
     const {_new,...item}=promoDraft;
     if(!(item.name||"").trim()){alert("행사명을 입력해 주세요.");return;}
@@ -3438,22 +3472,26 @@ function Board() {
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
               <b style={{fontSize:15}}>행사 기획·손익</b>
               <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{},tree:tForm()})}>+ 행사 추가</button>
-              <span style={{fontSize:12,color:"var(--ink3)"}}>{promos.length}건 · 행을 누르면 수정</span>
+              <span style={{fontSize:12,color:"var(--ink3)"}}>{promoList.length===promos.length?`${promos.length}건`:`${promoList.length} / ${promos.length}건`}</span>
+              <input className="inp" style={{marginLeft:"auto",minWidth:200,maxWidth:280}} placeholder="🔍 행사명·기획·상품·메모 검색" value={promoQ} onChange={(e)=>setPromoQ(e.target.value)} />
             </div>
-            {promos.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다.</div>:(<>
+            {promoCats.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+              {["전체",...promoCats].map((c)=><button key={c} onClick={()=>setPromoCat(c)} style={chipStyle(promoCat===c,true)}>{c}</button>)}
+            </div>}
+            {promoList.length===0?<div style={{padding:"30px 0",textAlign:"center",color:"var(--ink3)",fontSize:13.5}}>{promos.length?"검색/분류 조건에 맞는 행사가 없습니다.":"아직 기록이 없습니다. [+ 행사 추가]로 기획부터 적어 두고, 발송 후 성과를 채우면 손익이 자동 계산됩니다."}</div>:(<>
             {(()=>{
-              const t=promos.reduce((a,x)=>{const c=promoCalc(x);return{sent:a.sent+pNum(x.sent),read:a.read+pNum(x.read),click:a.click+pNum(x.click),orders:a.orders+pNum(x.orders),rev:a.rev+pNum(x.revenue),cost:a.cost+c.sendCost+pNum(x.extraCost),profit:a.profit+(c.profit||0),done:a.done+((pNum(x.sent)>0||pNum(x.revenue)>0||pNum(x.orders)>0)?1:0)};},{sent:0,read:0,click:0,orders:0,rev:0,cost:0,profit:0,done:0});
+              const t=promoList.reduce((a,x)=>{const c=promoCalc(x);return{sent:a.sent+pNum(x.sent),read:a.read+pNum(x.read),click:a.click+pNum(x.click),orders:a.orders+pNum(x.orders),rev:a.rev+pNum(x.revenue),cost:a.cost+c.sendCost+pNum(x.extraCost),profit:a.profit+(c.profit||0),done:a.done+((pNum(x.sent)>0||pNum(x.revenue)>0||pNum(x.orders)>0)?1:0)};},{sent:0,read:0,click:0,orders:0,rev:0,cost:0,profit:0,done:0});
               const div=(x,y)=>y>0?x/y:null;
-              const tiles=[["행사 수",promos.length+"건",`진행 완료 ${t.done}건`],["총 주문금액",fWon(t.rev),"원"],["총 주문고객",fWon(t.orders),"명"],["평균 객단가",fWon(div(t.rev,t.orders)),"원"],["총 비용",fWon(t.cost),"원"],["총 공헌이익",fWon(t.profit),"원"],["ROAS",t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-","주문금액÷비용"],["이익률",t.rev>0?(t.profit/t.rev*100).toFixed(1)+"%":"-","공헌이익÷주문금액"]];
+              const tiles=[["행사 수",promoList.length+"건",`진행 완료 ${t.done}건`],["총 주문금액",fWon(t.rev),"원"],["총 주문고객",fWon(t.orders),"명"],["평균 객단가",fWon(div(t.rev,t.orders)),"원"],["총 비용",fWon(t.cost),"원"],["총 공헌이익",fWon(t.profit),"원"],["ROAS",t.cost>0?Math.round(t.rev/t.cost*100)+"%":"-","주문금액÷비용"],["이익률",t.rev>0?(t.profit/t.rev*100).toFixed(1)+"%":"-","공헌이익÷주문금액"]];
               const reach=[["총 발송 수",fWon(t.sent)],["평균 오픈율",fPct(div(t.read,t.sent))],["평균 CTR",fPct(div(t.click,t.sent))],["평균 CTOR",fPct(div(t.click,t.read))],["평균 CVR",fPct(div(t.orders,t.click))],["평균 구매전환율",fPct(div(t.orders,t.sent))],["건당 획득비용",fWon(div(t.cost,t.orders))]];
               // 상품별 구매 비중 (전체 행사 합산)
               const pm=new Map();
-              promos.forEach((x)=>(x.items||[]).forEach((it)=>{const ic=itemCalc(it),nm=(it.name||"").trim();if(!nm||!(ic.sold>0))return;const o=pm.get(nm)||{qty:0,rev:0,n:0};pm.set(nm,{qty:o.qty+ic.sold,rev:o.rev+(ic.rev||0),n:o.n+1});}));
+              promoList.forEach((x)=>(x.items||[]).forEach((it)=>{const ic=itemCalc(it),nm=(it.name||"").trim();if(!nm||!(ic.sold>0))return;const o=pm.get(nm)||{qty:0,rev:0,n:0};pm.set(nm,{qty:o.qty+ic.sold,rev:o.rev+(ic.rev||0),n:o.n+1});}));
               const prods=[...pm.entries()].map(([name,v])=>({name,...v})).sort((a,b)=>b.rev-a.rev||b.qty-a.qty);
               const pTot=prods.reduce((a,x)=>a+x.rev,0),qTot=prods.reduce((a,x)=>a+x.qty,0);
               // 채널별
               const cm=new Map();
-              promos.forEach((x)=>{const c=promoCalc(x),k=(x.channel||"미지정").trim()||"미지정",o=cm.get(k)||{n:0,rev:0,cost:0,profit:0,orders:0};cm.set(k,{n:o.n+1,rev:o.rev+pNum(x.revenue),cost:o.cost+c.sendCost+pNum(x.extraCost),profit:o.profit+(c.profit||0),orders:o.orders+pNum(x.orders)});});
+              promoList.forEach((x)=>{const c=promoCalc(x),k=(x.channel||"미지정").trim()||"미지정",o=cm.get(k)||{n:0,rev:0,cost:0,profit:0,orders:0};cm.set(k,{n:o.n+1,rev:o.rev+pNum(x.revenue),cost:o.cost+c.sendCost+pNum(x.extraCost),profit:o.profit+(c.profit||0),orders:o.orders+pNum(x.orders)});});
               const chans=[...cm.entries()].map(([name,v])=>({name,...v})).sort((a,b)=>b.rev-a.rev);
               return(<div className="poverall">
                 <div className="poh" onClick={()=>setPromoOpen({...promoOpen,__sum:!promoOpen.__sum})}>
@@ -3489,7 +3527,7 @@ function Board() {
                     <div className="rt-row"><span className={"rt-l"+(kids.length?" grp":"")}>{n.label}</span>{(n.text||"").trim()&&<p>{n.text}</p>}</div>
                     {kids.length>0&&<div className="rt-kids">{RT(kids,depth+1)}</div>}
                   </div>);});
-              return promos.map((x)=>{
+              return promoList.map((x)=>{
                 const c=promoCalc(x),ns=!!x.noSend,done=pNum(x.sent)>0||pNum(x.revenue)>0||(ns&&pNum(x.orders)>0),open=!!promoOpen[x.id];
                 const K=(l,v,hi)=><div className="pk"><span>{l}</span><b style={hi}>{v}</b></div>;
                 const items=(x.items||[]).filter((i)=>i.name||i.sale||i.list);
@@ -3499,14 +3537,15 @@ function Board() {
                 <div key={x.id} className={"pcard"+(open?" open":"")}>
                   <div className="phead" onClick={()=>setPromoOpen({...promoOpen,[x.id]:!open})}>
                     <span className="pchev">{open?"▾":"▸"}</span>
-                    <div className="pname">{x.name}{x.channel&&<span className="pch">{x.channel}</span>}<span className={"pst"+(done?" on":"")}>{done?(ns?"진행 완료":"발송 완료"):(ns?"진행 전":"발송 전")}</span>{ns&&<span className="pst">보내지 않음</span>}</div>
+                    <div className="pname">{x.name}{x.cat&&<span className="pch" style={{background:"#F3F0FF",color:"#5E4DB2"}}>{x.cat}</span>}{x.channel&&<span className="pch">{x.channel}</span>}<span className={"pst"+(done?" on":"")}>{done?(ns?"진행 완료":"발송 완료"):(ns?"진행 전":"발송 전")}</span>{ns&&<span className="pst">보내지 않음</span>}</div>
                     <div className="pdate">{x.date}{x.endDate&&x.endDate!==x.date?` ~ ${x.endDate}`:""}</div>
                   </div>
                   {open&&<div className="pbody">
                     <div className="pbar">
                       {!ns&&x.sendAt&&<span>발송 시간 {x.sendAt.replace("T"," ")}</span>}
                       {done&&<span>공헌이익 <b style={{color:c.profit==null?"var(--ink3)":c.profit<0?"#CA3521":"#1F845A"}}>{fWon(c.profit)}원</b></span>}
-                      <button type="button" className="btn ghost" style={{marginLeft:"auto",padding:"6px 14px"}} onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>✏️ 수정</button>
+                      <button type="button" className="btn ghost" style={{marginLeft:"auto",padding:"6px 14px"}} onClick={()=>copyPromo(x)}>📋 복사</button>
+                      <button type="button" className="btn ghost" style={{padding:"6px 14px"}} onClick={()=>setPromoDraft({...x,ov:x.ov||{}})}>✏️ 수정</button>
                     </div>
                     {(hasTree||legacy.length>0)&&<div className="psc"><h4>기획</h4>
                       {hasTree?RT(x.tree,0):legacy.map(([l,v])=><div key={l} className="rt"><div className="rt-row"><span className="rt-l">{l}</span><p>{v}</p></div></div>)}
@@ -3524,7 +3563,13 @@ function Board() {
                       <div className="pgrp"><em>구매</em>{K("주문고객",fWon(pNum(x.orders)))}{K("주문금액",fWon(pNum(x.revenue)))}{!ns&&K("CVR",fPct(c.cvr))}{!ns&&K("구매전환율",fPct(c.buyRate))}{K("객단가",fWon(c.aov))}</div>
                       <div className="pgrp"><em>손익</em>{K("비용",fWon(c.sendCost+pNum(x.extraCost)))}{K("공헌이익",fWon(c.profit),{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"})}{K("ROAS",c.roas==null?"-":Math.round(c.roas*100)+"%")}</div>
                     </div></div>:<div className="psc"><h4>성과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 결과가 없어요. [수정]에서 주문·매출을 입력하면 손익이 자동 계산돼요.</p></div>}
+                    {x.feedback&&<div className="psc"><h4>받은 피드백</h4><div className="pnote" style={{background:"#E9F2FF"}}>{x.feedback}</div></div>}
                     {x.note&&<div className="psc"><h4>특이사항·회고</h4><div className="pnote">{x.note}</div></div>}
+                    {(x.checks||[]).length>0&&<div className="psc"><h4>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— {(x.checks||[]).filter((k)=>k.done).length}/{(x.checks||[]).length} 완료 · 눌러서 체크</span></h4>
+                      <div className="pchk">{(x.checks||[]).map((k)=>(
+                        <label key={k.id} className={k.done?"on":""}>
+                          <input type="checkbox" checked={!!k.done} onChange={()=>commit((dd)=>({...dd,promos:(dd.promos||[]).map((y)=>y.id===x.id?{...y,checks:(y.checks||[]).map((z)=>z.id===k.id?{...z,done:!z.done}:z),updatedAt:Date.now()}:y),updatedAt:Date.now()}),[])} />
+                          <span>{k.text}</span></label>))}</div></div>}
                   </div>}
                 </div>);});
             })()}</div></>)}
@@ -5301,6 +5346,8 @@ function Board() {
             <div style={g2}>{F("행사명","name",{autoFocus:true,placeholder:"예) 11월 블랙프라이데이 알림톡"})}{F("채널","channel",{placeholder:"알림톡 / 문자 / 앱푸시 / 자사몰 …",list:"promo-ch"})}</div>
             <datalist id="promo-ch">{["알림톡","친구톡","문자(LMS)","앱푸시","이메일","자사몰 기획전","네이버","쿠팡","올리브영"].map((o)=><option key={o} value={o} />)}</datalist>
             <div style={g2}>{F("시작일","date",{type:"date"})}{F("종료일","endDate",{type:"date"})}</div>
+            <div style={g2}>{F("카테고리","cat",{placeholder:"예) 정기행사 / 신제품 / 시즌 / 리타겟팅",list:"promo-cat"})}</div>
+            <datalist id="promo-cat">{promoCats.map((o)=><option key={o} value={o} />)}</datalist>
             <div className="fld"><label>기획양식 <span style={{fontWeight:500,color:"var(--ink3)"}}>↳ 하위 단계 · ＋ 같은 단계 추가 · × 삭제</span></label>
               {(()=>{
                 const up=(id,fn)=>setPromoDraft({...d,tree:tUpd(d.tree||[],id,fn)});
@@ -5329,6 +5376,14 @@ function Board() {
               })()}
             </div>
             <div className="fld"><label>구성 <span style={{fontWeight:500,color:"var(--ink3)"}}>행사가 = 판매가 − 쿠폰 · 개당 = 행사가 ÷ 수량 · 적립금 = 행사가 × 적립률 · 할인율 = (정상가 − 행사가) ÷ 정상가</span></label>
+              {savedProducts.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
+                <span style={{fontSize:12,color:"var(--ink3)"}}>저장된 상품:</span>
+                {savedProducts.map((sp)=>(
+                  <span key={sp.id} style={{display:"inline-flex",alignItems:"center",gap:4,background:"#E9F2FF",borderRadius:14,padding:"3px 4px 3px 11px",fontSize:12.5,fontWeight:700,color:"#0C66E4"}}>
+                    <button type="button" style={{background:"none",border:"none",cursor:"pointer",color:"inherit",font:"inherit",padding:0}} onClick={()=>setPromoDraft({...d,items:[...(d.items||[]),{...sp,id:uid(),sold:"",deleted:undefined,updatedAt:undefined}]})}>+ {sp.name}</button>
+                    <button type="button" title="저장 목록에서 삭제" style={{background:"none",border:"none",cursor:"pointer",color:"#8993A4",padding:"0 4px"}} onClick={()=>deleteProduct(sp.id)}>×</button>
+                  </span>))}
+              </div>}
               <div style={{overflowX:"auto"}}>
                 <table className="itbl">
                   <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립률(%)","적립금","할인율","판매 수량","판매금액","비중",""].map((h)=><th key={h}>{h}</th>)}</tr></thead>
@@ -5343,7 +5398,8 @@ function Board() {
                         <td><input type="number" min="0" value={it.sold??""} onChange={upd("sold")} placeholder="판매 수" /></td>
                         <td className="calc">{fWon(ic.rev)}</td>
                         <td className="calc">{(()=>{const tot=(d.items||[]).reduce((a,y)=>a+(itemCalc(y).rev||0),0);return tot>0&&ic.rev!=null?fPct(ic.rev/tot):"-";})()}</td>
-                        <td><button type="button" className="btn ghost" style={{padding:"4px 8px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,items:d.items.filter((x)=>x.id!==it.id)})}>×</button></td>
+                        <td style={{whiteSpace:"nowrap"}}><button type="button" title="상품 저장 (다음 행사에서 바로 불러오기)" className="btn ghost" style={{padding:"4px 7px"}} onClick={()=>saveProduct(it)}>💾</button>
+                          <button type="button" className="btn ghost" style={{padding:"4px 8px",color:"#CA3521",marginLeft:4}} onClick={()=>setPromoDraft({...d,items:d.items.filter((x)=>x.id!==it.id)})}>×</button></td>
                       </tr>);})}
                   </tbody>
                 </table>
@@ -5366,7 +5422,19 @@ function Board() {
               {!d.noSend&&<><span>오픈율 <b>{fPct(c.openRate)}</b></span><span>CTR <b>{fPct(c.ctr)}</b></span><span>CTOR <b>{fPct(c.ctor)}</b></span><span>CVR <b>{fPct(c.cvr)}</b></span><span>구매전환율 <b>{fPct(c.buyRate)}</b></span></>}<span>객단가 <b>{fWon(c.aov)}</b></span><span>ROAS <b>{c.roas==null?"-":Math.round(c.roas*100)+"%"}</b></span>
               <span>공헌이익 <b style={{color:c.profit==null?undefined:c.profit<0?"#CA3521":"#1F845A"}}>{c.profit==null?"이익률 입력 필요":fWon(c.profit)+"원"}</b></span>
             </div>
-            <div className="fld" style={{marginTop:14}}><label>특이사항 · 회고</label><textarea value={d.note||""} onChange={set("note")} placeholder="잘된 점, 아쉬운 점, 다음에 바꿀 것" /></div>
+            <div className="fld" style={{marginTop:14}}><label>받은 피드백 <span style={{fontWeight:500,color:"var(--ink3)"}}>팀장·동료에게 받은 의견을 그대로 적어 두기</span></label><textarea value={d.feedback||""} onChange={set("feedback")} placeholder="예) 혜택이 한눈에 안 들어온다 — 메인 카피에 할인율 먼저" /></div>
+            <div className="fld"><label>특이사항 · 회고</label><textarea value={d.note||""} onChange={set("note")} placeholder="잘된 점, 아쉬운 점, 다음에 바꿀 것" /></div>
+            <div className="fld"><label>체크리스트 <span style={{fontWeight:500,color:"var(--ink3)"}}>스스로 점검할 항목을 직접 적어 두세요</span></label>
+              <div className="pchk edit">
+                {(d.checks||[]).map((k)=>(
+                  <div key={k.id} className="pchk-row">
+                    <input type="checkbox" checked={!!k.done} onChange={(e)=>setPromoDraft({...d,checks:d.checks.map((z)=>z.id===k.id?{...z,done:e.target.checked}:z)})} />
+                    <input value={k.text} placeholder="예) 목적이 한 줄로 설명되는가?" onChange={(e)=>setPromoDraft({...d,checks:d.checks.map((z)=>z.id===k.id?{...z,text:e.target.value}:z)})} style={{textDecoration:k.done?"line-through":"none"}} />
+                    <button type="button" className="btn ghost" style={{padding:"5px 9px",color:"#CA3521"}} onClick={()=>setPromoDraft({...d,checks:d.checks.filter((z)=>z.id!==k.id)})}>×</button>
+                  </div>))}
+                <button type="button" className="btn ghost" style={{marginTop:6}} onClick={()=>setPromoDraft({...d,checks:[...(d.checks||[]),{id:uid(),text:"",done:false}]})}>+ 체크 항목 추가</button>
+              </div>
+            </div>
           </div>
           <div className="modal-foot">
             {!d._new&&canEdit&&<button className="btn ghost" style={{color:"#CA3521"}} onClick={()=>deletePromo(d.id)}>삭제</button>}
