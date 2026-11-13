@@ -501,7 +501,7 @@ const noteKeyDown = (e, val, set) => {
 const dayDiff = (d) => !d ? null : Math.round((new Date(d+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 const fmtTs = (ts) => { const d=new Date(ts),p=(n)=>String(n).padStart(2,"0"); return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const nextDue = (due, repeat) => { const b=due?new Date(due+"T00:00:00"):new Date(); if(repeat==="daily")b.setDate(b.getDate()+1); else if(repeat==="weekly")b.setDate(b.getDate()+7); else if(repeat==="biweekly")b.setDate(b.getDate()+14); else if(repeat==="monthly")b.setMonth(b.getMonth()+1); else return due; return b.toISOString().slice(0,10); };
-const emptyData = () => ({ promos:[],promoProducts:[],tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockOrderTs:{naver:0,coupang:0},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
+const emptyData = () => ({ promos:[],promoProducts:[],promoDefaults:null,tasks:[],routines:[],checkitems:[],members:[],channels:DEFAULT_CHANNELS,channelsUpdatedAt:0,types:TYPES,typesUpdatedAt:0,monthlies:[],routineCats:["오전","오후"],routineCatsUpdatedAt:0,rItems:[],colLabels:{},colLabelsUpdatedAt:0,memoItems:[],reportItems:[],notifications:[],mindmaps:[],refs:[],refCats:["디자인","마케팅","경쟁사","콘텐츠"],stockData:{naver:[],coupang:[]},stockOrderTs:{naver:0,coupang:0},stockSafe:{},reorderRequests:[],inboundPlans:[],tabOrder:[],hiddenTabs:[],tabFolders:[],tabConfigUpdatedAt:0,edProducts:{보틀:[],대용량:[],파우치:[]},edMasterImages:{보틀:[],대용량:[],파우치:[]},edSavedSummaries:[],edUpdatedAt:0,log:[],updatedAt:0 });
 // Firestore 문서 1MiB 한도 대응: 삭제된 항목은 내용을 비우고 id/deleted/시각만 남긴다.
 // (묘비는 유지 → 다른 기기의 오래된 사본이 병합 때 되살아나지 않음. 원본 내용은 일일 백업에 남아 있음)
 // 행사 손익 자동 계산. ov[k]에 값이 있으면 그 값을 우선(직접 수정), 없으면 자동값
@@ -512,17 +512,22 @@ const DEF_COSTS=["쿠폰","사은품","바이럴","스튜디오","쇼호스트"]
 const itemCalc=(it,feeRate)=>{
   const has=String(it.sale??"")!=="";
   const promo=has?pNum(it.sale)-pNum(it.coupon):null,q=pNum(it.qty),l=pNum(it.list),sold=pNum(it.sold);
-  const rev=has&&sold>0?promo*sold:null;
-  const cost=sold*pNum(it.cost),ship=sold*pNum(it.ship),fee=rev!=null?rev*pNum(feeRate)/100:0;
-  const profit=rev!=null?rev-cost-ship-fee:null;
+  const o=(k)=>String(it[k]??"")!=="";
+  const autoRev=has&&sold>0?promo*sold:null;
+  const rev=o("revOv")?pNum(it.revOv):autoRev;
+  const cost=sold*pNum(it.cost),ship=sold*pNum(it.ship);
+  const autoFee=rev!=null?rev*pNum(feeRate)/100:0;
+  const fee=o("feeOv")?pNum(it.feeOv):autoFee;
+  const autoProfit=rev!=null?rev-cost-ship-fee:null;
+  const profit=o("profitOv")?pNum(it.profitOv):autoProfit;
   return {promo,per:has&&q>0?promo/q:null,point:has&&String(it.pr??"")!==""?promo*pNum(it.pr)/100:null,disc:has&&l>0?(l-promo)/l:null,
-    sold,rev,cost,ship,fee,profit,margin:rev>0&&profit!=null?profit/rev:null};
+    sold,rev,cost,ship,fee,profit,margin:rev>0&&profit!=null?profit/rev:null,autoRev,autoFee,autoProfit};
 };
 const promoCalc=(p)=>{
   const sent=pNum(p.sent),read=pNum(p.read),click=pNum(p.click),orders=pNum(p.orders),extra=pNum(p.extraCost);
   const ics=(p.items||[]).map((i)=>itemCalc(i,p.feeRate));
   const itemsRev=ics.reduce((a,i)=>a+(i.rev||0),0);
-  const rev=itemsRev>0?itemsRev:pNum(p.revenue);
+  const rev=String(p.revenue??"")!==""?pNum(p.revenue):itemsRev;
   const prodCost=ics.reduce((a,i)=>a+i.cost,0),shipCost=ics.reduce((a,i)=>a+i.ship,0);
   const feeCost=rev*pNum(p.feeRate)/100;
   const lines=(p.costs||[]).reduce((a,c)=>a+pNum(c.amt),0);
@@ -537,7 +542,7 @@ const promoCalc=(p)=>{
   auto.profit=detail>0?rev-totalCost:(String(p.marginRate??"")===""?null:rev*pNum(p.marginRate)/100-v.sendCost-extra);
   v.profit=has("profit")?pNum(ov.profit):auto.profit;
   v.roas=div(rev,totalCost);
-  return {...v,auto,ics,rev,prodCost,shipCost,feeCost,lines,vat,extra,totalCost,margin:rev>0&&v.profit!=null?v.profit/rev:null};
+  return {...v,auto,ics,itemsRev,rev,prodCost,shipCost,feeCost,lines,vat,extra,totalCost,margin:rev>0&&v.profit!=null?v.profit/rev:null};
 };
 // 전략 트리: 노드 {id,label,text,children}. fn은 노드를 받아 교체할 노드(배열이면 여러 개)나 null(삭제)을 반환
 const tUpd=(ns,id,fn)=>ns.flatMap((n)=>n.id===id?[].concat(fn(n)||[]):[{...n,children:tUpd(n.children||[],id,fn)}]);
@@ -606,6 +611,7 @@ function mergeData(r,l) {
     refs:[...refMap.values()],
     promos:[...promoMap.values()],
     promoProducts:[...ppMap.values()],
+    promoDefaults:((l.promoDefaults?.updatedAt||0)>=(r.promoDefaults?.updatedAt||0)?l.promoDefaults:r.promoDefaults)||null,
     refCats:((l.updatedAt||0)>=(r.updatedAt||0)?l.refCats:r.refCats)||["디자인","마케팅","경쟁사","콘텐츠"],
     stockData:(()=>{
       const mergeStockArr=(rArr,lArr,rOrderTs,lOrderTs)=>{
@@ -2438,6 +2444,23 @@ function Board() {
     setPromoDraft({_new:true,name:(x.name||"")+" (복사)",cat:x.cat,channel:x.channel,date:todayStr(),endDate:"",noSend:x.noSend,
       tree:strip(x.tree||[]),items:(x.items||[]).map((i)=>({...i,id:uid(),sold:""})),comp:x.comp,
       unitCost:x.unitCost,marginRate:x.marginRate,checks:(x.checks||[]).map((c)=>({...c,id:uid(),done:false})),ov:{}});};
+  const promoDefaults=data.promoDefaults||null;
+  const newPromo=()=>{const t=promoDefaults;
+    return {_new:true,date:todayStr(),name:"",ov:{},tree:t?.tree?JSON.parse(JSON.stringify(t.tree)):tForm(),
+      checks:(t?.checks||[]).map((k)=>({...k,id:uid(),done:false})),costs:(t?.costs||[]).map((k)=>({...k,id:uid()})),
+      cat:t?.cat||"",channel:t?.channel||"",feeRate:t?.feeRate||"",vatRate:t?.vatRate||"",unitCost:t?.unitCost||"",marginRate:t?.marginRate||"",
+      items:(t?.items||[]).map((i)=>({...i,id:uid(),sold:"",revOv:"",feeOv:"",profitOv:""}))};};
+  const saveDefaults=(x)=>{
+    if(!window.confirm("지금 화면의 기획양식·체크리스트·비용 항목·요율·구성 상품을 다음 행사부터 기본으로 사용할까요?\n(이 행사 내용은 그대로 유지됩니다)"))return;
+    const strip=(ns)=>(ns||[]).map((n)=>({...n,done:false,children:strip(n.children)}));
+    commit((d)=>({...d,promoDefaults:{tree:strip(x.tree),checks:(x.checks||[]).map((k)=>({...k,done:false})),
+      costs:(x.costs||[]).map((k)=>({name:k.name,amt:""})),cat:x.cat||"",channel:x.channel||"",
+      feeRate:x.feeRate||"",vatRate:x.vatRate||"",unitCost:x.unitCost||"",marginRate:x.marginRate||"",
+      items:(x.items||[]).map((i)=>({name:i.name,qty:i.qty,list:i.list,sale:i.sale,coupon:i.coupon,pr:i.pr,cost:i.cost,ship:i.ship})),
+      updatedAt:Date.now()},updatedAt:Date.now()}),[]);
+    alert("저장했어요. 다음 [+ 행사 추가]부터 이 양식으로 시작합니다.");};
+  const clearDefaults=()=>{if(!window.confirm("저장된 기본 양식을 지울까요? 다음 행사부터 처음 양식으로 돌아갑니다."))return;
+    commit((d)=>({...d,promoDefaults:null,updatedAt:Date.now()}),[]);};
   const savePromo=()=>{
     const {_new,...item}=promoDraft;
     if(!(item.name||"").trim()){alert("행사명을 입력해 주세요.");return;}
@@ -3497,7 +3520,7 @@ function Board() {
           <div className="panel" style={{padding:"14px 16px"}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
               <b style={{fontSize:15}}>행사 기획·손익</b>
-              <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={()=>setPromoDraft({_new:true,date:todayStr(),name:"",ov:{},tree:tForm()})}>+ 행사 추가</button>
+              <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={()=>setPromoDraft(newPromo())}>+ 행사 추가</button>
               <span style={{fontSize:12,color:"var(--ink3)"}}>{promoList.length===promos.length?`${promos.length}건`:`${promoList.length} / ${promos.length}건`}</span>
               <input className="inp" style={{marginLeft:"auto",minWidth:200,maxWidth:280}} placeholder="🔍 행사명·기획·상품·메모 검색" value={promoQ} onChange={(e)=>setPromoQ(e.target.value)} />
             </div>
@@ -5477,15 +5500,15 @@ function Board() {
                           <td><input type="number" min="0" value={it.sold??""} onChange={upd("sold")} placeholder="0" /></td>
                           <td><input type="number" min="0" value={it.cost??""} onChange={upd("cost")} placeholder="원가" /></td>
                           <td><input type="number" min="0" value={it.ship??""} onChange={upd("ship")} placeholder="배송" /></td>
-                          <td className="calc">{fWon(ic.rev)}</td><td className="calc">{fWon(ic.fee||null)}</td>
-                          <td className="calc" style={{color:ic.profit==null?undefined:ic.profit<0?"#CA3521":"#1F845A"}}>{fWon(ic.profit)}</td>
+                          {[["revOv",ic.autoRev],["feeOv",ic.autoFee],["profitOv",ic.autoProfit]].map(([k,a])=>(
+                            <td key={k}><input type="number" value={it[k]??""} placeholder={a==null?"자동":"자동 "+fWon(a)} onChange={upd(k)} style={String(it[k]??"")!==""?{background:"#FFF7D6"}:undefined} /></td>))}
                           <td className="calc">{fPct(ic.margin)}</td>
                           <td className="calc">{qt>0&&ic.sold>0?fPct(ic.sold/qt):"-"}</td>
                         </tr>);});})()}
                     </tbody>
                   </table>
                 </div>}
-            {!(d.items||[]).some((i)=>pNum(i.sold)>0)&&<div style={g4}>{N("주문금액 (원)","revenue","상품별 판매수량을 넣으면 자동")}</div>}
+            <div style={g4}><div className="fld"><label>전체 매출 (원) <span style={{fontWeight:500,color:"var(--ink3)"}}>비우면 상품별 합계</span></label><input type="number" min="0" value={d.revenue??""} placeholder={c.itemsRev>0?"자동 "+fWon(c.itemsRev):"0"} onChange={set("revenue")} style={String(d.revenue??"")!==""?{background:"#FFF7D6"}:undefined} /></div></div>
             <div className="fld"><label>프로모션·기타 비용</label>
               <div className="pcost">
                 {(d.costs||[]).map((cl)=>(
@@ -5523,6 +5546,8 @@ function Board() {
           </div>
           <div className="modal-foot">
             {!d._new&&canEdit&&<button className="btn ghost" style={{color:"#CA3521"}} onClick={()=>deletePromo(d.id)}>삭제</button>}
+            <button className="btn ghost" title="지금 양식을 다음 행사부터 기본으로 사용" onClick={()=>saveDefaults(d)}>🔖 다음 행사부터 적용</button>
+            {promoDefaults&&<button className="btn ghost" style={{fontSize:12.5}} onClick={clearDefaults}>기본 양식 초기화</button>}
             <button className="btn ghost" style={{marginLeft:"auto"}} onClick={()=>setPromoDraft(null)}>닫기</button>
             <button style={{background:"#0C66E4",color:"#fff",border:"none",padding:"8px 16px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={savePromo}>저장</button>
           </div>
