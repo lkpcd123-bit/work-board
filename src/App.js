@@ -507,13 +507,13 @@ const emptyData = () => ({ promos:[],promoProducts:[],promoDefaults:null,tasks:[
 // 행사 손익 자동 계산. ov[k]에 값이 있으면 그 값을 우선(직접 수정), 없으면 자동값
 const pNum=(v)=>{const n=parseFloat(String(v??"").replace(/,/g,""));return isFinite(n)?n:0;};
 const PROMO_PCT=["openRate","ctr","ctor","cvr","buyRate"];
-const DEF_COSTS=["쿠폰","사은품","바이럴","스튜디오","쇼호스트"];
+const DEF_COSTS=["바이럴","스튜디오","쇼호스트","촬영비","모델비"];
  const DEF_CHECKS=["목적이 한 줄로 설명되는가?","이 문구를 고객이 이해할까?","지금 이 정보가 ‘지금’ 필요한가?","상사가 지적했던 포인트가 반영됐는가?","이전 반려 사유를 다시 밟고 있진 않은가?","새로움 또는 기존에서 업그레이드가 되었는가?"];
 const DEF_COLS=["판관비","광고비","찜쿠폰","파우치","보틀","매출VAT"];
 // 상품별 비용 열: 기본 제품가·배송비 + 사용자가 추가한 열 (세트당 금액 × 판매수량)
 const colVal=(it,c)=>pNum(c.id==="cost"?it.cost:c.id==="ship"?it.ship:(it.cv||{})[c.id]);
 const promoSales=(p)=>p.sales||(p.items||[]).filter((i)=>pNum(i.sold)>0);
-const promoCols=(p)=>(p&&p.cols)||[{id:"cost",name:"제품가"},{id:"ship",name:"배송비"}];
+const promoCols=(p)=>(p&&p.cols)||[{id:"cost",name:"제품가"},{id:"ship",name:"배송비"},{id:"gift",name:"사은품"},{id:"cpn",name:"쿠폰"}];
 // 상품 한 줄: 매출 = 행사가×판매수량, 비용 = 제품가·배송비(수량분) + 수수료(매출×수수료율)
 const itemCalc=(it,feeRate,cols)=>{
   const has=String(it.sale??"")!=="";
@@ -527,10 +527,12 @@ const itemCalc=(it,feeRate,cols)=>{
   const cost=each.cost||0,ship=each.ship||0;
   const autoFee=rev!=null?rev*pNum(feeRate)/100:0;
   const fee=o("feeOv")?pNum(it.feeOv):autoFee;
-  const autoProfit=rev!=null?rev-colSum-fee:null;
+  const base=rev!=null?rev-colSum-fee:null;
+  const vat=base!=null?Math.max(0,base)/11:0;
+  const autoProfit=base!=null?base-vat:null;
   const profit=o("profitOv")?pNum(it.profitOv):autoProfit;
   return {promo,per:has&&q>0?promo/q:null,point:has&&String(it.pr??"")!==""?promo*pNum(it.pr)/100:null,disc:has&&l>0?(l-promo)/l:null,
-    sold,rev,cost,ship,each,colSum,fee,profit,margin:rev>0&&profit!=null?profit/rev:null,autoRev,autoFee,autoProfit};
+    sold,rev,cost,ship,each,colSum,fee,vat,profit,margin:rev>0&&profit!=null?profit/rev:null,autoRev,autoFee,autoProfit};
 };
 const promoCalc=(p)=>{
   const sent=pNum(p.sent),read=pNum(p.read),click=pNum(p.click),extra=pNum(p.extraCost);
@@ -545,7 +547,7 @@ const promoCalc=(p)=>{
   const orders=String(p.orders??"")!==""?pNum(p.orders):soldQty;
   const feeCost=rev*pNum(p.feeRate)/100;
   const lines=(p.costs||[]).reduce((a,c)=>a+pNum(c.amt),0);
-  const autoVat=String(p.vatRate??"")!==""?rev*pNum(p.vatRate)/100:0;
+  const autoVat=String(p.vatRate??"")!==""?rev*pNum(p.vatRate)/100:ics.reduce((a,i)=>a+i.vat,0);
   const vat=String(p.vatAmt??"")!==""?pNum(p.vatAmt):autoVat;
   const div=(a,b)=>b>0?a/b:null;
   const ov=p.ov||{},has=(k)=>ov[k]!==undefined&&ov[k]!=="";
@@ -5562,7 +5564,7 @@ function Board() {
             </>}
             <div className="psec">④ 총 결과 (입력) <span style={{fontWeight:500,color:"var(--ink3)",fontSize:12}}>— 무엇이 얼마나 팔렸는지 넣으면 매출·공헌이익이 자동 계산됩니다</span></div>
             <div className="plegend"><span><i className="lg-in" />직접 입력</span><span><i className="lg-au" />자동 계산</span><span><i className="lg-ov" />자동값을 내가 고침</span></div>
-            <div style={g4}><div className="fld"><label>주문고객 수 <span style={{fontWeight:500,color:"var(--ink3)"}}>비우면 판매수량 합계</span></label><input className={String(d.orders??"")!==""?"inp-ov":"inp-auto"} type="number" min="0" value={d.orders??""} placeholder={c.soldQty>0?fWon(c.soldQty):"0"} onChange={set("orders")} /></div>{N("수수료율 (%)","feeRate","예) 3.85")}<div className="fld"><label>매출 VAT</label><div style={{display:"flex",gap:6}}><input style={{width:"42%"}} type="number" value={d.vatRate??""} placeholder="율 %" onChange={set("vatRate")} /><input className={String(d.vatAmt??"")!==""?"inp-ov":"inp-auto"} type="number" value={d.vatAmt??""} placeholder={fWon(c.autoVat)} onChange={set("vatAmt")} /></div></div>{N("기타 비용 (원)","extraCost","위 항목에 없는 비용")}</div>
+            <div style={g4}><div className="fld"><label>주문고객 수 <span style={{fontWeight:500,color:"var(--ink3)"}}>비우면 판매수량 합계</span></label><input className={String(d.orders??"")!==""?"inp-ov":"inp-auto"} type="number" min="0" value={d.orders??""} placeholder={c.soldQty>0?fWon(c.soldQty):"0"} onChange={set("orders")} /></div>{N("수수료율 (%)","feeRate","예) 3.85")}<div className="fld"><label>매출 VAT <span style={{fontWeight:500,color:"var(--ink3)"}}>자동 = (매출−비용−수수료)÷11</span></label><div style={{display:"flex",gap:6}}><input style={{width:"38%"}} type="number" value={d.vatRate??""} placeholder="율 %(선택)" onChange={set("vatRate")} /><input className={String(d.vatAmt??"")!==""?"inp-ov":"inp-auto"} type="number" value={d.vatAmt??""} placeholder={fWon(c.autoVat)} onChange={set("vatAmt")} /></div></div>{N("기타 비용 (원)","extraCost","위 항목에 없는 비용")}</div>
             {(()=>{const cols=promoCols(d),rows=d.sales||[],qt=rows.reduce((a,y)=>a+pNum(y.sold),0);
               const setRows=(r)=>setPromoDraft({...d,sales:r});
               const setCols=(ncols)=>setPromoDraft({...d,cols:ncols});
