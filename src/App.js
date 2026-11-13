@@ -967,7 +967,7 @@ const CSS = `
 .psum{display:flex;flex-wrap:wrap;gap:8px;}
 .psum i{display:block;font-style:normal;font-size:11px;color:var(--ink3);margin-top:2px;}
 .pbreak{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;}
-.pbreak>div{flex:1;min-width:92px;background:#F7F8F9;border-radius:8px;padding:8px 11px;}
+.pbreak>div{flex:1;min-width:92px;background:#F7F8F9;border:1px solid var(--line);border-radius:8px;padding:8px 11px;}
 .pbreak>div.hi{background:#FFF7D6;}
 .pbreak>div.pf{background:#E3FCEF;min-width:120px;}
 .pbreak span{display:block;font-size:11.5px;color:var(--ink3);}
@@ -1003,7 +1003,19 @@ const CSS = `
 .pchev{color:var(--ink3);font-size:14px;width:14px;}
 .pcard .pdate{margin:0 0 0 auto;white-space:nowrap;}
 .pbody{padding:2px 22px 20px;border-top:1px solid var(--line);}
-.pbar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;font-size:13.5px;color:var(--ink2);padding:12px 0;}
+.pbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13.5px;color:var(--ink2);padding:12px 0 14px;}
+.pbc{display:inline-flex;align-items:baseline;gap:7px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 12px;}
+.pbc em{font-style:normal;font-size:11.5px;color:var(--ink3);font-weight:700;}
+.pbc b{font-size:14px;font-weight:800;}
+.pbody{background:#F4F5F7;margin:0 -22px -20px;padding:2px 22px 20px;}
+.pcard.open .phead{background:#fff;border-bottom:1px solid var(--line);}
+.psc{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 2px rgba(9,30,66,.07);margin-top:12px;}
+.psc h4{margin:0 0 12px;}
+.rt-l{display:inline-block;background:#E9F2FF;color:#0055CC;border-radius:12px;padding:3px 11px;font-size:12.5px;font-weight:800;min-width:78px;text-align:center;}
+.rt.sub>.rt-row>.rt-l{background:#FFF4E5;color:#9E4C00;}
+.rt-row{align-items:center;padding:3px 0;}
+.rt-row p{color:var(--ink);}
+.pmemo{background:#F7F8F9;border-left:3px solid var(--line2);}
 .psc{margin-top:16px;}
 .psc h4{margin:0 0 10px;font-size:13px;font-weight:800;color:#0C66E4;letter-spacing:-.01em;padding-bottom:6px;border-bottom:2px solid #E9F2FF;}
 .rt{margin-bottom:9px;}
@@ -3751,8 +3763,10 @@ function Board() {
                   </div>
                   {open&&<div className="pbody">
                     <div className="pbar">
-                      {!ns&&x.sendAt&&<span>발송 시간 {x.sendAt.replace("T"," ")}</span>}
-                      {done&&<span>공헌이익 <b style={{color:c.profit==null?"var(--ink3)":c.profit<0?"#CA3521":"#1F845A"}}>{fWon(c.profit)}원</b></span>}
+                      {(()=>{const chips=[["기간",`${x.date||"-"}${x.endDate&&x.endDate!==x.date?` ~ ${x.endDate}`:""}`],
+                        ...(ns?[]:[["발송",x.sendAt?x.sendAt.replace("T"," "):(pNum(x.sent)>0?fWon(pNum(x.sent))+"건":"미입력")]]),
+                        ...(done?[["주문",fWon(c.orders)+"명"],["매출",fWon(c.rev)+"원"],["공헌이익",fWon(c.profit)+"원"],["이익률",fPct(c.margin)]]:[["결과","아직 입력 전"]])];
+                        return chips.map(([l,v])=>(<span key={l} className="pbc"><em>{l}</em><b style={l==="공헌이익"?{color:c.profit==null?"var(--ink3)":c.profit<0?"#CA3521":"#1F845A"}:undefined}>{v}</b></span>));})()}
                       <button type="button" className="btn ghost" style={{marginLeft:"auto",padding:"6px 14px"}} onClick={()=>copyPromo(x)}>📋 복사</button>
                       <button type="button" className="btn ghost" style={{padding:"6px 14px"}} onClick={()=>setPromoDraft({...x,ov:x.ov||{},sales:promoSales(x).map((i)=>({...i,id:i.id||uid()}))})}>✏️ 수정</button>
                     </div>
