@@ -589,14 +589,38 @@ const promoText=(x)=>{const t=(n)=>`${n.label||""} ${n.text||""} ${(n.children||
 const fPct=(x)=>x==null?"-":(x*100).toFixed(1)+"%";
 const fPct0=(x)=>x==null?"-":Math.round(x*100)+"%";
 const fWon=(x)=>x==null?"-":Math.round(x).toLocaleString();
-const UNSAVED_KEY="wb_unsaved";
+const UNSAVED_KEY="wb_unsaved",LASTGOOD_KEY="wb_last_good",BK_KEEP=2;
+const stripImgs=(obj)=>JSON.parse(JSON.stringify(obj).replace(/"data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+"/g,'"[img]"'));
+// 일일 백업은 최신 BK_KEEP개만 남긴다 (예전엔 계속 쌓여 저장 공간이 차서 새 백업이 기록되지 않았음)
+const pruneBackups=(keep=BK_KEEP)=>{
+  try{
+    const ks=Object.keys(localStorage).filter((k)=>k.startsWith("wb_daily_backup_")).sort();
+    ks.slice(0,Math.max(0,ks.length-keep)).forEach((k)=>localStorage.removeItem(k));
+    return ks.length;
+  }catch(e){return 0;}
+};
+// 용량이 부족하면 오래된 백업부터 지우고 다시 시도
+const lsSet=(key,val)=>{
+  for(let i=0;i<4;i++){
+    try{localStorage.setItem(key,val);return true;}
+    catch(e){if(pruneBackups(Math.max(0,BK_KEEP-1-i))===0)return false;}
+  }
+  return false;
+};
 // 저장 실패분을 브라우저에 보관 (이미지 base64는 제외해 용량 초과 방지)
 const stashUnsaved=(data)=>{
   try{
-    const t=JSON.stringify(data).replace(/"data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+"/g,'"[img]"');
-    localStorage.setItem(UNSAVED_KEY,JSON.stringify({ts:Date.now(),json:t}));
+    const t=JSON.stringify(stripImgs(data));
+    lsSet(UNSAVED_KEY,JSON.stringify({ts:Date.now(),json:t}));
     return JSON.parse(t);
   }catch(e){return null;}
+};
+// 저장에 성공할 때마다 마지막 정상 상태를 보관 (5분에 한 번)
+let lastGoodAt=0;
+const keepLastGood=(data)=>{
+  if(Date.now()-lastGoodAt<300000)return;
+  lastGoodAt=Date.now();
+  try{lsSet(LASTGOOD_KEY,JSON.stringify({ts:Date.now(),json:JSON.stringify(stripImgs(data))}));}catch(e){}
 };
 const downloadJson=(obj,name)=>{
   try{
@@ -1500,11 +1524,8 @@ function Board() {
               const bkData=JSON.parse(JSON.stringify(p));
               // refs 이미지 제외
               if(Array.isArray(bkData.refs))bkData.refs=bkData.refs.map((r)=>({...r,images:(r.images||[]).map((img)=>({...img,src:'[img]'}))}));
-              try{localStorage.setItem(bkKey,JSON.stringify(bkData));
-                // 어제 백업은 삭제
-                const yd=new Date();yd.setDate(yd.getDate()-1);const ydStr=yd.toISOString().slice(0,10);
-                localStorage.removeItem(`wb_daily_backup_${ydStr}`);
-              }catch(e){}
+              pruneBackups(BK_KEEP-1);
+              lsSet(bkKey,JSON.stringify(bkData));
             }
           }catch(e){}
           const merged=mergeData(p,emptyData());
@@ -1565,9 +1586,15 @@ function Board() {
       if(remote){Object.keys(remote).forEach((k)=>{if(!(k in merged))merged[k]=remote[k];});}
       // JSON 왕복으로 undefined 필드 제거 (Firestore가 undefined를 거부함) + 삭제 항목 비우기 + 큰 이미지는 드라이브로
       const out=JSON.parse(JSON.stringify(await externalizeImages(slimDeleted(merged))));
+      // 안전장치: 서버에 있던 항목보다 줄어드는 저장은 거부 (버그로 인한 대량 유실 방지)
+      if(remote){
+        const lost=SLIM_KEYS.filter((k)=>Array.isArray(remote[k])&&Array.isArray(out[k])&&out[k].length<remote[k].length);
+        if(lost.length)throw new Error(`안전장치가 저장을 막았습니다 (${lost.join(", ")} 항목이 줄어듦). 새로고침 후 다시 시도해 주세요.`);
+      }
       await setDoc(BOARD_REF(),out);
       // 뒤따르는 저장이 남아 있으면 화면을 덮어쓰지 않는다 (마지막 저장이 최신 상태로 반영)
       try{localStorage.removeItem(UNSAVED_KEY);}catch(_){}
+      keepLastGood(out);
       if(pendingRef.current===1){errShownRef.current=false;setUnsaved(null);dataRef.current=out;setData(out);setSaveState("saved");setTimeout(()=>setSaveState("idle"),1500);}
     } catch(e){
       setSaveState("error");
@@ -2495,6 +2522,12 @@ function Board() {
   const [promoDraft, setPromoDraft] = useState(null);
   const [promoFull, setPromoFull] = useState(true);
   const [unsaved, setUnsaved] = useState(()=>{try{const v=localStorage.getItem(UNSAVED_KEY);return v?JSON.parse(v):null;}catch(e){return null;}});
+  const dlLastGood=()=>{
+    try{const v=JSON.parse(localStorage.getItem(LASTGOOD_KEY)||"null");
+      if(!v){alert("보관된 백업이 아직 없습니다.");return;}
+      downloadJson(JSON.parse(v.json),`work-board-백업-${new Date(v.ts).toISOString().slice(0,16).replace(/[:T]/g,"")}.json`);
+    }catch(e){alert("백업을 읽지 못했습니다.");}
+  };
   const restoreUnsaved=()=>{
     if(!unsaved)return;
     let snap=null;try{snap=JSON.parse(unsaved.json);}catch(e){alert("보관된 내용을 읽지 못했습니다.");return;}
@@ -5290,6 +5323,7 @@ function Board() {
         <div className="panel"><h3>백업</h3><p className="sub">주기적으로 내려받아 두세요.</p>
           <div style={{display:"flex",gap:7}}>
             <button className="btn ghost" onClick={exportJson}>JSON 내려받기</button>
+            <button className="btn ghost" onClick={dlLastGood} title="마지막으로 저장에 성공한 상태를 파일로 내려받기">직전 백업 내려받기</button>
             {isAdmin&&<button className="btn ghost" onClick={()=>importRef.current?.click()}>JSON 가져오기</button>}
             <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={(e)=>{const f=e.target.files?.[0];if(f)importJson(f);e.target.value="";}} />
           </div>
