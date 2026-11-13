@@ -3784,7 +3784,6 @@ function Board() {
                         <label key={k.id} className={k.done?"on":""}>
                           <input type="checkbox" checked={!!k.done} onChange={()=>commit((dd)=>({...dd,promos:(dd.promos||[]).map((y)=>y.id===x.id?{...y,checks:(y.checks||[]).map((z)=>z.id===k.id?{...z,done:!z.done}:z),updatedAt:Date.now()}:y),updatedAt:Date.now()}),[])} />
                           <span>{k.text}</span></label>))}</div></div>}
-                  </div>}
                     {items.length>0&&<div className="psc"><h4>구성</h4>
                       <div style={{overflowX:"auto"}}><table className="rtbl">
                         <thead><tr>{["상품명","수량","정상가","판매가","쿠폰","행사가","개당 가격","적립금","할인율"].map((h)=><th key={h}>{h}</th>)}</tr></thead>
@@ -3814,6 +3813,7 @@ function Board() {
                     </div>:<div className="psc"><h4>총 결과</h4><p className="pmemo" style={{background:"#F1F2F4"}}>아직 결과가 없어요. [수정] → <b>총 결과</b>에서 상품별 판매수량을 넣으면 매출·공헌이익이 자동 계산돼요.</p></div>}
                     {x.feedback&&<div className="psc"><h4>받은 피드백</h4><div className="pnote" style={{background:"#E9F2FF"}}>{x.feedback}</div></div>}
                     {x.note&&<div className="psc"><h4>특이사항·회고</h4><div className="pnote">{x.note}</div></div>}
+                  </div>}
                 </div>);});
             })()}</div></>)}
           </div>
