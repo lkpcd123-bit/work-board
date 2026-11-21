@@ -2975,7 +2975,7 @@ function Board() {
         <span className="spacer" />
         <button className="who" onClick={()=>setPwChange({cur:"",next:"",next2:""})} title="비밀번호 변경">
           <span className="av">{(me||"?").slice(0,1)}</span>
-          {me||"이름 설정"}<span className="role">{ROLES.find((r)=>r.id===myRole)?.label}</span>
+          {me||"이름 설정"}
         </button>
         <span className="save"><i className={"dot "+(saveState==="error"?"err":saveState==="idle"?"":"on")} />{saveState==="saving"?"저장 중":saveState==="saved"?"저장됨":saveState==="error"?"저장 실패":saveState==="loading"?"불러오는 중":"동기화됨"}</span>
         <button className="ghostw" onClick={()=>load()}>새로고침</button>
