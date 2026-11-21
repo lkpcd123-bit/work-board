@@ -5246,16 +5246,14 @@ function Board() {
       )}
 
       {view==="team"&&(<>
-        <div className="panel"><h3>팀원과 권한</h3><p className="sub">관리자/멤버/뷰어 3단계.</p>
+        <div className="panel"><h3>접속 계정</h3><p className="sub">현재 로그인할 수 있는 사용자 목록입니다. (권한 구분 없음)</p>
           {data.members.length===0&&<div className="empty">팀원이 없습니다</div>}
           {data.members.map((m)=>(
             <div key={m.name} className="mrow" style={{borderTop:"1px solid var(--line)"}}>
               <span style={{fontWeight:600,fontSize:13,minWidth:90}}>{m.name}{m.name===me&&<span style={{fontSize:10,color:"#8F959C",fontFamily:"monospace"}}> (나)</span>}</span>
               <span style={{fontSize:11,fontFamily:"monospace",color:m.pw?"var(--ok)":"var(--warn)"}}>{m.pw?"🔒 설정됨":"⚠ 비번없음"}</span>
-              <select className="sel" value={m.role} disabled={!isAdmin} onChange={(e)=>{const role=e.target.value;commit((d)=>({...d,members:d.members.map((x)=>x.name===m.name?{...x,role,updatedAt:Date.now()}:x)}),[mkLog("권한 변경",null,`${m.name} -> ${ROLES.find((r)=>r.id===role).label}`)]);}}>
-                {ROLES.map((r)=><option key={r.id} value={r.id}>{r.label}</option>)}
-              </select>
-              <span className="spacer" />{isAdmin&&m.name!==me&&<button className="del" onClick={()=>{if(window.confirm(`"${m.name}" 님을 팀에서 내보낼까요? 로그인할 수 없게 됩니다.`))commit((d)=>({...d,members:d.members.filter((x)=>x.name!==m.name)}),[mkLog("팀원 삭제",null,m.name)]);}}>내보내기</button>}
+              <span className="spacer" />
+              {m.name!==me&&<button className="del" onClick={()=>{if(window.confirm(`"${m.name}" 님을 내보낼까요?`))commit((d)=>({...d,members:d.members.filter((x)=>x.name!==m.name)}),[mkLog("팀원 삭제",null,m.name)]);}}>삭제</button>}
             </div>
           ))}
         </div>
