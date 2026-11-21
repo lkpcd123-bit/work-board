@@ -47,7 +47,7 @@ const DEFAULT_CHANNELS = [
 const TYPES = ["상품기획","채널운영","마케팅","상세페이지","공급사","인플루언서","데이터분석","기타"];
 const PRIORITIES = [{ id:"urgent",label:"가장 먼저",rank:0 },{ id:"high",label:"높음",rank:1 },{ id:"mid",label:"보통",rank:2 },{ id:"low",label:"낮음",rank:3 }];
 const REPEATS = [{ id:"none",label:"반복 없음" },{ id:"daily",label:"매일" },{ id:"weekly",label:"매주" },{ id:"biweekly",label:"격주" },{ id:"monthly",label:"매월" }];
-const ROLES = [{ id:"admin",label:"관리자" },{ id:"member",label:"멤버" },{ id:"viewer",label:"뷰어" }];
+const ROLES = [{ id:"admin",label:"관리자" }];
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
@@ -1701,7 +1701,7 @@ function Board() {
     if(loginPw!==signupPw2){alert("비밀번호가 일치하지 않습니다.");return;}
     const exist=dataRef.current.members.find((m)=>m.name===n);
     if(exist&&exist.pw){alert("이미 비밀번호가 설정된 이름입니다. 로그인을 사용하세요.");return;}
-    const role=dataRef.current.members.length===0?"admin":(exist?exist.role:"member");
+    const role=dataRef.current.members.length===0?"admin":(exist?exist.role:"viewer");
     commit((d)=>{const list=d.members||[];const ex=list.find((m)=>m.name===n);
       return{...d,members:ex?list.map((m)=>m.name===n?{...m,pw:loginPw,updatedAt:Date.now()}:m):[...list,{name:n,role,pw:loginPw,updatedAt:Date.now()}]};},
       [{id:uid(),ts:Date.now(),who:n,taskId:null,taskTitle:"",action:exist?"비밀번호 설정":"계정 생성",detail:ROLES.find((r)=>r.id===role).label}]);
