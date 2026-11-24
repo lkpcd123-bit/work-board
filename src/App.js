@@ -1741,7 +1741,7 @@ function Board() {
     if(isNew)logs.push(mkLog("업무 생성",clean,`${clean.channel} · ${clean.type}`));
     else{const diffs=[];if(before){if(before.title!==clean.title)diffs.push("업무명");if(before.status!==clean.status)diffs.push(`상태 -> ${cols.find((c)=>c.id===clean.status)?.label}`);if(before.owner!==clean.owner)diffs.push(`담당자 -> ${clean.owner||"미지정"}`);if(before.due!==clean.due)diffs.push(`마감 -> ${clean.due||"없음"}`);if(before.priority!==clean.priority)diffs.push("우선순위");if(before.channel!==clean.channel)diffs.push(`채널 -> ${clean.channel}`);if((before.comments||[]).length!==(clean.comments||[]).length)diffs.push("댓글");}logs.push(mkLog("업무 수정",clean,diffs.join(", ")||"내용 변경"));}
     let spawn=null;
-    if(clean.status==="done"&&before?.status!=="done"&&clean.repeat!=="none"){spawn={...clean,id:uid(),status:"todo",due:nextDue(clean.due,clean.repeat),checklist:(clean.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}
+    if(clean.status==="done"&&before?.status!=="done"&&clean.repeat!=="none"){spawn={...clean,remindAt:"",id:uid(),status:"todo",due:nextDue(clean.due,clean.repeat),checklist:(clean.checklist||[]).map((c)=>({...c,id:uid(),done:false})),comments:[],createdAt:now,createdBy:me,updatedAt:now,doneAt:null};logs.push(mkLog("반복 생성",spawn,`다음 마감 ${spawn.due}`));}
     commit((d)=>{const ex=d.tasks.some((t)=>t.id===clean.id);const rec={...clean,createdAt:before?.createdAt||now,createdBy:before?.createdBy||me,updatedAt:now,updatedBy:me,doneAt:clean.status==="done"?(before?.doneAt||now):null};let tasks=ex?d.tasks.map((t)=>t.id===rec.id?rec:t):[rec,...d.tasks];if(spawn)tasks=[spawn,...tasks];return{...d,tasks};},logs);
     // 중간 저장: 창을 유지하고 신규 → 기존 업무로 전환 (이후 저장은 수정으로 처리)
     if(close)setDraft(null);else setDraft({...clean,createdAt:before?.createdAt||now,createdBy:before?.createdBy||me,updatedAt:now,updatedBy:me});
@@ -2878,6 +2878,24 @@ function Board() {
     };
     check();
     const iv=setInterval(check,5*60*1000);
+    return()=>clearInterval(iv);
+  },[notifOn,data.tasks,me,notify,getNotified,markNotified]);
+  /* 업무별 지정 시각 알림 (탭이 열려있을 때) */
+  useEffect(()=>{
+    if(!notifOn||!me)return;
+    const check=()=>{
+      const now=Date.now();
+      data.tasks.forEach((t)=>{
+        if(t.deleted||t.archived||t.status==="done"||!t.remindAt)return;
+        if(t.owner!==me&&t.createdBy!==me)return;
+        const at=new Date(t.remindAt).getTime();
+        if(isNaN(at)||at>now)return;
+        const key=`remind:${t.id}:${t.remindAt}`;
+        if(!getNotified().has(key)){notify("⏰ 알림",`"${t.title}"${t.due?` (마감 ${t.due.slice(5)})`:""}`);markNotified(key);}
+      });
+    };
+    check();
+    const iv=setInterval(check,30*1000);
     return()=>clearInterval(iv);
   },[notifOn,data.tasks,me,notify,getNotified,markNotified]);
   useEffect(()=>{const h=(e)=>{if(e.key==="Escape"){setDraft(null);setConfirmBox(null);}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
@@ -6087,6 +6105,12 @@ function Board() {
           <div className="r2">
             <div className="fld"><label>시작일</label><input type="date" disabled={!canEdit} value={draft.start||""} onChange={(e)=>setDraft({...draft,start:e.target.value})} /></div>
             <div className="fld"><label>마감일</label><input type="date" disabled={!canEdit} value={draft.due} onChange={(e)=>setDraft({...draft,due:e.target.value})} /></div>
+          </div>
+          <div className="fld"><label>⏰ 알림 시각 {!notifOn&&<span style={{color:"var(--danger)",fontWeight:400}}>(상단 알림을 켜야 울려요)</span>}</label>
+            <div style={{display:"flex",gap:6}}>
+              <input type="datetime-local" disabled={!canEdit} value={draft.remindAt||""} onChange={(e)=>setDraft({...draft,remindAt:e.target.value})} style={{flex:1}} />
+              {draft.remindAt&&canEdit&&<button type="button" className="btn" onClick={()=>setDraft({...draft,remindAt:""})}>지우기</button>}
+            </div>
           </div>
           <div className="r3">
             <div className="fld"><label>우선순위</label><select disabled={!canEdit} value={draft.priority} onChange={(e)=>setDraft({...draft,priority:e.target.value})}>{PRIORITIES.map((p)=><option key={p.id} value={p.id}>{p.label}</option>)}</select></div>
