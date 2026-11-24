@@ -2845,13 +2845,14 @@ function Board() {
   useEffect(()=>{
     if(!notifOn){prevTasksRef.current=data.tasks;return;}
     const prev=prevTasksRef.current;
-    if(prev){
+    if(prev&&prev.length){
       const prevMap=new Map(prev.map((t)=>[t.id,t]));
       data.tasks.forEach((t)=>{
         if((t.boardId||"공용")!=="공용"||t.deleted)return;
         const p=prevMap.get(t.id);
         if(!p){
-          if(t.owner===me&&t.createdBy&&t.createdBy!==me)notify("새 업무가 배정됐어요",`${t.createdBy}님이 "${t.title}" 업무를 배정했습니다.`);
+          const k=`new:${t.id}`;
+          if(t.owner===me&&t.createdBy&&t.createdBy!==me&&!getNotified().has(k)){notify("새 업무가 배정됐어요",`${t.createdBy}님이 "${t.title}" 업무를 배정했습니다.`);markNotified(k);}
           return;
         }
         if(t.updatedBy===me)return;
@@ -2861,7 +2862,7 @@ function Board() {
       });
     }
     prevTasksRef.current=data.tasks;
-  },[data.tasks,notifOn,me,notify]);
+  },[data.tasks,notifOn,me,notify,getNotified,markNotified]);
 
   useEffect(()=>{
     if(!notifOn)return;
