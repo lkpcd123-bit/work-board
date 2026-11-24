@@ -6061,7 +6061,7 @@ function Board() {
       )}
 
       {draft&&(
-        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setDraft(null)}><div className="modal">
+        <div className="mask" onClick={(e)=>e.target===e.currentTarget&&setDraft(null)}><div className="modal" style={{maxWidth:900}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
             <h2 style={{margin:0}}>{draft._new?"새 업무":"업무 상세"}</h2>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -6174,22 +6174,22 @@ function Board() {
                 {h.image&&<img src={h.image} alt="" style={{maxWidth:"100%",maxHeight:240,borderRadius:8,cursor:"pointer",marginTop:6,border:"1px solid var(--line)"}} onClick={()=>setLightbox(h.image)} />}
                 {h.editing
                   ? <div style={{display:"flex",gap:6,marginTop:4}}>
-                      <input defaultValue={h.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14}}
+                      <textarea defaultValue={h.text} autoFocus style={{flex:1,border:"1px solid var(--line2)",borderRadius:6,padding:"6px 9px",fontSize:14,minHeight:120,maxHeight:480,resize:"vertical",fontFamily:"inherit",lineHeight:1.5}}
                         onKeyDown={(e)=>{
                           if(e.nativeEvent.isComposing)return;
-                          if(e.key==="Enter"){const v=e.target.value.trim();if(v)setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,text:v,edited:true,editing:false}:x)});}
+                          if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();const v=e.target.value.trim();if(v)setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,text:v,edited:true,editing:false}:x)});}
                           if(e.key==="Escape")setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:false}:x)});
                         }} />
                       <button className="btn ghost" onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:false}:x)})}>취소</button>
                     </div>
-                  : h.text&&<p>{h.text}</p>}
+                  : h.text&&<p style={{whiteSpace:"pre-wrap"}}>{h.text}</p>}
                 {canEdit&&!h.editing&&<div style={{display:"flex",gap:10,marginTop:3}}>
                   {!h.image&&<button style={{background:"none",border:"none",color:"var(--ink3)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.map((x)=>x.id===h.id?{...x,editing:true}:x)})}>수정</button>}
                   <button style={{background:"none",border:"none",color:"var(--danger)",fontSize:12,cursor:"pointer",padding:0}} onClick={()=>setDraft({...draft,history:draft.history.filter((x)=>x.id!==h.id)})}>삭제</button>
                 </div>}
               </div>
             ))}
-            {canEdit&&<div className="addrow"><textarea className="hinput" placeholder="진행 상황·메모 입력 (Enter 전송, Shift+Enter 줄바꿈 / 이미지 Ctrl+V 붙여넣기 가능)"
+            {canEdit&&<div className="addrow"><textarea className="hinput" placeholder="진행 상황·메모 입력 (Enter 전송, Shift+Enter 줄바꿈 / 이미지 Ctrl+V 붙여넣기 가능)" style={{minHeight:140,maxHeight:480}}
               onPaste={async(e)=>{
                 const items=Array.from(e.clipboardData.items||[]);
                 const imgItem=items.find((i)=>i.type.startsWith("image/"));
