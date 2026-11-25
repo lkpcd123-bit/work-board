@@ -1499,15 +1499,14 @@ function Board() {
   const notifiedRef = useRef(null);
   const getNotified = useCallback(() => {
     if(notifiedRef.current) return notifiedRef.current;
-    const key = `wb-notified-${todayStr()}`;
-    try { const s=localStorage.getItem(key); notifiedRef.current=new Set(s?JSON.parse(s):[]); }
+    try { const s=localStorage.getItem("wb-notified"); notifiedRef.current=new Set(s?JSON.parse(s):[]); }
     catch(e) { notifiedRef.current=new Set(); }
     return notifiedRef.current;
   }, []);
   const markNotified = useCallback((id) => {
     const set = getNotified();
     set.add(id);
-    try { localStorage.setItem(`wb-notified-${todayStr()}`,JSON.stringify([...set])); } catch(e) {}
+    try { localStorage.setItem("wb-notified",JSON.stringify([...set].slice(-500))); } catch(e) {}
   }, [getNotified]);
   const [mlyDraft, setMlyDraft] = useState(null);
   const [mlyHistEditId, setMlyHistEditId] = useState(null);
@@ -2871,9 +2870,9 @@ function Board() {
         if((t.boardId||"공용")!=="공용"||t.deleted||t.archived||t.status==="done"||t.owner!==me||!t.due)return;
         const dd=dayDiff(t.due);if(dd===null)return;
         let key=null,ttl=null,body=null;
-        if(dd<0){key=`overdue:${t.id}`;ttl="마감이 지났어요";body=`"${t.title}" 마감 ${Math.abs(dd)}일 지남`;}
-        else if(dd===0){key=`due0:${t.id}`;ttl="오늘 마감이에요";body=`"${t.title}"`;}
-        else if(dd===1){key=`due1:${t.id}`;ttl="마감이 임박했어요";body=`"${t.title}" 내일 마감`;}
+        if(dd<0){key=`overdue:${t.id}:${t.due}`;ttl="마감이 지났어요";body=`"${t.title}" 마감 ${Math.abs(dd)}일 지남`;}
+        else if(dd===0){key=`due0:${t.id}:${t.due}`;ttl="오늘 마감이에요";body=`"${t.title}"`;}
+        else if(dd===1){key=`due1:${t.id}:${t.due}`;ttl="마감이 임박했어요";body=`"${t.title}" 내일 마감`;}
         if(key&&!getNotified().has(key)){notify(ttl,body);markNotified(key);}
       });
     };
