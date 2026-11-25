@@ -2891,8 +2891,12 @@ function Board() {
         if(t.owner!==me&&t.createdBy!==me)return;
         const at=new Date(t.remindAt).getTime();
         if(isNaN(at)||at>now)return;
-        const key=`remind:${t.id}:${t.remindAt}`;
-        if(!getNotified().has(key)){notify("⏰ 알림",`"${t.title}"${t.due?` (마감 ${t.due.slice(5)})`:""}`);markNotified(key);}
+        const key=`${t.id}:${t.remindAt}`;
+        let seen=[];try{seen=JSON.parse(localStorage.getItem("wb-reminded")||"[]");}catch(e){}
+        if(!seen.includes(key)){
+          notify("⏰ 알림",`"${t.title}"${t.due?` (마감 ${t.due.slice(5)})`:""}`);
+          try{localStorage.setItem("wb-reminded",JSON.stringify([...seen,key].slice(-300)));}catch(e){}
+        }
       });
     };
     check();
